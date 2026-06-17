@@ -337,6 +337,7 @@ export function DirectiveContent({ text }: { text: string }) {
       return { cleanedText: text ?? '', images: [] }
     }
   }, [text])
+
   const segments = useMemo(() => {
     try {
       return hermesDirectiveFormatter.parse(cleanedText)

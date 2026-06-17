@@ -1,7 +1,7 @@
 'use client'
 
 import type { SyntaxHighlighterProps } from '@assistant-ui/react-streamdown'
-import type { FC } from 'react'
+import { type FC, useMemo } from 'react'
 import ShikiHighlighter from 'react-shiki'
 
 import {
@@ -12,6 +12,7 @@ import {
   CodeCardSubtitle,
   CodeCardTitle
 } from '@/components/chat/code-card'
+import { ExpandableBlock } from '@/components/chat/expandable-block'
 import { CopyButton } from '@/components/ui/copy-button'
 import { useI18n } from '@/i18n'
 import { codiconForLanguage, isLikelyProseCodeBlock, sanitizeLanguageTag } from '@/lib/markdown-code'
@@ -43,6 +44,87 @@ const SHIKI_COLOR_REPLACEMENTS: Record<string, Record<string, string>> = {
   'github-light-default': { '#6e7781': '#57606a' }
 }
 
+// Shiki tokenizes every line into a tree of spans, so a pathologically large
+// block (a logged bundle, a huge tool dump) emits millions of DOM nodes and
+// freezes the renderer. Past a generous budget we skip highlighting and render
+// the block as plain text (see PlainCode) — all content preserved, just
+// unstyled. The block stays fully in the DOM; we never drop content.
+const MAX_HIGHLIGHT_CHARS = 150_000
+const MAX_HIGHLIGHT_LINES = 3_000
+
+export function exceedsHighlightBudget(code: string): boolean {
+  if (code.length > MAX_HIGHLIGHT_CHARS) {
+    return true
+  }
+
+  let lines = 1
+  let idx = code.indexOf('\n')
+
+  while (idx !== -1) {
+    if ((lines += 1) > MAX_HIGHLIGHT_LINES) {
+      return true
+    }
+
+    idx = code.indexOf('\n', idx + 1)
+  }
+
+  return false
+}
+
+// Plain (un-highlighted) code renderer. For oversized blocks we split into
+// fixed line-chunks and let the browser virtualize them natively via
+// `content-visibility: auto` — it skips layout/paint for off-screen chunks
+// while keeping every line in the DOM (selectable, find-in-page, a11y intact).
+// Chunking is what makes this scale: one element per ~200 lines keeps the node
+// count low (content-visibility itself degrades past ~20k elements), instead of
+// one giant element whose single layout pass is the freeze we're avoiding.
+const CHUNK_LINES = 200
+const EST_LINE_PX = 16
+
+interface CodeChunk {
+  text: string
+  lines: number
+}
+
+export function chunkByLines(code: string, perChunk: number): CodeChunk[] {
+  const lines = code.split('\n')
+
+  if (lines.length <= perChunk) {
+    return [{ text: code, lines: lines.length }]
+  }
+
+  const chunks: CodeChunk[] = []
+
+  for (let i = 0; i < lines.length; i += perChunk) {
+    const slice = lines.slice(i, i + perChunk)
+    chunks.push({ text: slice.join('\n'), lines: slice.length })
+  }
+
+  return chunks
+}
+
+const PlainCode: FC<{ code: string }> = ({ code }) => {
+  const chunks = useMemo(() => chunkByLines(code, CHUNK_LINES), [code])
+
+  if (chunks.length === 1) {
+    return <code className="block whitespace-pre">{code}</code>
+  }
+
+  return (
+    <>
+      {chunks.map((chunk, index) => (
+        <code
+          className="block whitespace-pre [content-visibility:auto]"
+          key={index}
+          style={{ containIntrinsicSize: `auto ${chunk.lines * EST_LINE_PX}px` }}
+        >
+          {chunk.text}
+        </code>
+      ))}
+    </>
+  )
+}
+
 export const SyntaxHighlighter: FC<HermesSyntaxHighlighterProps> = ({
   components: { Pre },
   language,
@@ -64,6 +146,7 @@ export const SyntaxHighlighter: FC<HermesSyntaxHighlighterProps> = ({
 
   const cleanLanguage = sanitizeLanguageTag(language || '')
   const label = cleanLanguage && cleanLanguage !== 'unknown' ? cleanLanguage : ''
+  const plain = defer || exceedsHighlightBudget(trimmed)
 
   return (
     <CodeCard data-streaming={defer ? 'true' : undefined}>
@@ -83,24 +166,26 @@ export const SyntaxHighlighter: FC<HermesSyntaxHighlighterProps> = ({
         />
       </CodeCardHeader>
       <CodeCardBody>
-        <Pre className="aui-shiki m-0 overflow-hidden bg-transparent p-0">
-          {defer ? (
-            <code className="block whitespace-pre">{trimmed}</code>
-          ) : (
-            <ShikiHighlighter
-              addDefaultStyles={false}
-              as="div"
-              colorReplacements={SHIKI_COLOR_REPLACEMENTS}
-              defaultColor="light-dark()"
-              delay={120}
-              language={language || 'text'}
-              showLanguage={false}
-              theme={SHIKI_THEME}
-            >
-              {trimmed}
-            </ShikiHighlighter>
-          )}
-        </Pre>
+        <ExpandableBlock>
+          <Pre className="aui-shiki m-0 overflow-hidden bg-transparent p-0">
+            {plain ? (
+              <PlainCode code={trimmed} />
+            ) : (
+              <ShikiHighlighter
+                addDefaultStyles={false}
+                as="div"
+                colorReplacements={SHIKI_COLOR_REPLACEMENTS}
+                defaultColor="light-dark()"
+                delay={120}
+                language={language || 'text'}
+                showLanguage={false}
+                theme={SHIKI_THEME}
+              >
+                {trimmed}
+              </ShikiHighlighter>
+            )}
+          </Pre>
+        </ExpandableBlock>
       </CodeCardBody>
     </CodeCard>
   )

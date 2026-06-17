@@ -19,8 +19,9 @@ import {
   useState
 } from 'react'
 
+import { ExpandableBlock } from '@/components/chat/expandable-block'
 import { PreviewAttachment } from '@/components/chat/preview-attachment'
-import { SyntaxHighlighter } from '@/components/chat/shiki-highlighter'
+import { chunkByLines, SyntaxHighlighter } from '@/components/chat/shiki-highlighter'
 import { ZoomableImage } from '@/components/chat/zoomable-image'
 import { normalizeExternalUrl, openExternalLink, PrettyLink } from '@/lib/external-link'
 import { createMemoizedMathPlugin } from '@/lib/katex-memo'
@@ -462,8 +463,47 @@ const MARKDOWN_CONTAINER_CLASS_NAME = cn(
   '[&>*:first-child]:mt-0 [&>*:last-child]:mb-0 [&>*+*]:mt-(--paragraph-gap)'
 )
 
+// A single pathological message (a multi-MB tool dump / logged bundle) runs the
+// whole markdown pipeline — preprocess regex passes + `marked` lex over the
+// entire string — synchronously inside Streamdown's useMemo, freezing the tab
+// before anything paints (content-visibility can't help: our JS runs before the
+// browser ever gets to skip layout). Past this budget we bypass markdown and
+// render the raw text in content-visibility chunks: synchronous work is bounded
+// to string-splitting, and the browser virtualizes the layout natively. No
+// content is dropped — every line stays in the DOM, selectable and findable.
+const MAX_MARKDOWN_CHARS = 200_000
+const HUGE_TEXT_CHUNK_LINES = 200
+const HUGE_TEXT_EST_LINE_PX = 18
+
+function HugeTextFallback({ containerClassName, text }: { containerClassName?: string; text: string }) {
+  const chunks = useMemo(() => chunkByLines(text, HUGE_TEXT_CHUNK_LINES), [text])
+
+  return (
+    <div
+      className={cn(
+        // Bounded, collapsible raw-text surface — mirrors a code card so an
+        // oversized dump stays a small block in the transcript.
+        'aui-md w-full max-w-none overflow-hidden rounded-[0.625rem] border border-border font-mono text-[0.7rem] leading-relaxed text-foreground/90',
+        containerClassName
+      )}
+    >
+      <ExpandableBlock className="p-2">
+        {chunks.map((chunk, index) => (
+          <div
+            className="[content-visibility:auto]"
+            key={index}
+            style={{ containIntrinsicSize: `auto ${chunk.lines * HUGE_TEXT_EST_LINE_PX}px` }}
+          >
+            {chunk.text}
+          </div>
+        ))}
+      </ExpandableBlock>
+    </div>
+  )
+}
+
 function MarkdownTextSurface({ containerClassName, containerProps }: MarkdownTextSurfaceProps) {
-  const { status } = useMessagePartText()
+  const { status, text } = useMessagePartText()
   const isStreaming = status.type === 'running'
 
   // Keep code parsing enabled while streaming so incomplete fenced blocks still
@@ -541,6 +581,12 @@ function MarkdownTextSurface({ containerClassName, containerProps }: MarkdownTex
       }) as StreamdownTextComponents,
     [isStreaming]
   )
+
+  // Gate after hooks (never before — hook order must stay stable across the
+  // stream as `text` grows past the budget).
+  if (text.length > MAX_MARKDOWN_CHARS) {
+    return <HugeTextFallback containerClassName={containerClassName} text={text} />
+  }
 
   return (
     <StreamdownTextPrimitive
