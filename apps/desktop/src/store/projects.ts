@@ -5,7 +5,9 @@ import {
   type ChatGroup,
   createChatGroup,
   deleteChatGroup,
+  getSession,
   listChatGroups,
+  type SessionInfo,
   unassignConversation,
   updateChatGroup
 } from '@/hermes'
@@ -70,6 +72,44 @@ export async function refreshProjects(): Promise<void> {
   }
 }
 
+// Backend group rows carry only `session_ids`, not titles. Project members that
+// fall outside the loaded recent-sessions page would otherwise render as a raw
+// id prefix (e.g. today's date "20260618"). This cache holds session metadata
+// fetched by id so those rows show the real chat title. `null` marks a member
+// that 404'd (e.g. deleted) so we don't refetch it every render.
+export const $projectSessionMeta = atom<Record<string, null | SessionInfo>>({})
+
+const inFlightSessionMeta = new Set<string>()
+
+// Fetch + cache metadata for any member ids not already known (loaded in a
+// session list) and not already cached or in-flight. Best-effort and fire-and-
+// forget: each resolved fetch updates the cache, re-rendering subscribers.
+export function ensureProjectMemberSessions(ids: string[], knownIds: Set<string>): void {
+  const cache = $projectSessionMeta.get()
+  const missing = ids.filter(
+    id => !knownIds.has(id) && !(id in cache) && !inFlightSessionMeta.has(id)
+  )
+
+  if (missing.length === 0) {
+    return
+  }
+
+  for (const id of missing) {
+    inFlightSessionMeta.add(id)
+
+    getSession(id)
+      .then(info => {
+        $projectSessionMeta.set({ ...$projectSessionMeta.get(), [id]: info })
+      })
+      .catch(() => {
+        $projectSessionMeta.set({ ...$projectSessionMeta.get(), [id]: null })
+      })
+      .finally(() => {
+        inFlightSessionMeta.delete(id)
+      })
+  }
+}
+
 export async function createProject(input: {
   description?: string
   instructions?: string
@@ -94,6 +134,33 @@ export async function updateProject(
 export async function deleteProject(id: string): Promise<void> {
   await deleteChatGroup(id)
   await refreshProjects()
+}
+
+// Persist a new project order from a sidebar drag. Reorder $projects optimistically
+// (the drag should feel instant) then write each row's position to the backend.
+// position = array index, so the list re-renders in the dragged order and the
+// next refresh returns it in the same order. A failed persist refreshes back to
+// the server's truth rather than leaving the UI lying.
+export async function reorderProjects(orderedIds: string[]): Promise<void> {
+  const current = $projects.get()
+  const byId = new Map(current.map(project => [project.id, project]))
+  const reordered = orderedIds.map(id => byId.get(id)).filter((p): p is ChatGroup => p !== undefined)
+
+  if (reordered.length !== current.length) {
+    return
+  }
+
+  $projects.set(reordered.map((project, index) => ({ ...project, position: index })))
+
+  try {
+    await Promise.all(
+      reordered.map((project, index) =>
+        project.position === index ? null : updateChatGroup(project.id, { position: index })
+      )
+    )
+  } catch {
+    await refreshProjects()
+  }
 }
 
 export async function addSessionToProject(projectId: string, sessionId: string): Promise<void> {

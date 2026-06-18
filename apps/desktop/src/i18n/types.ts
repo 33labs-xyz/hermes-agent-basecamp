@@ -957,6 +957,32 @@ export interface Translations {
         capacityTitle: string
         capacityUsage: (used: number, max: number) => string
         capacityFull: string
+        composerPlaceholder: string
+        composerSend: string
+        projectActions: string
+        scheduledTitle: string
+        scheduledEmpty: string
+        scheduledAdd: string
+        scheduledCancel: string
+        scheduledCreate: string
+        scheduledCreated: string
+        scheduledCreateFailed: string
+        scheduledLoadFailed: string
+        scheduledToggleFailed: string
+        scheduledDeleted: string
+        scheduledDelete: string
+        scheduledDeleteFailed: string
+        scheduledPause: string
+        scheduledPaused: string
+        scheduledResume: string
+        scheduledNoCadence: string
+        scheduledPromptLabel: string
+        scheduledPromptPlaceholder: string
+        scheduledCadenceLabel: string
+        scheduledCadencePlaceholder: string
+        contextTitle: string
+        memoryTitle: string
+        memoryEmpty: string
       }
     }
     groupAriaGrouped: string

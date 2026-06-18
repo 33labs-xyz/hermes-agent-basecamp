@@ -107,6 +107,34 @@ async def test_list_cron_jobs_specific_profile_filters_results(isolated_profiles
 
 
 @pytest.mark.asyncio
+async def test_create_cron_job_persists_group_id_and_list_filters(isolated_profiles):
+    from hermes_cli import web_server
+    from hermes_cli.web_server import CronJobCreate
+
+    scoped = await web_server.create_cron_job(
+        CronJobCreate(
+            prompt="project weekly digest",
+            schedule="every 1h",
+            name="proj-digest",
+            group_id="proj_xyz",
+        ),
+        profile="default",
+    )
+    await web_server.create_cron_job(
+        CronJobCreate(prompt="unscoped global", schedule="every 2h", name="global-job"),
+        profile="default",
+    )
+
+    assert scoped["group_id"] == "proj_xyz"
+
+    scoped_jobs = await web_server.list_cron_jobs(profile="all", group_id="proj_xyz")
+    assert [job["id"] for job in scoped_jobs] == [scoped["id"]]
+
+    all_jobs = await web_server.list_cron_jobs(profile="all")
+    assert len(all_jobs) == 2
+
+
+@pytest.mark.asyncio
 async def test_cron_mutation_without_profile_finds_named_profile_job(isolated_profiles):
     from hermes_cli import web_server
 

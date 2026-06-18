@@ -233,6 +233,9 @@ def _normalize_job_record(job: Dict[str, Any]) -> Dict[str, Any]:
         state = "scheduled" if normalized.get("enabled", True) else "paused"
     normalized["state"] = state
 
+    group_id = _coerce_job_text(normalized.get("group_id")).strip()
+    normalized["group_id"] = group_id or None
+
     return normalized
 
 
@@ -626,6 +629,7 @@ def create_job(
     enabled_toolsets: Optional[List[str]] = None,
     workdir: Optional[str] = None,
     no_agent: bool = False,
+    group_id: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Create a new cron job.
@@ -704,6 +708,8 @@ def create_job(
     normalized_toolsets = normalized_toolsets or None
     normalized_workdir = _normalize_workdir(workdir)
     normalized_no_agent = bool(no_agent)
+    normalized_group_id = str(group_id).strip() if isinstance(group_id, str) else None
+    normalized_group_id = normalized_group_id or None
 
     # no_agent jobs are meaningless without a script — the script IS the job.
     # Surface this as a clear ValueError at create time so bad configs never
@@ -757,6 +763,10 @@ def create_job(
         "origin": origin,  # Tracks where job was created for "origin" delivery
         "enabled_toolsets": normalized_toolsets,
         "workdir": normalized_workdir,
+        # Optional chat_group (project) this job belongs to. None = global job
+        # not scoped to any project. Lets the desktop Projects view list a
+        # project's scheduled tasks without a per-job migration.
+        "group_id": normalized_group_id,
     }
 
     with _jobs_lock():

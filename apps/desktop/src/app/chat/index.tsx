@@ -154,6 +154,26 @@ function ChatHeader({
             'calc(100vw - var(--titlebar-content-inset,0px) - var(--titlebar-tools-right) - var(--titlebar-tools-width) - 1.5rem)'
         }}
       >
+        {ownerProject && (
+          <>
+            <button
+              className="pointer-events-auto flex shrink-0 items-center gap-1 bg-transparent text-(--ui-text-tertiary) hover:text-foreground [-webkit-app-region:no-drag]"
+              onClick={() => navigate(projectRoute(ownerProject.id))}
+              title={ownerProject.name}
+              type="button"
+            >
+              <Codicon className="shrink-0" name="folder" size="0.6875rem" />
+              <span className="min-w-0 max-w-[8rem] truncate text-[0.6875rem] font-medium leading-none">
+                {ownerProject.name}
+              </span>
+            </button>
+            <Codicon
+              className="shrink-0 text-(--ui-text-quaternary)"
+              name="chevron-right"
+              size="0.6875rem"
+            />
+          </>
+        )}
         <SessionActionsMenu
           align="start"
           onDelete={selectedSessionId ? onDeleteSelectedSession : undefined}
@@ -172,17 +192,6 @@ function ChatHeader({
             <Codicon className="shrink-0 text-(--ui-text-tertiary)" name="chevron-down" size="0.8125rem" />
           </Button>
         </SessionActionsMenu>
-        {ownerProject && (
-          <button
-            className="pointer-events-auto flex h-6 min-w-0 max-w-[12rem] items-center gap-1 rounded-md border border-transparent px-1.5 text-(--ui-text-tertiary) hover:border-(--ui-stroke-tertiary) hover:bg-(--ui-control-hover-background) hover:text-foreground [-webkit-app-region:no-drag]"
-            onClick={() => navigate(projectRoute(ownerProject.id))}
-            title={ownerProject.name}
-            type="button"
-          >
-            <Codicon className="shrink-0" name="folder" size="0.75rem" />
-            <span className="min-w-0 truncate text-[0.6875rem] font-medium leading-none">{ownerProject.name}</span>
-          </button>
-        )}
       </div>
     </header>
   )

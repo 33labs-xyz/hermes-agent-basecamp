@@ -527,6 +527,12 @@ export function getCronJobs(): Promise<CronJob[]> {
   })
 }
 
+export function getCronJobsForGroup(groupId: string): Promise<CronJob[]> {
+  return window.hermesDesktop.api<CronJob[]>({
+    path: `/api/cron/jobs?group_id=${encodeURIComponent(groupId)}`
+  })
+}
+
 export function getCronJob(jobId: string): Promise<CronJob> {
   return window.hermesDesktop.api<CronJob>({
     path: `/api/cron/jobs/${encodeURIComponent(jobId)}`

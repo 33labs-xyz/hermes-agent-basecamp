@@ -440,6 +440,7 @@ export interface AnalyticsTotals {
 export interface CronJob {
   deliver?: null | string
   enabled: boolean
+  group_id?: null | string
   id: string
   last_error?: null | string
   last_run_at?: null | string
@@ -454,6 +455,7 @@ export interface CronJob {
 
 export interface CronJobCreatePayload {
   deliver?: string
+  group_id?: string
   name?: string
   prompt: string
   schedule: string

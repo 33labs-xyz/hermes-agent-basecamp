@@ -6972,6 +6972,7 @@ class CronJobCreate(BaseModel):
     name: str = ""
     deliver: str = "local"
     skills: Optional[List[str]] = None
+    group_id: Optional[str] = None
 
 
 class CronJobUpdate(BaseModel):
@@ -7059,10 +7060,17 @@ def _find_cron_job_profile(job_id: str) -> Optional[str]:
 
 
 @app.get("/api/cron/jobs")
-async def list_cron_jobs(profile: str = "all"):
+async def list_cron_jobs(profile: str = "all", group_id: Optional[str] = None):
+    group_filter = (group_id or "").strip() or None
+
+    def _scope(items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        if group_filter is None:
+            return items
+        return [j for j in items if j.get("group_id") == group_filter]
+
     requested = (profile or "all").strip()
     if requested.lower() != "all":
-        return _call_cron_for_profile(requested, "list_jobs", True)
+        return _scope(_call_cron_for_profile(requested, "list_jobs", True))
 
     jobs: List[Dict[str, Any]] = []
     for item in _cron_profile_dicts():
@@ -7073,7 +7081,7 @@ async def list_cron_jobs(profile: str = "all"):
             jobs.extend(_call_cron_for_profile(name, "list_jobs", True))
         except Exception:
             _log.exception("Failed to list cron jobs for profile %s", name)
-    return jobs
+    return _scope(jobs)
 
 
 @app.get("/api/cron/jobs/{job_id}")
@@ -7144,6 +7152,7 @@ async def create_cron_job(body: CronJobCreate, profile: str = "default"):
             name=body.name,
             deliver=body.deliver,
             skills=body.skills,
+            group_id=body.group_id,
         )
     except Exception as e:
         _log.exception("POST /api/cron/jobs failed")

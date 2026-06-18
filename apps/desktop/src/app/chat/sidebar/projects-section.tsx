@@ -1,5 +1,14 @@
+import {
+  closestCenter,
+  DndContext,
+  type DragEndEvent,
+  PointerSensor,
+  useSensor,
+  useSensors
+} from '@dnd-kit/core'
+import { arrayMove, SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { useStore } from '@nanostores/react'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 import { Button } from '@/components/ui/button'
@@ -19,8 +28,15 @@ import type { ChatGroup, SessionInfo } from '@/hermes'
 import { useI18n } from '@/i18n'
 import { triggerHaptic } from '@/lib/haptics'
 import { cn } from '@/lib/utils'
+import { projectMemberTitle } from '@/lib/project-session-title'
 import { notify, notifyError } from '@/store/notifications'
-import { $projects, deleteProject } from '@/store/projects'
+import {
+  $projects,
+  $projectSessionMeta,
+  deleteProject,
+  ensureProjectMemberSessions,
+  reorderProjects
+} from '@/store/projects'
 import { $cronSessions, $selectedStoredSessionId, $sessions } from '@/store/session'
 
 import { PROJECTS_ROUTE, projectRoute } from '../../routes'
@@ -45,6 +61,24 @@ export function SidebarProjectsSection({ label, onOpenChat, onToggle, open }: Si
   const projects = useStore($projects)
   const sessions = useStore($sessions)
   const cronSessions = useStore($cronSessions)
+  // Distance constraint so a tap-to-open click on a row isn't swallowed by the
+  // drag sensor; only a real drag past 4px starts a reorder.
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }))
+  const projectIds = useMemo(() => projects.map(project => project.id), [projects])
+
+  const handleDragEnd = ({ active, over }: DragEndEvent) => {
+    if (!over || active.id === over.id) {
+      return
+    }
+
+    const from = projectIds.indexOf(String(active.id))
+    const to = projectIds.indexOf(String(over.id))
+
+    if (from >= 0 && to >= 0) {
+      void reorderProjects(arrayMove(projectIds, from, to))
+    }
+  }
+
   const [expandedId, setExpandedId] = useState<null | string>(null)
   const [createOpen, setCreateOpen] = useState(false)
   const [editProject, setEditProject] = useState<ChatGroup | null>(null)
@@ -62,6 +96,18 @@ export function SidebarProjectsSection({ label, onOpenChat, onToggle, open }: Si
 
     return map
   }, [sessions, cronSessions])
+
+  // Members outside the loaded session lists have no title here; fetch their
+  // metadata by id so rows show real titles instead of a bare id prefix.
+  const sessionMeta = useStore($projectSessionMeta)
+  const knownIds = useMemo(() => new Set(sessionById.keys()), [sessionById])
+
+  useEffect(() => {
+    ensureProjectMemberSessions(
+      projects.flatMap(project => project.session_ids),
+      knownIds
+    )
+  }, [projects, knownIds])
 
   return (
     <SidebarGroup className="shrink-0 p-0 pb-1">
@@ -109,19 +155,24 @@ export function SidebarProjectsSection({ label, onOpenChat, onToggle, open }: Si
           {projects.length === 0 ? (
             <div className="py-1 pl-2 text-[0.6875rem] text-(--ui-text-tertiary)">{p.empty}</div>
           ) : (
-            projects.map(project => (
-              <ProjectRow
-                expanded={expandedId === project.id}
-                key={project.id}
-                onDelete={() => setDeleteTarget(project)}
-                onOpenChat={onOpenChat}
-                onOpenProject={onOpenProject}
-                onSettings={() => setEditProject(project)}
-                onToggle={() => setExpandedId(prev => (prev === project.id ? null : project.id))}
-                project={project}
-                sessionById={sessionById}
-              />
-            ))
+            <DndContext collisionDetection={closestCenter} onDragEnd={handleDragEnd} sensors={sensors}>
+              <SortableContext items={projectIds} strategy={verticalListSortingStrategy}>
+                {projects.map(project => (
+                  <ProjectRow
+                    expanded={expandedId === project.id}
+                    key={project.id}
+                    onDelete={() => setDeleteTarget(project)}
+                    onOpenChat={onOpenChat}
+                    onOpenProject={onOpenProject}
+                    onSettings={() => setEditProject(project)}
+                    onToggle={() => setExpandedId(prev => (prev === project.id ? null : project.id))}
+                    project={project}
+                    sessionById={sessionById}
+                    sessionMeta={sessionMeta}
+                  />
+                ))}
+              </SortableContext>
+            </DndContext>
           )}
         </SidebarGroupContent>
       )}
@@ -149,7 +200,8 @@ function ProjectRow({
   onSettings,
   onToggle,
   project,
-  sessionById
+  sessionById,
+  sessionMeta
 }: {
   expanded: boolean
   onDelete: () => void
@@ -159,15 +211,32 @@ function ProjectRow({
   onToggle: () => void
   project: ChatGroup
   sessionById: Map<string, SessionInfo>
+  sessionMeta: Record<string, null | SessionInfo>
 }) {
   const { t } = useI18n()
   const p = t.sidebar.projects
   const selectedSessionId = useStore($selectedStoredSessionId)
   const count = project.session_ids.length
+  // Whole row is the drag handle (distance-constrained sensor keeps clicks working).
+  // Vertical list: translate Y only so a dragged row never drifts sideways.
+  const { attributes, isDragging, listeners, setNodeRef, transform, transition } = useSortable({ id: project.id })
+  const sortableStyle = {
+    transform: transform ? `translate3d(0px, ${transform.y}px, 0)` : undefined,
+    transition: isDragging ? undefined : transition,
+    willChange: isDragging ? 'transform' : undefined,
+    zIndex: isDragging ? 1 : undefined
+  }
 
   return (
-    <div>
-      <div className="group/project relative grid min-h-[1.625rem] grid-cols-[minmax(0,1fr)_auto] items-center rounded-md hover:bg-(--chrome-action-hover)">
+    <div ref={setNodeRef} style={sortableStyle}>
+      <div
+        className={cn(
+          'group/project relative grid min-h-[1.625rem] grid-cols-[minmax(0,1fr)_auto] items-center rounded-md hover:bg-(--chrome-action-hover)',
+          isDragging && 'bg-(--chrome-action-hover) opacity-80'
+        )}
+        {...attributes}
+        {...listeners}
+      >
         <button
           className="flex min-w-0 items-center gap-1.5 bg-transparent py-0.5 pl-2 pr-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
           onClick={() => onOpenProject(project.id)}
@@ -225,7 +294,11 @@ function ProjectRow({
           ) : (
             project.session_ids.map(sessionId => {
               const session = sessionById.get(sessionId)
-              const title = session?.title?.trim() || sessionId.slice(0, 8)
+              const title = projectMemberTitle(
+                session,
+                sessionMeta[sessionId],
+                t.sidebar.row.untitledPlaceholder
+              )
 
               return (
                 <button
