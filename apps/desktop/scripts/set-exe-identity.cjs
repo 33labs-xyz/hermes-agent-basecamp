@@ -68,10 +68,10 @@ async function stampExeIdentity(exe, desktopRoot = path.resolve(__dirname, '..')
   await rcedit(exe, {
     icon,
     'version-string': {
-      ProductName: 'Hermes',
-      FileDescription: 'Hermes',
-      CompanyName: 'Nous Research',
-      LegalCopyright: 'Copyright (c) 2026 Nous Research'
+      ProductName: 'Basecamp',
+      FileDescription: 'Basecamp',
+      CompanyName: '33labs',
+      LegalCopyright: 'Copyright (c) 2026 33labs'
     }
   })
 

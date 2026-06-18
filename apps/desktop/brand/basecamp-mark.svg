@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FAF8F4"/>
+      <stop offset="1" stop-color="#E7EFE9"/>
+    </linearGradient>
+    <linearGradient id="backPeak" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#357A59"/>
+      <stop offset="1" stop-color="#2F6B4F"/>
+    </linearGradient>
+    <linearGradient id="frontPeak" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#458C68"/>
+      <stop offset="1" stop-color="#3C7E5E"/>
+    </linearGradient>
+    <clipPath id="tileClip">
+      <rect x="112" y="112" width="800" height="800" rx="180" ry="180"/>
+    </clipPath>
+  </defs>
+
+  <!-- squircle tile -->
+  <rect x="112" y="112" width="800" height="800" rx="180" ry="180" fill="url(#sky)"/>
+
+  <g clip-path="url(#tileClip)">
+    <!-- back peak (tall) -->
+    <polygon points="512,250 792,748 232,748" fill="url(#backPeak)"/>
+    <!-- snow cap -->
+    <polygon points="512,250 575,362 512,330 449,362" fill="#FAF8F4"/>
+    <!-- front peak (shorter, left) -->
+    <polygon points="372,430 632,748 152,748" fill="url(#frontPeak)"/>
+    <!-- front snow cap -->
+    <polygon points="372,430 414,494 372,476 330,494" fill="#F4F1EB"/>
+    <!-- foreground apron -->
+    <rect x="112" y="748" width="800" height="164" fill="#2A6047"/>
+  </g>
+
+  <!-- flag pole + pennant on back peak summit -->
+  <rect x="505" y="176" width="14" height="92" rx="7" fill="#2A6047"/>
+  <polygon points="519,182 606,210 519,238" fill="#C04A2B"/>
+</svg>

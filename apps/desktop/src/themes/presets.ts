@@ -278,7 +278,80 @@ export const slateTheme: DesktopTheme = {
   }
 }
 
+// Basecamp brand seeds, lifted from the mountain mark: forest greens for the
+// peaks, a warm cream "sky", and a terracotta flag accent for destructive.
+const CAMP_GREEN = '#2F6B4F'
+const CAMP_FLAG = '#C0432B'
+const campTint = (pct: number) => `color-mix(in srgb, ${CAMP_GREEN} ${pct}%, #FFFFFF)`
+const campTintTransparent = (pct: number) => `color-mix(in srgb, ${CAMP_GREEN} ${pct}%, transparent)`
+
+/**
+ * Basecamp — the default identity for this app. Warm cream surfaces with forest
+ * green accents drawn from the mountain mark; deep evergreen in dark mode.
+ */
+export const basecampTheme: DesktopTheme = {
+  name: 'basecamp',
+  label: 'Basecamp',
+  description: 'Warm cream neutrals with forest green accents',
+  colors: {
+    background: '#F6F8F4',
+    foreground: '#16231C',
+    card: '#FFFFFF',
+    cardForeground: '#16231C',
+    muted: campTint(5),
+    mutedForeground: '#5C6B62',
+    popover: '#FFFFFF',
+    popoverForeground: '#16231C',
+    primary: CAMP_GREEN,
+    primaryForeground: '#FCFCFC',
+    secondary: campTint(8),
+    secondaryForeground: '#23322A',
+    accent: campTint(12),
+    accentForeground: '#1E2D24',
+    border: campTintTransparent(20),
+    input: campTintTransparent(28),
+    ring: CAMP_GREEN,
+    midground: CAMP_GREEN,
+    composerRing: CAMP_GREEN,
+    destructive: CAMP_FLAG,
+    destructiveForeground: '#FFFFFF',
+    sidebarBackground: '#EEF3EC',
+    sidebarBorder: campTintTransparent(16),
+    userBubble: campTint(7),
+    userBubbleBorder: campTintTransparent(22)
+  },
+  darkColors: {
+    background: '#0E1F18',
+    foreground: '#E8F0E9',
+    card: '#13271E',
+    cardForeground: '#E8F0E9',
+    muted: '#193225',
+    mutedForeground: '#9FB3A6',
+    popover: '#122419',
+    popoverForeground: '#E8F0E9',
+    primary: '#5BB98A',
+    primaryForeground: '#0B1A12',
+    secondary: '#1C3A2A',
+    secondaryForeground: '#D4E4D8',
+    accent: '#235038',
+    accentForeground: '#EAF4EC',
+    border: '#274635',
+    input: '#0E2418',
+    ring: '#5BB98A',
+    midground: CAMP_GREEN,
+    composerRing: '#5BB98A',
+    destructive: '#D2563C',
+    destructiveForeground: '#FCEFEA',
+    sidebarBackground: '#0B1A13',
+    sidebarBorder: '#23402F',
+    userBubble: '#163022',
+    userBubbleBorder: '#2C4D39'
+  },
+  typography: DEFAULT_TYPOGRAPHY
+}
+
 export const BUILTIN_THEMES: Record<string, DesktopTheme> = {
+  basecamp: basecampTheme,
   nous: nousTheme,
   midnight: midnightTheme,
   ember: emberTheme,
@@ -290,4 +363,4 @@ export const BUILTIN_THEMES: Record<string, DesktopTheme> = {
 export const BUILTIN_THEME_LIST = Object.values(BUILTIN_THEMES)
 
 /** Skin used when nothing is persisted or the persisted name is retired. */
-export const DEFAULT_SKIN_NAME = 'nous'
+export const DEFAULT_SKIN_NAME = 'basecamp'
