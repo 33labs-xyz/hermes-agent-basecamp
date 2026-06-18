@@ -47,6 +47,7 @@ import {
   normalizeProfileKey,
   refreshActiveProfile
 } from '../store/profile'
+import { refreshProjects } from '../store/projects'
 import {
   $activeSessionId,
   $currentCwd,
@@ -131,6 +132,7 @@ const CommandCenterView = lazy(async () => ({ default: (await import('./command-
 const CronView = lazy(async () => ({ default: (await import('./cron')).CronView }))
 const MessagingView = lazy(async () => ({ default: (await import('./messaging')).MessagingView }))
 const ProfilesView = lazy(async () => ({ default: (await import('./profiles')).ProfilesView }))
+const ProjectsView = lazy(async () => ({ default: (await import('./projects')).ProjectsView }))
 const SettingsView = lazy(async () => ({ default: (await import('./settings')).SettingsView }))
 const SkillsView = lazy(async () => ({ default: (await import('./skills')).SkillsView }))
 
@@ -458,6 +460,7 @@ export function DesktopController() {
     void refreshCronSessions()
     void refreshCronJobs()
     void refreshMessagingSessions()
+    void refreshProjects()
   }, [profileScope, refreshCronSessions, refreshCronJobs, refreshMessagingSessions])
 
   const loadMoreSessions = useCallback(() => {
@@ -862,7 +865,6 @@ export function DesktopController() {
     gatewayState,
     inferenceStatus,
     openAgents,
-    freshDraftReady,
     openCommandCenterSection,
     requestGateway,
     statusSnapshot,
@@ -1127,6 +1129,22 @@ export function DesktopController() {
               </Suspense>
             }
             path="artifacts"
+          />
+          <Route
+            element={
+              <Suspense fallback={null}>
+                <ProjectsView setStatusbarItemGroup={setStatusbarItemGroup} />
+              </Suspense>
+            }
+            path="projects/:groupId"
+          />
+          <Route
+            element={
+              <Suspense fallback={null}>
+                <ProjectsView setStatusbarItemGroup={setStatusbarItemGroup} />
+              </Suspense>
+            }
+            path="projects"
           />
           <Route element={null} path="cron" />
           <Route element={null} path="profiles" />

@@ -12004,6 +12004,11 @@ _mount_plugin_api_routes()
 from hermes_cli.dashboard_auth.routes import router as _dashboard_auth_router  # noqa: E402
 app.include_router(_dashboard_auth_router)
 
+# Projects (chat groups): /api/chat/groups CRUD + membership. Registered before
+# the SPA catch-all so the routes resolve instead of being swallowed.
+from hermes_cli.chat_groups.routes import register_chat_group_routes  # noqa: E402
+register_chat_group_routes(app)
+
 mount_spa(app)
 
 

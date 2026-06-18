@@ -59,7 +59,6 @@ interface StatusbarItemsOptions {
   inferenceStatus: RuntimeReadinessResult | null
   openAgents: () => void
   openCommandCenterSection: (section: CommandCenterSection) => void
-  freshDraftReady: boolean
   requestGateway: <T = unknown>(method: string, params?: Record<string, unknown>) => Promise<T>
   statusSnapshot: StatusResponse | null
   toggleCommandCenter: () => void
@@ -76,7 +75,6 @@ export function useStatusbarItems({
   inferenceStatus,
   openAgents,
   openCommandCenterSection,
-  freshDraftReady,
   requestGateway,
   statusSnapshot,
   toggleCommandCenter
@@ -141,7 +139,11 @@ export function useStatusbarItems({
     [requestGateway]
   )
 
-  const showYoloToggle = gatewayState === 'open' && (!!activeSessionId || freshDraftReady)
+  // Always surface the toggle while the gateway is up so YOLO can be flipped
+  // from anywhere (sessionless shift+click sets the global approvals mode; a
+  // plain click with no active session arms local state applied at session
+  // create). Previously hidden unless a session or fresh draft existed.
+  const showYoloToggle = gatewayState === 'open'
 
   const gatewayMenuContent = useMemo(
     () => (

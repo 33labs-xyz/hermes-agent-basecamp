@@ -750,3 +750,107 @@ export function getElevenLabsVoices(): Promise<ElevenLabsVoicesResponse> {
     path: '/api/audio/elevenlabs/voices'
   })
 }
+
+// Projects (chat groups). A project bundles related conversations and can carry
+// shared instructions that steer every chat inside it. A session belongs to at
+// most one project. Mirrors the dashboard's chat-group endpoints.
+export interface ChatGroup {
+  id: string
+  name: string
+  description: string
+  instructions: string
+  position: number
+  created_at: number
+  updated_at: number
+  session_ids: string[]
+}
+
+export async function listChatGroups(): Promise<ChatGroup[]> {
+  const { groups } = await window.hermesDesktop.api<{ groups: ChatGroup[] }>({
+    path: '/api/chat/groups'
+  })
+
+  return groups ?? []
+}
+
+export function createChatGroup(body: {
+  description?: string
+  instructions?: string
+  name: string
+}): Promise<ChatGroup> {
+  return window.hermesDesktop.api<ChatGroup>({
+    path: '/api/chat/groups',
+    method: 'POST',
+    body
+  })
+}
+
+export function updateChatGroup(
+  id: string,
+  updates: { description?: string; instructions?: string; name?: string; position?: number }
+): Promise<ChatGroup> {
+  return window.hermesDesktop.api<ChatGroup>({
+    path: `/api/chat/groups/${encodeURIComponent(id)}`,
+    method: 'PATCH',
+    body: updates
+  })
+}
+
+export function deleteChatGroup(id: string): Promise<{ ok: boolean }> {
+  return window.hermesDesktop.api<{ ok: boolean }>({
+    path: `/api/chat/groups/${encodeURIComponent(id)}`,
+    method: 'DELETE'
+  })
+}
+
+export function assignConversation(groupId: string, sessionId: string): Promise<{ ok: boolean }> {
+  return window.hermesDesktop.api<{ ok: boolean }>({
+    path: `/api/chat/groups/${encodeURIComponent(groupId)}/members/${encodeURIComponent(sessionId)}`,
+    method: 'PUT'
+  })
+}
+
+export function unassignConversation(groupId: string, sessionId: string): Promise<{ ok: boolean }> {
+  return window.hermesDesktop.api<{ ok: boolean }>({
+    path: `/api/chat/groups/${encodeURIComponent(groupId)}/members/${encodeURIComponent(sessionId)}`,
+    method: 'DELETE'
+  })
+}
+
+// A project knowledge file. Its `content` is injected into the agent's system
+// prompt for every chat in the project; list responses return metadata only.
+export interface ChatKnowledgeFile {
+  id: string
+  group_id: string
+  name: string
+  content_type: string
+  size: number
+  created_at: number
+  updated_at: number
+}
+
+export async function listKnowledgeFiles(groupId: string): Promise<ChatKnowledgeFile[]> {
+  const { files } = await window.hermesDesktop.api<{ files: ChatKnowledgeFile[] }>({
+    path: `/api/chat/groups/${encodeURIComponent(groupId)}/files`
+  })
+
+  return files ?? []
+}
+
+export function addKnowledgeFile(
+  groupId: string,
+  body: { content: string; content_type?: string; name: string }
+): Promise<ChatKnowledgeFile> {
+  return window.hermesDesktop.api<ChatKnowledgeFile>({
+    path: `/api/chat/groups/${encodeURIComponent(groupId)}/files`,
+    method: 'POST',
+    body
+  })
+}
+
+export function deleteKnowledgeFile(groupId: string, fileId: string): Promise<{ ok: boolean }> {
+  return window.hermesDesktop.api<{ ok: boolean }>({
+    path: `/api/chat/groups/${encodeURIComponent(groupId)}/files/${encodeURIComponent(fileId)}`,
+    method: 'DELETE'
+  })
+}

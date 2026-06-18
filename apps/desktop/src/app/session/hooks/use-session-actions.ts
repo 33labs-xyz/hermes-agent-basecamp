@@ -12,6 +12,7 @@ import { clearQueuedPrompts } from '@/store/composer-queue'
 import { $pinnedSessionIds } from '@/store/layout'
 import { clearNotifications, notify, notifyError } from '@/store/notifications'
 import { requestDesktopOnboarding } from '@/store/onboarding'
+import { consumePendingProjectAssignment } from '@/store/projects'
 import { $activeGatewayProfile, $newChatProfile, $profiles, ensureGatewayProfile, normalizeProfileKey } from '@/store/profile'
 import {
   $currentCwd,
@@ -492,6 +493,10 @@ export function useSessionActions({
           // Other windows (e.g. the main window when this is the pop-out) can't
           // see this session until they re-pull the shared list.
           broadcastSessionsChanged()
+          // If "New chat in this project" armed an assignment, land this chat in
+          // that project now that it has a stored id. Fire-and-forget — the send
+          // must not wait on (or fail from) the membership write.
+          void consumePendingProjectAssignment(stored)
         }
 
         setFreshDraftReady(false)

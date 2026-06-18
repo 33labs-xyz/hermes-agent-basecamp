@@ -21,6 +21,7 @@ import re
 import sqlite3
 import threading
 import time
+import uuid
 from pathlib import Path
 
 from agent.memory_manager import sanitize_context
@@ -108,6 +109,11 @@ T = TypeVar("T")
 DEFAULT_DB_PATH = get_hermes_home() / "state.db"
 
 SCHEMA_VERSION = 16
+
+# Upper bound on the total characters of project knowledge-file content injected
+# into an agent's system prompt (see SessionDB.build_project_context). Keeps a
+# large knowledge base from blowing out the prompt.
+KNOWLEDGE_CONTEXT_MAX = 32_000
 
 # ---------------------------------------------------------------------------
 # WAL-compatibility fallback
@@ -587,6 +593,40 @@ CREATE INDEX IF NOT EXISTS idx_sessions_parent ON sessions(parent_session_id);
 CREATE INDEX IF NOT EXISTS idx_sessions_started ON sessions(started_at DESC);
 CREATE INDEX IF NOT EXISTS idx_messages_session ON messages(session_id, timestamp);
 CREATE INDEX IF NOT EXISTS idx_compression_locks_expires ON compression_locks(expires_at);
+
+CREATE TABLE IF NOT EXISTS chat_groups (
+    id           TEXT PRIMARY KEY,
+    name         TEXT NOT NULL,
+    description  TEXT NOT NULL DEFAULT '',
+    instructions TEXT NOT NULL DEFAULT '',
+    position     INTEGER NOT NULL DEFAULT 0,
+    created_at   REAL NOT NULL,
+    updated_at   REAL NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS chat_group_members (
+    group_id    TEXT NOT NULL,
+    session_id  TEXT NOT NULL,
+    position    INTEGER NOT NULL DEFAULT 0,
+    added_at    REAL NOT NULL,
+    PRIMARY KEY (session_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_chat_group_members_group ON chat_group_members(group_id);
+
+CREATE TABLE IF NOT EXISTS chat_group_knowledge_files (
+    id           TEXT PRIMARY KEY,
+    group_id     TEXT NOT NULL,
+    name         TEXT NOT NULL,
+    content_type TEXT NOT NULL DEFAULT 'text/markdown',
+    size         INTEGER NOT NULL DEFAULT 0,
+    content      TEXT NOT NULL DEFAULT '',
+    created_at   REAL NOT NULL,
+    updated_at   REAL NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_chat_group_knowledge_group
+    ON chat_group_knowledge_files(group_id);
 """
 
 # Indexes that reference columns added in later schema versions must be
@@ -1703,6 +1743,335 @@ class SessionDB:
             )
             row = cursor.fetchone()
         return dict(row) if row else None
+
+    def list_chat_groups(self) -> list[dict]:
+        """All groups ordered by position, each with its member session_ids.
+
+        Member ids are returned in their stored order (position, then
+        added_at). Membership rows pointing at a now-rotated session id are
+        tolerated here; the API layer filters them against live sessions.
+        """
+        groups = []
+        for row in self._conn.execute(
+            "SELECT id, name, description, instructions, position, created_at, updated_at "
+            "FROM chat_groups ORDER BY position ASC, created_at ASC"
+        ).fetchall():
+            g = dict(row)
+            members = [
+                m[0]
+                for m in self._conn.execute(
+                    "SELECT session_id FROM chat_group_members "
+                    "WHERE group_id = ? ORDER BY position ASC, added_at ASC",
+                    (g["id"],),
+                ).fetchall()
+            ]
+            g["session_ids"] = members
+            groups.append(g)
+        return groups
+
+    def create_chat_group(
+        self,
+        name: str,
+        *,
+        now: float,
+        description: str = "",
+        instructions: str = "",
+    ) -> dict:
+        """Insert a new group at the end (max position + 1). Returns the record.
+
+        ``description`` is a short human note shown in the UI. ``instructions``
+        are project-level guidance appended to the agent's system prompt for
+        every chat in the group (see ``instructions_for_session``).
+        """
+        group_id = uuid.uuid4().hex
+
+        def _do(conn):
+            row = conn.execute(
+                "SELECT COALESCE(MAX(position), -1) + 1 FROM chat_groups"
+            ).fetchone()
+            position = row[0]
+            conn.execute(
+                "INSERT INTO chat_groups "
+                "(id, name, description, instructions, position, created_at, updated_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (group_id, name, description, instructions, position, now, now),
+            )
+            return position
+
+        position = self._execute_write(_do)
+        return {
+            "id": group_id,
+            "name": name,
+            "description": description,
+            "instructions": instructions,
+            "position": position,
+            "created_at": now,
+            "updated_at": now,
+            "session_ids": [],
+        }
+
+    def set_group_position(self, group_id: str, position: int, *, now: float) -> bool:
+        """Update a group's sort position. Returns False if the group is unknown."""
+        def _do(conn):
+            cur = conn.execute(
+                "UPDATE chat_groups SET position = ?, updated_at = ? WHERE id = ?",
+                (int(position), now, group_id),
+            )
+            return cur.rowcount
+
+        return bool(self._execute_write(_do))
+
+    def update_chat_group(
+        self,
+        group_id: str,
+        *,
+        now: float,
+        name: str | None = None,
+        description: str | None = None,
+        instructions: str | None = None,
+    ) -> dict | None:
+        """Update a group's name/description/instructions. Returns the updated
+        record (list_chat_groups shape), or None if the group is unknown.
+
+        Only the provided fields are changed; omitted fields keep their values.
+        """
+        sets: list[str] = []
+        params: list[object] = []
+        if name is not None:
+            sets.append("name = ?")
+            params.append(name)
+        if description is not None:
+            sets.append("description = ?")
+            params.append(description)
+        if instructions is not None:
+            sets.append("instructions = ?")
+            params.append(instructions)
+        if not sets:
+            # Nothing to change; just confirm existence and re-read.
+            for g in self.list_chat_groups():
+                if g["id"] == group_id:
+                    return g
+            return None
+        sets.append("updated_at = ?")
+        params.append(now)
+        params.append(group_id)
+
+        def _do(conn):
+            cur = conn.execute(
+                f"UPDATE chat_groups SET {', '.join(sets)} WHERE id = ?",
+                tuple(params),
+            )
+            return cur.rowcount
+
+        if not self._execute_write(_do):
+            return None
+
+        row = self._conn.execute(
+            "SELECT id, name, description, instructions, position, created_at, updated_at "
+            "FROM chat_groups WHERE id = ?",
+            (group_id,),
+        ).fetchone()
+        if row is None:
+            return None
+        record = dict(row)
+        record["session_ids"] = [
+            m[0]
+            for m in self._conn.execute(
+                "SELECT session_id FROM chat_group_members "
+                "WHERE group_id = ? ORDER BY position ASC, added_at ASC",
+                (group_id,),
+            ).fetchall()
+        ]
+        return record
+
+    def rename_chat_group(self, group_id: str, name: str, *, now: float) -> dict | None:
+        """Rename a group. Thin wrapper over update_chat_group for callers that
+        only change the name. Returns the updated record or None if unknown.
+        """
+        return self.update_chat_group(group_id, name=name, now=now)
+
+    def instructions_for_session(self, session_id: str) -> str:
+        """Project (chat-group) instructions for the group this session belongs
+        to, or '' if it is ungrouped or the group has no instructions.
+
+        Used to steer the agent: the result is appended to the ephemeral system
+        prompt when the agent is built for this session.
+        """
+        row = self._conn.execute(
+            "SELECT g.instructions FROM chat_group_members m "
+            "JOIN chat_groups g ON g.id = m.group_id "
+            "WHERE m.session_id = ?",
+            (session_id,),
+        ).fetchone()
+        if row is None:
+            return ""
+        return (row[0] or "").strip()
+
+    def assign_conversation(self, group_id: str, session_id: str, *, now: float) -> bool:
+        """Move a conversation into a group (at most one group per conversation).
+
+        Upserts on session_id, so re-assigning replaces the prior group.
+        New members are appended at the end of the target group.
+        """
+        def _do(conn):
+            row = conn.execute(
+                "SELECT COALESCE(MAX(position), -1) + 1 FROM chat_group_members "
+                "WHERE group_id = ?",
+                (group_id,),
+            ).fetchone()
+            position = row[0]
+            conn.execute(
+                "INSERT INTO chat_group_members (group_id, session_id, position, added_at) "
+                "VALUES (?, ?, ?, ?) "
+                "ON CONFLICT(session_id) DO UPDATE SET "
+                "group_id = excluded.group_id, "
+                "position = excluded.position, "
+                "added_at = excluded.added_at",
+                (group_id, session_id, position, now),
+            )
+            return 1
+
+        return bool(self._execute_write(_do))
+
+    def unassign_conversation(self, session_id: str) -> bool:
+        """Remove a conversation's group membership. False if it had none."""
+        def _do(conn):
+            cur = conn.execute(
+                "DELETE FROM chat_group_members WHERE session_id = ?",
+                (session_id,),
+            )
+            return cur.rowcount
+
+        return bool(self._execute_write(_do))
+
+    def delete_chat_group(self, group_id: str) -> bool:
+        """Delete a group and its membership rows in one transaction.
+
+        Conversations in the group fall back to ungrouped (their membership
+        rows are removed). Returns False if the group did not exist.
+        """
+        def _do(conn):
+            cur = conn.execute(
+                "DELETE FROM chat_groups WHERE id = ?", (group_id,)
+            )
+            if cur.rowcount == 0:
+                return 0
+            conn.execute(
+                "DELETE FROM chat_group_members WHERE group_id = ?", (group_id,)
+            )
+            conn.execute(
+                "DELETE FROM chat_group_knowledge_files WHERE group_id = ?", (group_id,)
+            )
+            return cur.rowcount
+
+        return bool(self._execute_write(_do))
+
+    # --- Project knowledge files ------------------------------------------
+
+    def add_knowledge_file(
+        self,
+        group_id: str,
+        name: str,
+        content: str,
+        *,
+        now: float,
+        content_type: str = "text/markdown",
+    ) -> dict:
+        """Attach a text knowledge file to a project (chat group).
+
+        The ``content`` is stored verbatim and injected into the agent's
+        system prompt for every chat in the group (see
+        ``build_project_context``). Returns a metadata record (no content) so
+        list/echo payloads stay small.
+        """
+        file_id = uuid.uuid4().hex
+        size = len(content)
+
+        def _do(conn):
+            conn.execute(
+                "INSERT INTO chat_group_knowledge_files "
+                "(id, group_id, name, content_type, size, content, created_at, updated_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                (file_id, group_id, name, content_type, size, content, now, now),
+            )
+            return 1
+
+        self._execute_write(_do)
+        return {
+            "id": file_id,
+            "group_id": group_id,
+            "name": name,
+            "content_type": content_type,
+            "size": size,
+            "created_at": now,
+            "updated_at": now,
+        }
+
+    def list_knowledge_files(self, group_id: str) -> list[dict]:
+        """Metadata for a group's knowledge files, oldest first. No content."""
+        return [
+            dict(row)
+            for row in self._conn.execute(
+                "SELECT id, group_id, name, content_type, size, created_at, updated_at "
+                "FROM chat_group_knowledge_files WHERE group_id = ? "
+                "ORDER BY created_at ASC, name ASC",
+                (group_id,),
+            ).fetchall()
+        ]
+
+    def delete_knowledge_file(self, group_id: str, file_id: str) -> bool:
+        """Remove one knowledge file. False if it did not exist in the group."""
+        def _do(conn):
+            cur = conn.execute(
+                "DELETE FROM chat_group_knowledge_files WHERE id = ? AND group_id = ?",
+                (file_id, group_id),
+            )
+            return cur.rowcount
+
+        return bool(self._execute_write(_do))
+
+    def build_project_context(self, session_id: str) -> str:
+        """Full project context for a session: group instructions plus the
+        concatenated knowledge-file bodies, or '' when ungrouped/empty.
+
+        Replaces ``instructions_for_session`` at the agent-build site so both
+        instructions and knowledge steer every chat in the project. The total
+        is bounded by ``KNOWLEDGE_CONTEXT_MAX`` so a large knowledge base can
+        never blow out the system prompt.
+        """
+        row = self._conn.execute(
+            "SELECT g.id, g.instructions FROM chat_group_members m "
+            "JOIN chat_groups g ON g.id = m.group_id "
+            "WHERE m.session_id = ?",
+            (session_id,),
+        ).fetchone()
+        if row is None:
+            return ""
+
+        group_id = row[0]
+        parts: list[str] = []
+        instructions = (row[1] or "").strip()
+        if instructions:
+            parts.append(instructions)
+
+        files = self._conn.execute(
+            "SELECT name, content FROM chat_group_knowledge_files WHERE group_id = ? "
+            "ORDER BY created_at ASC, name ASC",
+            (group_id,),
+        ).fetchall()
+        if files:
+            budget = KNOWLEDGE_CONTEXT_MAX
+            sections: list[str] = []
+            for name, content in files:
+                if budget <= 0:
+                    break
+                body = (content or "")[:budget]
+                budget -= len(body)
+                sections.append(f"## {name}\n{body}")
+            if sections:
+                parts.append("# Project knowledge\n\n" + "\n\n".join(sections))
+
+        return "\n\n".join(parts)
 
     def resolve_session_id(self, session_id_or_prefix: str) -> Optional[str]:
         """Resolve an exact or uniquely prefixed session ID to the full ID.

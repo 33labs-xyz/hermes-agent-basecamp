@@ -8,6 +8,9 @@ export const ARTIFACTS_ROUTE = '/artifacts'
 export const CRON_ROUTE = '/cron'
 export const PROFILES_ROUTE = '/profiles'
 export const AGENTS_ROUTE = '/agents'
+// Projects are a full-page (non-overlay) view keyed by group id:
+// `/projects/:groupId`. The base path below is the route prefix.
+export const PROJECTS_ROUTE = '/projects'
 
 export type AppView =
   | 'agents'
@@ -17,6 +20,7 @@ export type AppView =
   | 'cron'
   | 'messaging'
   | 'profiles'
+  | 'projects'
   | 'settings'
   | 'skills'
 
@@ -52,6 +56,28 @@ export const APP_ROUTES = [
 const APP_VIEW_BY_PATH = new Map<string, AppView>(APP_ROUTES.map(route => [route.path, route.view]))
 const RESERVED_PATHS: ReadonlySet<string> = new Set(APP_ROUTES.map(route => route.path))
 
+// Match the parameterized project page (`/projects/:groupId`). The exact
+// `/projects` base also resolves here so a stray click never dead-ends.
+export function routeProjectGroupId(pathname: string): string | null {
+  if (pathname === PROJECTS_ROUTE) {
+    return ''
+  }
+
+  const prefix = `${PROJECTS_ROUTE}/`
+
+  if (!pathname.startsWith(prefix)) {
+    return null
+  }
+
+  const id = pathname.slice(prefix.length)
+
+  return id && !id.includes('/') ? decodeURIComponent(id) : ''
+}
+
+export function projectRoute(groupId: string): string {
+  return `${PROJECTS_ROUTE}/${encodeURIComponent(groupId)}`
+}
+
 // Views that render as a full-screen modal card (OverlayView) over the shell.
 // While one is open the app's titlebar control clusters must hide so they don't
 // bleed over the overlay (they sit at a higher z-index than the overlay card).
@@ -82,6 +108,10 @@ export function sessionRoute(sessionId: string): string {
 export function appViewForPath(pathname: string): AppView {
   if (isNewChatRoute(pathname) || routeSessionId(pathname)) {
     return 'chat'
+  }
+
+  if (routeProjectGroupId(pathname) !== null) {
+    return 'projects'
   }
 
   return APP_VIEW_BY_PATH.get(pathname) ?? 'chat'
