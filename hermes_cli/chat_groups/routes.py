@@ -21,6 +21,7 @@ _DESCRIPTION_MAX = 500
 _INSTRUCTIONS_MAX = 16000
 _FILE_NAME_MAX = 200
 _FILE_CONTENT_MAX = 200_000
+_MEMORY_CONTENT_MAX = 4_000
 
 
 class CreateGroupBody(BaseModel):
@@ -33,6 +34,10 @@ class CreateKnowledgeFileBody(BaseModel):
     name: str
     content: str
     content_type: Optional[str] = None
+
+
+class CreateMemoryEntryBody(BaseModel):
+    content: str
 
 
 class PatchGroupBody(BaseModel):
@@ -269,6 +274,51 @@ def register_chat_group_routes(app: FastAPI, db_factory: Optional[Callable] = No
                 return JSONResponse(
                     status_code=404,
                     content={"error_code": "not_found", "message": "file not found"},
+                )
+            return {"ok": True}
+        except Exception:
+            return _internal_err()
+        finally:
+            db.close()
+
+    @app.get("/api/chat/groups/{group_id}/memory", response_model=None)
+    async def list_memory(group_id: str):
+        db = factory()
+        try:
+            return {"entries": db.list_memory_entries(group_id)}
+        except Exception:
+            return _internal_err()
+        finally:
+            db.close()
+
+    @app.post("/api/chat/groups/{group_id}/memory", response_model=None)
+    async def add_memory(group_id: str, body: CreateMemoryEntryBody):
+        content = body.content.strip() if isinstance(body.content, str) else ""
+        if not content:
+            return _validation_err("content required")
+        if len(content) > _MEMORY_CONTENT_MAX:
+            return _validation_err(f"content too long (max {_MEMORY_CONTENT_MAX} chars)")
+        db = factory()
+        try:
+            groups = {g["id"] for g in db.list_chat_groups()}
+            if group_id not in groups:
+                return _not_found()
+            # UI-created entries are always user-sourced; the agent writes its
+            # own via the project_memory tool, never this route.
+            return db.add_memory_entry(group_id, content, now=time.time(), source="user")
+        except Exception:
+            return _internal_err()
+        finally:
+            db.close()
+
+    @app.delete("/api/chat/groups/{group_id}/memory/{entry_id}", response_model=None)
+    async def delete_memory(group_id: str, entry_id: str):
+        db = factory()
+        try:
+            if not db.delete_memory_entry(group_id, entry_id):
+                return JSONResponse(
+                    status_code=404,
+                    content={"error_code": "not_found", "message": "memory entry not found"},
                 )
             return {"ok": True}
         except Exception:

@@ -24,14 +24,18 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import {
   addKnowledgeFile,
+  addMemoryEntry,
   type ChatGroup,
   type ChatKnowledgeFile,
+  type ChatMemoryEntry,
   createCronJob,
   type CronJob,
   deleteCronJob,
   deleteKnowledgeFile,
+  deleteMemoryEntry,
   getCronJobsForGroup,
   listKnowledgeFiles,
+  listMemoryEntries,
   pauseCronJob,
   resumeCronJob,
   type SessionInfo
@@ -75,6 +79,9 @@ const PASTED_KNOWLEDGE_NAME = 'note.md'
 // shows how much of this budget the project's knowledge files consume; content
 // past it is truncated server-side at agent build.
 const KNOWLEDGE_BUDGET = 32_000
+// Mirror the backend per-entry memory cap (routes _MEMORY_CONTENT_MAX). Validate
+// here so an oversized note fails fast with a friendly message instead of a 4xx.
+const MEMORY_CONTENT_MAX = 4_000
 // Cron job names surface in the global Scheduled dashboard, so derive a short one
 // from the prompt rather than dumping the whole instruction into the name slot.
 const SCHEDULED_NAME_MAX = 60
@@ -611,11 +618,11 @@ function ContextCard({ project }: { project: ChatGroup }) {
   const { t } = useI18n()
   const p = t.sidebar.projects.page
 
-  // Memory lands in a follow-up push once its backend store exists; shipping an
-  // honest-empty placeholder now would imply a capture flow that isn't wired yet.
   return (
     <ProjectCard icon={<FolderOpen className="size-3.5" />} title={p.contextTitle}>
       <KnowledgeSection project={project} />
+      <div className="my-4 border-t border-(--ui-divider)" />
+      <MemorySection project={project} />
     </ProjectCard>
   )
 }
@@ -847,6 +854,135 @@ function KnowledgeSection({ project }: { project: ChatGroup }) {
           <Button disabled={busy || !paste.trim()} onClick={() => void addPasted()} size="sm">
             <Plus className="size-3.5" />
             {p.addKnowledge}
+          </Button>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+// Project memory: short durable notes injected into every chat in the project.
+// Mirrors KnowledgeSection's list/add/delete shape. Entries carry a `source`
+// ('user' or 'agent') so agent-written notes get a small badge — the agent
+// writes its own via the project_memory tool; this UI only adds user notes.
+function MemorySection({ project }: { project: ChatGroup }) {
+  const { t } = useI18n()
+  const p = t.sidebar.projects.page
+  const [entries, setEntries] = useState<ChatMemoryEntry[] | null>(null)
+  const [text, setText] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+
+    listMemoryEntries(project.id)
+      .then(loaded => {
+        if (!cancelled) {
+          setEntries(loaded)
+        }
+      })
+      .catch(err => {
+        if (!cancelled) {
+          setEntries([])
+          notifyError(err, p.memoryLoadFailed)
+        }
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [project.id, p.memoryLoadFailed])
+
+  async function add() {
+    const content = text.trim()
+
+    if (!content) {
+      return
+    }
+
+    if (content.length > MEMORY_CONTENT_MAX) {
+      notify({ durationMs: 3_000, kind: 'error', message: p.memoryTooLong })
+
+      return
+    }
+
+    setBusy(true)
+
+    try {
+      const created = await addMemoryEntry(project.id, content)
+      setEntries(current => [...(current ?? []), created])
+      setText('')
+      notify({ durationMs: 2_000, kind: 'success', message: p.memoryAdded })
+    } catch (err) {
+      notifyError(err, p.memoryAddFailed)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function remove(entryId: string) {
+    try {
+      await deleteMemoryEntry(project.id, entryId)
+      setEntries(current => (current ?? []).filter(entry => entry.id !== entryId))
+      notify({ durationMs: 2_000, kind: 'success', message: p.memoryDeleted })
+    } catch (err) {
+      notifyError(err, p.memoryDeleteFailed)
+    }
+  }
+
+  return (
+    <section>
+      <SectionTitle>{p.memoryTitle}</SectionTitle>
+      <p className="mt-1 text-[length:var(--conversation-caption-font-size)] leading-(--conversation-caption-line-height) text-(--ui-text-tertiary)">
+        {p.memoryHint}
+      </p>
+
+      <div className="mt-3 grid gap-1">
+        {entries === null ? (
+          <p className="text-[length:var(--conversation-caption-font-size)] text-(--ui-text-tertiary)">…</p>
+        ) : entries.length === 0 ? (
+          <p className="text-[length:var(--conversation-caption-font-size)] text-(--ui-text-tertiary)">
+            {p.memoryEmpty}
+          </p>
+        ) : (
+          entries.map(entry => (
+            <div className="flex items-start gap-2 rounded-md border border-(--ui-divider) px-3 py-2" key={entry.id}>
+              <div className="min-w-0 flex-1">
+                <p className="whitespace-pre-wrap break-words text-[0.8125rem] text-(--ui-text-secondary)">
+                  {entry.content}
+                </p>
+                {entry.source === 'agent' && (
+                  <span className="mt-1 inline-block rounded-sm bg-(--ui-divider) px-1.5 py-0.5 text-[0.6rem] uppercase tracking-wide text-(--ui-text-tertiary)">
+                    {p.memoryAgentBadge}
+                  </span>
+                )}
+              </div>
+              <Button
+                aria-label={p.memoryRemove}
+                className="size-7 shrink-0"
+                onClick={() => void remove(entry.id)}
+                size="icon"
+                title={p.memoryRemove}
+                variant="ghost"
+              >
+                <Trash2 className="size-3.5" />
+              </Button>
+            </div>
+          ))
+        )}
+      </div>
+
+      <div className="mt-3 space-y-2 rounded-lg border border-(--ui-divider) p-3">
+        <Textarea
+          aria-label={p.memoryPlaceholder}
+          onChange={event => setText(event.target.value)}
+          placeholder={p.memoryPlaceholder}
+          value={text}
+        />
+        <div className="flex justify-end">
+          <Button disabled={busy || !text.trim()} onClick={() => void add()} size="sm">
+            <Plus className="size-3.5" />
+            {p.memoryAdd}
           </Button>
         </div>
       </div>

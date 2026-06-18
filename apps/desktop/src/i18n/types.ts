@@ -982,7 +982,18 @@ export interface Translations {
         scheduledCadencePlaceholder: string
         contextTitle: string
         memoryTitle: string
+        memoryHint: string
         memoryEmpty: string
+        memoryLoadFailed: string
+        memoryPlaceholder: string
+        memoryAdd: string
+        memoryAdded: string
+        memoryAddFailed: string
+        memoryDeleted: string
+        memoryDeleteFailed: string
+        memoryRemove: string
+        memoryAgentBadge: string
+        memoryTooLong: string
       }
     }
     groupAriaGrouped: string

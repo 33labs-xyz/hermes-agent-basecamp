@@ -185,3 +185,60 @@ def test_delete_file(client):
 def test_delete_unknown_file_is_404(client):
     gid = _create(client, name="G").json()["id"]
     assert client.delete(f"/api/chat/groups/{gid}/files/ghost").status_code == 404
+
+
+# --- Project memory -------------------------------------------------------
+
+
+def _add_memory(client, gid, content="User ships to Netlify."):
+    return client.post(f"/api/chat/groups/{gid}/memory", json={"content": content})
+
+
+def test_add_memory_returns_record(client):
+    gid = _create(client, name="G").json()["id"]
+
+    resp = _add_memory(client, gid, content="Prefers metric units.")
+
+    assert resp.status_code == 200
+    payload = resp.json()
+    assert payload["content"] == "Prefers metric units."
+    assert payload["source"] == "user"
+    assert "id" in payload
+
+
+def test_add_memory_unknown_group_is_404(client):
+    assert _add_memory(client, "nope").status_code == 404
+
+
+def test_add_memory_blank_content_is_400(client):
+    gid = _create(client, name="G").json()["id"]
+    assert _add_memory(client, gid, content="   ").status_code == 400
+
+
+def test_add_memory_content_too_large_is_400(client):
+    gid = _create(client, name="G").json()["id"]
+    assert _add_memory(client, gid, content="x" * 4_001).status_code == 400
+
+
+def test_list_memory_returns_added(client):
+    gid = _create(client, name="G").json()["id"]
+    _add_memory(client, gid, content="first")
+    _add_memory(client, gid, content="second")
+
+    resp = client.get(f"/api/chat/groups/{gid}/memory")
+
+    assert resp.status_code == 200
+    assert [e["content"] for e in resp.json()["entries"]] == ["first", "second"]
+
+
+def test_delete_memory_entry(client):
+    gid = _create(client, name="G").json()["id"]
+    eid = _add_memory(client, gid).json()["id"]
+
+    assert client.delete(f"/api/chat/groups/{gid}/memory/{eid}").status_code == 200
+    assert client.get(f"/api/chat/groups/{gid}/memory").json()["entries"] == []
+
+
+def test_delete_unknown_memory_entry_is_404(client):
+    gid = _create(client, name="G").json()["id"]
+    assert client.delete(f"/api/chat/groups/{gid}/memory/ghost").status_code == 404

@@ -860,3 +860,39 @@ export function deleteKnowledgeFile(groupId: string, fileId: string): Promise<{ 
     method: 'DELETE'
   })
 }
+
+// A project memory entry: a short durable note scoped to the project. Entries are
+// injected into the agent's system prompt for every chat in the project. `source`
+// is 'user' for UI-added notes and 'agent' for notes the agent wrote itself via
+// the project_memory tool, so the UI can badge the difference.
+export interface ChatMemoryEntry {
+  id: string
+  group_id: string
+  content: string
+  source: 'user' | 'agent'
+  created_at: number
+  updated_at: number
+}
+
+export async function listMemoryEntries(groupId: string): Promise<ChatMemoryEntry[]> {
+  const { entries } = await window.hermesDesktop.api<{ entries: ChatMemoryEntry[] }>({
+    path: `/api/chat/groups/${encodeURIComponent(groupId)}/memory`
+  })
+
+  return entries ?? []
+}
+
+export function addMemoryEntry(groupId: string, content: string): Promise<ChatMemoryEntry> {
+  return window.hermesDesktop.api<ChatMemoryEntry>({
+    path: `/api/chat/groups/${encodeURIComponent(groupId)}/memory`,
+    method: 'POST',
+    body: { content }
+  })
+}
+
+export function deleteMemoryEntry(groupId: string, entryId: string): Promise<{ ok: boolean }> {
+  return window.hermesDesktop.api<{ ok: boolean }>({
+    path: `/api/chat/groups/${encodeURIComponent(groupId)}/memory/${encodeURIComponent(entryId)}`,
+    method: 'DELETE'
+  })
+}

@@ -1441,7 +1441,18 @@ export const zh: Translations = {
         scheduledCadencePlaceholder: '例如：每天上午9点',
         contextTitle: '上下文',
         memoryTitle: '记忆',
-        memoryEmpty: '让助手记住的内容会保存在这里。'
+        memoryHint: '助手在本项目所有对话中都会记住的简短事实。',
+        memoryEmpty: '暂无记忆。添加一条备注，或由助手保存它学到的内容。',
+        memoryLoadFailed: '无法加载项目记忆',
+        memoryPlaceholder: '添加一条本项目需要记住的事实…',
+        memoryAdd: '添加',
+        memoryAdded: '记忆已保存',
+        memoryAddFailed: '无法保存记忆',
+        memoryDeleted: '记忆已删除',
+        memoryDeleteFailed: '无法删除记忆',
+        memoryRemove: '删除',
+        memoryAgentBadge: '助手',
+        memoryTooLong: '备注过长（最多 4,000 个字符）'
       }
     },
     groupAriaGrouped: '以单一列表显示会话',

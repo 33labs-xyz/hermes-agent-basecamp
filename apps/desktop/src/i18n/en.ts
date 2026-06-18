@@ -1254,7 +1254,18 @@ export const en: Translations = {
         scheduledCadencePlaceholder: 'e.g. every day at 9am',
         contextTitle: 'Context',
         memoryTitle: 'Memory',
-        memoryEmpty: "Ask the agent to remember something and it'll save it here."
+        memoryHint: 'Short facts the agent keeps in mind across every chat in this project.',
+        memoryEmpty: 'No memory yet. Add a note, or the agent will save what it learns.',
+        memoryLoadFailed: 'Could not load project memory',
+        memoryPlaceholder: 'Add a fact to remember for this project…',
+        memoryAdd: 'Add',
+        memoryAdded: 'Memory saved',
+        memoryAddFailed: 'Could not save memory',
+        memoryDeleted: 'Memory removed',
+        memoryDeleteFailed: 'Could not remove memory',
+        memoryRemove: 'Remove',
+        memoryAgentBadge: 'agent',
+        memoryTooLong: 'Note too long (max 4,000 characters)'
       }
     },
     groupAriaGrouped: 'Show sessions as a single list',
