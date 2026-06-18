@@ -16,13 +16,14 @@ import {
   type SessionInfo
 } from '@/hermes'
 import { useI18n } from '@/i18n'
-import { ChevronLeft, FileText, FolderOpen, Plus, Save, Trash2 } from '@/lib/icons'
+import { ChevronLeft, FileText, FolderOpen, Pencil, Plus, Save, Trash2 } from '@/lib/icons'
 import { notify, notifyError } from '@/store/notifications'
 import { $projects, $projectsLoading, setPendingProjectForNewChat, updateProject } from '@/store/projects'
 import { $cronSessions, $sessions } from '@/store/session'
 
+import { ProjectSettingsDialog } from '../chat/sidebar/project-dialog'
 import { PageSearchShell } from '../page-search-shell'
-import { NEW_CHAT_ROUTE, sessionRoute } from '../routes'
+import { NEW_CHAT_ROUTE, projectRoute, sessionRoute } from '../routes'
 import type { SetStatusbarItemGroup } from '../shell/statusbar-controls'
 
 // Mirror the backend per-file content cap (_FILE_CONTENT_MAX). Validate here so
@@ -30,6 +31,10 @@ import type { SetStatusbarItemGroup } from '../shell/statusbar-controls'
 const KNOWLEDGE_CONTENT_MAX = 200_000
 // Fallback name for pasted text when the user leaves the name field blank.
 const PASTED_KNOWLEDGE_NAME = 'note.md'
+// Mirror the backend KNOWLEDGE_CONTEXT_MAX inject budget. The capacity meter
+// shows how much of this budget the project's knowledge files consume; content
+// past it is truncated server-side at agent build.
+const KNOWLEDGE_BUDGET = 32_000
 
 interface ProjectsViewProps extends React.ComponentProps<'section'> {
   setStatusbarItemGroup?: SetStatusbarItemGroup
@@ -44,11 +49,24 @@ export function ProjectsView({ setStatusbarItemGroup: _setStatusbarItemGroup, ..
   const loading = useStore($projectsLoading)
   const project = useMemo(() => projects.find(group => group.id === groupId) ?? null, [projects, groupId])
 
+  const [createOpen, setCreateOpen] = useState(false)
+  const [editOpen, setEditOpen] = useState(false)
+
   // Still resolving the project list on a cold open — wait before deciding the
   // id is bad, so a deep link doesn't flash "not found" before projects load.
   const stillLoading = loading && projects.length === 0
+  const isLanding = groupId === ''
 
-  const header = (
+  const header = isLanding ? (
+    <div className="flex min-w-0 flex-1 items-center gap-2">
+      <FolderOpen className="size-4 shrink-0 text-(--ui-text-tertiary)" />
+      <h2 className="min-w-0 truncate text-[0.9375rem] font-semibold tracking-tight">{t.sidebar.projects.label}</h2>
+      <Button className="ml-auto" onClick={() => setCreateOpen(true)} size="sm" variant="textStrong">
+        <Plus className="size-3.5" />
+        {t.sidebar.projects.add}
+      </Button>
+    </div>
+  ) : (
     <div className="flex min-w-0 flex-1 items-center gap-2">
       <Button aria-label={p.back} onClick={() => navigate(NEW_CHAT_ROUTE)} size="icon-xs" variant="ghost">
         <ChevronLeft className="size-4" />
@@ -58,10 +76,16 @@ export function ProjectsView({ setStatusbarItemGroup: _setStatusbarItemGroup, ..
         {project ? project.name : p.notFound}
       </h2>
       {project && (
-        <Button className="ml-auto" onClick={() => startNewChat(project.id, navigate)} size="sm" variant="textStrong">
-          <Plus className="size-3.5" />
-          {p.newChat}
-        </Button>
+        <div className="ml-auto flex shrink-0 items-center gap-1.5">
+          <Button aria-label={p.edit} onClick={() => setEditOpen(true)} size="sm" variant="ghost">
+            <Pencil className="size-3.5" />
+            {p.edit}
+          </Button>
+          <Button onClick={() => startNewChat(project.id, navigate)} size="sm" variant="textStrong">
+            <Plus className="size-3.5" />
+            {p.newChat}
+          </Button>
+        </div>
       )}
     </div>
   )
@@ -75,8 +99,10 @@ export function ProjectsView({ setStatusbarItemGroup: _setStatusbarItemGroup, ..
       searchValue=""
       tabs={header}
     >
-      {project ? (
-        <ProjectDetail key={project.id} project={project} />
+      {isLanding ? (
+        <ProjectsLanding loading={stillLoading} onCreate={() => setCreateOpen(true)} projects={projects} />
+      ) : project ? (
+        <ProjectWorkspace key={project.id} project={project} />
       ) : stillLoading ? (
         <PageLoader label={p.openProject} />
       ) : (
@@ -84,25 +110,12 @@ export function ProjectsView({ setStatusbarItemGroup: _setStatusbarItemGroup, ..
           {p.notFound}
         </div>
       )}
+
+      <ProjectSettingsDialog onOpenChange={setCreateOpen} open={createOpen} project={null} />
+      {project && (
+        <ProjectSettingsDialog onOpenChange={setEditOpen} open={editOpen} project={project} />
+      )}
     </PageSearchShell>
-  )
-}
-
-function ProjectDetail({ project }: { project: ChatGroup }) {
-  return (
-    <div className="min-h-0 flex-1 overflow-y-auto">
-      <div className="mx-auto max-w-2xl space-y-6 px-5 py-5">
-        {project.description.trim() && (
-          <p className="text-[length:var(--conversation-caption-font-size)] leading-(--conversation-caption-line-height) text-(--ui-text-tertiary)">
-            {project.description}
-          </p>
-        )}
-
-        <InstructionsSection project={project} />
-        <KnowledgeSection project={project} />
-        <RecentChatsSection project={project} />
-      </div>
-    </div>
   )
 }
 
@@ -111,6 +124,93 @@ function ProjectDetail({ project }: { project: ChatGroup }) {
 function startNewChat(projectId: string, navigate: (to: string) => void) {
   setPendingProjectForNewChat(projectId)
   navigate(NEW_CHAT_ROUTE)
+}
+
+function ProjectsLanding({
+  loading,
+  onCreate,
+  projects
+}: {
+  loading: boolean
+  onCreate: () => void
+  projects: ChatGroup[]
+}) {
+  const { t } = useI18n()
+  const p = t.sidebar.projects.page
+  const navigate = useNavigate()
+
+  return (
+    <div className="min-h-0 flex-1 overflow-y-auto">
+      <div className="mx-auto max-w-4xl px-5 py-6">
+        <p className="text-[length:var(--conversation-caption-font-size)] leading-(--conversation-caption-line-height) text-(--ui-text-tertiary)">
+          {p.subtitle}
+        </p>
+
+        {loading ? (
+          <div className="mt-6 text-sm text-(--ui-text-tertiary)">…</div>
+        ) : (
+          <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <button
+              className="flex min-h-[7.5rem] flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-(--ui-divider) p-4 text-(--ui-text-tertiary) transition-colors hover:border-(--ui-stroke-tertiary) hover:bg-(--ui-control-hover-background) hover:text-foreground"
+              onClick={onCreate}
+              type="button"
+            >
+              <Plus className="size-5" />
+              <span className="text-[0.8125rem] font-medium">{t.sidebar.projects.add}</span>
+            </button>
+
+            {projects.map(project => (
+              <button
+                className="group flex min-h-[7.5rem] flex-col gap-1.5 rounded-xl border border-(--ui-divider) p-4 text-left transition-colors hover:border-(--ui-stroke-tertiary) hover:bg-(--ui-control-hover-background)"
+                key={project.id}
+                onClick={() => navigate(projectRoute(project.id))}
+                title={project.name}
+                type="button"
+              >
+                <FolderOpen className="size-5 shrink-0 text-(--ui-text-tertiary)" />
+                <span className="truncate text-[0.875rem] font-semibold tracking-tight">{project.name}</span>
+                {project.description.trim() && (
+                  <span className="line-clamp-2 text-[0.75rem] leading-snug text-(--ui-text-tertiary)">
+                    {project.description}
+                  </span>
+                )}
+                <span className="mt-auto text-[0.6875rem] text-(--ui-text-quaternary) tabular-nums">
+                  {p.chatCount(project.session_ids.length)}
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
+
+        {!loading && projects.length === 0 && (
+          <p className="mt-4 text-sm text-(--ui-text-tertiary)">{t.sidebar.projects.empty}</p>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function ProjectWorkspace({ project }: { project: ChatGroup }) {
+  return (
+    <div className="flex min-h-0 flex-1">
+      <main className="min-w-0 flex-1 overflow-y-auto">
+        <div className="mx-auto max-w-3xl space-y-5 px-5 py-5">
+          {project.description.trim() && (
+            <p className="text-[length:var(--conversation-caption-font-size)] leading-(--conversation-caption-line-height) text-(--ui-text-tertiary)">
+              {project.description}
+            </p>
+          )}
+          <ChatsSection project={project} />
+        </div>
+      </main>
+      <aside className="hidden w-80 shrink-0 overflow-y-auto border-l border-(--ui-divider) lg:block">
+        <div className="space-y-6 px-4 py-5">
+          <KnowledgeSection project={project} />
+          <InstructionsSection project={project} />
+        </div>
+      </aside>
+    </div>
+  )
 }
 
 function InstructionsSection({ project }: { project: ChatGroup }) {
@@ -189,6 +289,12 @@ function KnowledgeSection({ project }: { project: ChatGroup }) {
     }
   }, [project.id, p.knowledgeLoadFailed])
 
+  // Sum of stored characters across the project's knowledge files, capped at the
+  // inject budget for the meter fill (content past it is truncated server-side).
+  const used = (files ?? []).reduce((total, file) => total + file.size, 0)
+  const pct = Math.min(100, Math.round((used / KNOWLEDGE_BUDGET) * 100))
+  const full = used >= KNOWLEDGE_BUDGET
+
   async function add(content: string, fileName: string, contentType?: string) {
     if (content.length > KNOWLEDGE_CONTENT_MAX) {
       notify({ durationMs: 3_000, kind: 'error', message: p.fileTooLarge })
@@ -250,6 +356,20 @@ function KnowledgeSection({ project }: { project: ChatGroup }) {
       <p className="mt-1 text-[length:var(--conversation-caption-font-size)] leading-(--conversation-caption-line-height) text-(--ui-text-tertiary)">
         {p.knowledgeHint}
       </p>
+
+      <div className="mt-3">
+        <div className="flex items-center justify-between text-[0.66rem] text-(--ui-text-tertiary)">
+          <span>{p.capacityTitle}</span>
+          <span className="tabular-nums">{p.capacityUsage(used, KNOWLEDGE_BUDGET)}</span>
+        </div>
+        <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-(--ui-divider)">
+          <div
+            className={full ? 'h-full rounded-full bg-destructive' : 'h-full rounded-full bg-(--ui-text-tertiary)'}
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+        {full && <p className="mt-1 text-[0.66rem] text-destructive">{p.capacityFull}</p>}
+      </div>
 
       <div className="mt-3 grid gap-1">
         {files === null ? (
@@ -320,7 +440,7 @@ function KnowledgeSection({ project }: { project: ChatGroup }) {
   )
 }
 
-function RecentChatsSection({ project }: { project: ChatGroup }) {
+function ChatsSection({ project }: { project: ChatGroup }) {
   const { t } = useI18n()
   const p = t.sidebar.projects.page
   const navigate = useNavigate()
@@ -341,8 +461,19 @@ function RecentChatsSection({ project }: { project: ChatGroup }) {
     <section>
       <SectionTitle>{p.recentChats}</SectionTitle>
       <div className="mt-3 grid gap-1">
+        <button
+          className="flex items-center gap-2 rounded-lg border border-dashed border-(--ui-divider) px-3 py-2.5 text-left text-[0.8125rem] text-(--ui-text-secondary) transition-colors hover:border-(--ui-stroke-tertiary) hover:bg-(--ui-control-hover-background) hover:text-foreground"
+          onClick={() => startNewChat(project.id, navigate)}
+          type="button"
+        >
+          <Plus className="size-3.5 shrink-0 text-(--ui-text-tertiary)" />
+          {p.newChat}
+        </button>
+
         {project.session_ids.length === 0 ? (
-          <p className="text-[length:var(--conversation-caption-font-size)] text-(--ui-text-tertiary)">{p.noChats}</p>
+          <p className="px-1 py-1 text-[length:var(--conversation-caption-font-size)] text-(--ui-text-tertiary)">
+            {p.noChats}
+          </p>
         ) : (
           project.session_ids.map(sessionId => {
             const session = sessionById.get(sessionId)

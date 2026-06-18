@@ -1409,7 +1409,13 @@ export const zh: Translations = {
         knowledgeDeleteFailed: '无法移除知识',
         removeFile: '移除',
         fileTooLarge: '文件过大（最多 200,000 个字符）',
-        fileBytes: chars => `${chars.toLocaleString()} 个字符`
+        fileBytes: chars => `${chars.toLocaleString()} 个字符`,
+        subtitle: '将相关聊天归组，再添加每个聊天都会用到的指令和知识。',
+        chatCount: count => `${count} 个聊天`,
+        edit: '编辑',
+        capacityTitle: '知识容量',
+        capacityUsage: (used, max) => `${used.toLocaleString()} / ${max.toLocaleString()} 个字符`,
+        capacityFull: '知识已满，移除文件后可继续添加。'
       }
     },
     groupAriaGrouped: '以单一列表显示会话',

@@ -8,7 +8,7 @@ import { useStore } from '@nanostores/react'
 import { useQuery } from '@tanstack/react-query'
 import type * as React from 'react'
 import { Suspense, useCallback, useMemo, useRef } from 'react'
-import { useLocation } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 
 import { Thread } from '@/components/assistant-ui/thread'
 import { Backdrop } from '@/components/Backdrop'
@@ -23,6 +23,7 @@ import { cn } from '@/lib/utils'
 import type { ComposerAttachment } from '@/store/composer'
 import { $pinnedSessionIds } from '@/store/layout'
 import { $gatewaySwapTarget } from '@/store/profile'
+import { $projects } from '@/store/projects'
 import {
   $activeSessionId,
   $awaitingResponse,
@@ -45,7 +46,7 @@ import {
 import { isSecondaryWindow } from '@/store/windows'
 import type { ModelOptionsResponse } from '@/types/hermes'
 
-import { routeSessionId } from '../routes'
+import { projectRoute, routeSessionId } from '../routes'
 import { titlebarHeaderBaseClass, titlebarHeaderShadowClass, titlebarHeaderTitleClass } from '../shell/titlebar'
 
 import { ChatDropOverlay } from './chat-drop-overlay'
@@ -106,11 +107,27 @@ function ChatHeader({
 }: ChatHeaderProps) {
   const sessions = useStore($sessions)
   const pinnedSessionIds = useStore($pinnedSessionIds)
+  const projects = useStore($projects)
+  const navigate = useNavigate()
 
   const activeStoredSession =
     sessions.find(session => session.id === selectedSessionId || session._lineage_root_id === selectedSessionId) || null
 
   const title = activeStoredSession ? sessionTitle(activeStoredSession) : 'New session'
+
+  // Surface the owning project as a clickable chip so a chat in a project reads
+  // like Claude's projects (membership is one group per session, resolved off
+  // any of the session's known ids — live tip, lineage root, or active id).
+  const ownerCandidateIds = [
+    selectedSessionId,
+    activeSessionId,
+    activeStoredSession?.id,
+    activeStoredSession?._lineage_root_id
+  ].filter((id): id is string => Boolean(id))
+  const ownerProject =
+    ownerCandidateIds.length > 0
+      ? projects.find(group => group.session_ids.some(id => ownerCandidateIds.includes(id))) ?? null
+      : null
 
   // Pins live on the durable lineage-root id, but selectedSessionId is the live
   // (tip) id — resolve through the loaded row so the menu reflects the pin
@@ -155,6 +172,17 @@ function ChatHeader({
             <Codicon className="shrink-0 text-(--ui-text-tertiary)" name="chevron-down" size="0.8125rem" />
           </Button>
         </SessionActionsMenu>
+        {ownerProject && (
+          <button
+            className="pointer-events-auto flex h-6 min-w-0 max-w-[12rem] items-center gap-1 rounded-md border border-transparent px-1.5 text-(--ui-text-tertiary) hover:border-(--ui-stroke-tertiary) hover:bg-(--ui-control-hover-background) hover:text-foreground [-webkit-app-region:no-drag]"
+            onClick={() => navigate(projectRoute(ownerProject.id))}
+            title={ownerProject.name}
+            type="button"
+          >
+            <Codicon className="shrink-0" name="folder" size="0.75rem" />
+            <span className="min-w-0 truncate text-[0.6875rem] font-medium leading-none">{ownerProject.name}</span>
+          </button>
+        )}
       </div>
     </header>
   )

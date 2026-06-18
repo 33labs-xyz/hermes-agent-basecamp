@@ -23,7 +23,7 @@ import { notify, notifyError } from '@/store/notifications'
 import { $projects, deleteProject } from '@/store/projects'
 import { $cronSessions, $selectedStoredSessionId, $sessions } from '@/store/session'
 
-import { projectRoute } from '../../routes'
+import { PROJECTS_ROUTE, projectRoute } from '../../routes'
 import { SidebarPanelLabel } from '../../shell/sidebar-label'
 
 import { ProjectSettingsDialog } from './project-dialog'
@@ -66,18 +66,29 @@ export function SidebarProjectsSection({ label, onOpenChat, onToggle, open }: Si
   return (
     <SidebarGroup className="shrink-0 p-0 pb-1">
       <div className="group/section flex shrink-0 items-center justify-between pb-1 pt-1.5">
-        <button
-          className="group/section-label flex w-fit items-center gap-1 bg-transparent text-left leading-none"
-          onClick={onToggle}
-          type="button"
-        >
-          <SidebarPanelLabel>{label}</SidebarPanelLabel>
-          <span className="text-[0.6875rem] font-medium text-(--ui-text-quaternary)">{projects.length}</span>
-          <DisclosureCaret
-            className="text-(--ui-text-tertiary) opacity-0 transition group-hover/section-label:opacity-100"
-            open={open}
-          />
-        </button>
+        <div className="group/section-label flex w-fit items-center gap-1 leading-none">
+          <button
+            className="flex items-center gap-1 bg-transparent text-left leading-none"
+            onClick={() => navigate(PROJECTS_ROUTE)}
+            title={label}
+            type="button"
+          >
+            <SidebarPanelLabel>{label}</SidebarPanelLabel>
+            <span className="text-[0.6875rem] font-medium text-(--ui-text-quaternary)">{projects.length}</span>
+          </button>
+          <button
+            aria-expanded={open}
+            aria-label={label}
+            className="bg-transparent leading-none"
+            onClick={onToggle}
+            type="button"
+          >
+            <DisclosureCaret
+              className="text-(--ui-text-tertiary) opacity-0 transition group-hover/section-label:opacity-100"
+              open={open}
+            />
+          </button>
+        </div>
         <Tip label={p.add}>
           <Button
             aria-label={p.add}

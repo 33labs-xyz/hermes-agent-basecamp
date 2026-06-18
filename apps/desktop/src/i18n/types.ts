@@ -951,6 +951,12 @@ export interface Translations {
         removeFile: string
         fileTooLarge: string
         fileBytes: (chars: number) => string
+        subtitle: string
+        chatCount: (count: number) => string
+        edit: string
+        capacityTitle: string
+        capacityUsage: (used: number, max: number) => string
+        capacityFull: string
       }
     }
     groupAriaGrouped: string

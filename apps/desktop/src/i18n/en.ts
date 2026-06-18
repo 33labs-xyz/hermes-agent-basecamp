@@ -1222,7 +1222,13 @@ export const en: Translations = {
         knowledgeDeleteFailed: 'Could not remove knowledge',
         removeFile: 'Remove',
         fileTooLarge: 'File too large (max 200,000 characters)',
-        fileBytes: chars => `${chars.toLocaleString()} chars`
+        fileBytes: chars => `${chars.toLocaleString()} chars`,
+        subtitle: 'Group related chats, then add instructions and knowledge the agent uses in every chat.',
+        chatCount: count => `${count} ${count === 1 ? 'chat' : 'chats'}`,
+        edit: 'Edit',
+        capacityTitle: 'Knowledge capacity',
+        capacityUsage: (used, max) => `${used.toLocaleString()} / ${max.toLocaleString()} chars`,
+        capacityFull: 'Knowledge is full. Remove a file to add more.'
       }
     },
     groupAriaGrouped: 'Show sessions as a single list',
