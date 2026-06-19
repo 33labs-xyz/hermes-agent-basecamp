@@ -214,16 +214,16 @@ pub(crate) fn resolve_hermes_desktop_exe(install_root: &std::path::Path) -> Opti
     let release_dir = install_root.join("apps").join("desktop").join("release");
     let candidates: &[(&str, &str)] = if cfg!(target_os = "windows") {
         &[
-            ("win-unpacked", "Hermes.exe"),
-            ("win-arm64-unpacked", "Hermes.exe"),
+            ("win-unpacked", "Basecamp.exe"),
+            ("win-arm64-unpacked", "Basecamp.exe"),
         ]
     } else if cfg!(target_os = "macos") {
         &[
-            ("mac/Hermes.app/Contents/MacOS", "Hermes"),
-            ("mac-arm64/Hermes.app/Contents/MacOS", "Hermes"),
+            ("mac/Basecamp.app/Contents/MacOS", "Basecamp"),
+            ("mac-arm64/Basecamp.app/Contents/MacOS", "Basecamp"),
         ]
     } else {
-        &[("linux-unpacked", "hermes")]
+        &[("linux-unpacked", "basecamp")]
     };
     for (subdir, exe) in candidates {
         let p = release_dir.join(subdir).join(exe);
