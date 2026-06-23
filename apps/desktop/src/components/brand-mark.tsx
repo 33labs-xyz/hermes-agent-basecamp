@@ -2,7 +2,7 @@ import { cn } from '@/lib/utils'
 
 const assetPath = (path: string) => `${import.meta.env.BASE_URL}${path.replace(/^\/+/, '')}`
 
-// Brand badge: Basecamp mountain mark, identical in light/dark.
+// Brand badge: Basecamp "B" mark, identical in light/dark.
 // The mark ships its own rounded tile + sky background; size via className (default size-14).
 export function BrandMark({ className, ...props }: React.ComponentProps<'span'>) {
   return (
