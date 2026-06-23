@@ -481,15 +481,16 @@ def test_apply_model_switch_does_not_leak_process_env():
     assert sess_a["agent"].model == "minimax/m3"
 
 
-def test_make_agent_appends_project_context_to_ephemeral_prompt():
-    """Desktop/TUI chats in a Project must be steered by the project's
-    instructions + knowledge + memory.
+def test_make_agent_does_not_bake_project_context_into_ephemeral_prompt():
+    """_make_agent must NOT snapshot project context into the ephemeral prompt.
 
-    Regression: the desktop dashboard built agents via _make_agent, which set
-    ephemeral_system_prompt from config only and never called
-    build_project_context — so chats ignored project instructions (e.g. a
-    "reply in pirate speak" project produced plain replies). _make_agent must
-    append SessionDB.build_project_context(session_id) like HermesCLI does.
+    The desktop dashboard reuses one cached AIAgent per session for its whole
+    lifetime, so a snapshot taken at construction goes stale the moment a chat
+    joins a Project or its instructions change. Project context is instead
+    recomputed every turn from the agent's own SessionDB + session_id (see
+    agent.project_context_refresh / test_project_context_refresh). So
+    _make_agent leaves ephemeral_system_prompt as the base prompt only and
+    never calls build_project_context at build time.
     """
 
     fake_runtime = {
@@ -524,10 +525,11 @@ def test_make_agent_appends_project_context_to_ephemeral_prompt():
 
         _make_agent("sid-proj", "20260623_051457_cdafa2")
 
-        fake_db.build_project_context.assert_called_once_with("20260623_051457_cdafa2")
+        # Construction must not snapshot project context.
+        fake_db.build_project_context.assert_not_called()
         ephemeral = mock_agent.call_args.kwargs["ephemeral_system_prompt"]
-        assert "base prompt" in ephemeral
-        assert "pirate speak" in ephemeral
+        assert ephemeral == "base prompt"
+        assert "pirate" not in (ephemeral or "")
 
 
 def test_make_agent_no_project_context_leaves_base_prompt_unchanged():

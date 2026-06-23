@@ -772,6 +772,11 @@ def run_conversation(
         effective_system = active_system_prompt or ""
         if agent.ephemeral_system_prompt:
             effective_system = (effective_system + "\n\n" + agent.ephemeral_system_prompt).strip()
+        # Project (chat_group) context is recomputed every turn so a chat that
+        # joins a Project — or whose project instructions change — is steered
+        # immediately, even on a long-lived cached agent. API-call-time only.
+        from agent.project_context_refresh import append_project_context
+        effective_system = append_project_context(effective_system, agent)
         if effective_system:
             api_messages = [{"role": "system", "content": effective_system}] + api_messages
 

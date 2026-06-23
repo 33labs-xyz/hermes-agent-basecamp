@@ -340,25 +340,12 @@ class CLIAgentSetupMixin:
                 "credential_pool": getattr(self, "_credential_pool", None),
             }
             effective_model = model_override or self.model
-            # Project (chat-group) context steers every chat in a project:
-            # its instructions plus any attached knowledge files are appended to
-            # the ephemeral system prompt so they apply to new and resumed
-            # sessions alike, without being persisted to trajectories.
+            # Project (chat-group) context is NOT folded in here. It is
+            # recomputed every turn from the agent's own SessionDB + session_id
+            # (see agent/project_context_refresh.py) so that joining a project,
+            # or editing its instructions, steers the very next message instead
+            # of only the messages sent after a fresh agent build.
             ephemeral_prompt = self.system_prompt if self.system_prompt else None
-            project_context = ""
-            try:
-                if self._session_db is not None and self.session_id:
-                    project_context = (
-                        self._session_db.build_project_context(self.session_id) or ""
-                    )
-            except Exception:
-                project_context = ""
-            if project_context:
-                ephemeral_prompt = (
-                    f"{ephemeral_prompt}\n\n{project_context}"
-                    if ephemeral_prompt
-                    else project_context
-                )
             self.agent = AIAgent(
                 model=effective_model,
                 api_key=runtime.get("api_key"),
