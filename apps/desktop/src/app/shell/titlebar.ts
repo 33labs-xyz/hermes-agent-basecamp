@@ -21,8 +21,12 @@ export const titlebarButtonClass =
 export const titlebarHeaderBaseClass =
   'pointer-events-none relative z-3 flex h-(--titlebar-height) w-full min-w-0 shrink-0 items-center justify-start gap-3 overflow-hidden border-b border-(--ui-stroke-tertiary) bg-(--ui-chat-surface-background) px-[max(0.75rem,var(--titlebar-content-inset,0rem))] pr-[calc(var(--titlebar-tools-right,0.75rem)+var(--titlebar-tools-width,0px)+0.75rem)]'
 
-// Title row inside the header — must stay in the flex truncate chain.
-export const titlebarHeaderTitleClass = 'min-w-0 flex-1 overflow-hidden'
+// Title row inside the header — must stay in the flex truncate chain. An
+// explicit flex row with items-center keeps the project chip, separator, and
+// title menu vertically centered; left as a block, multiple inline-block
+// children align on the text baseline and inflate the line box past the 34px
+// titlebar, so items-center centering clips the glyph tops.
+export const titlebarHeaderTitleClass = 'flex min-w-0 flex-1 items-center gap-1.5 overflow-hidden'
 
 export const titlebarHeaderShadowClass =
   "after:pointer-events-none after:absolute after:left-0 after:right-0 after:top-full after:h-4 after:bg-linear-to-b after:from-(--ui-chat-surface-background) after:to-transparent after:content-['']"

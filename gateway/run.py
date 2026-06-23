@@ -14572,6 +14572,24 @@ class GatewayRunner(GatewayAuthorizationMixin, GatewayKanbanWatchersMixin, Gatew
             if self._ephemeral_system_prompt:
                 combined_ephemeral = (combined_ephemeral + "\n\n" + self._ephemeral_system_prompt).strip()
 
+            # Inject per-session project (chat group) context — instructions,
+            # knowledge files, and memory — so Projects steer gateway/desktop
+            # chats the same way they steer the CLI agent (see
+            # cli_agent_setup_mixin._setup_agent). Ungrouped sessions resolve to
+            # "" and this is a no-op.
+            if self._session_db is not None and session_id:
+                try:
+                    project_context = self._session_db.build_project_context(session_id) or ""
+                except Exception:
+                    logger.debug("build_project_context failed for %s", session_id, exc_info=True)
+                    project_context = ""
+                if project_context:
+                    combined_ephemeral = (
+                        (combined_ephemeral + "\n\n" + project_context).strip()
+                        if combined_ephemeral
+                        else project_context
+                    )
+
             # Re-read .env and config for fresh credentials (gateway is long-lived,
             # keys may change without restart). Keep config.yaml authoritative for
             # runtime budget settings bridged into env vars.

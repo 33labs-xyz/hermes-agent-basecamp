@@ -21,10 +21,10 @@ import {
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import {
   addKnowledgeFile,
-  addMemoryEntry,
   type ChatGroup,
   type ChatKnowledgeFile,
   type ChatMemoryEntry,
@@ -41,7 +41,7 @@ import {
   type SessionInfo
 } from '@/hermes'
 import { useI18n } from '@/i18n'
-import { ArrowUp, ChevronDown, ChevronLeft, Clock, FileText, FolderOpen, MoreHorizontal, Pencil, Plus, Trash2 } from '@/lib/icons'
+import { ArrowUp, Brain, ChevronDown, ChevronLeft, FolderOpen, MoreHorizontal, Pencil, Plus, Trash2 } from '@/lib/icons'
 import { formatModelStatusLabel } from '@/lib/model-status-label'
 import { projectMemberTitle } from '@/lib/project-session-title'
 import { cn } from '@/lib/utils'
@@ -49,12 +49,11 @@ import { stashSessionDraft } from '@/store/composer'
 import { notify, notifyError } from '@/store/notifications'
 import {
   $projects,
-  $projectsLoading,
   $projectSessionMeta,
+  $projectsLoading,
   deleteProject,
   ensureProjectMemberSessions,
-  setPendingProjectForNewChat,
-  updateProject
+  setPendingProjectForNewChat
 } from '@/store/projects'
 import {
   $cronSessions,
@@ -67,7 +66,7 @@ import {
 
 import { ProjectSettingsDialog } from '../chat/sidebar/project-dialog'
 import { PageSearchShell } from '../page-search-shell'
-import { NEW_CHAT_ROUTE, PROJECTS_ROUTE, projectRoute, sessionRoute } from '../routes'
+import { NEW_CHAT_ROUTE, projectRoute, PROJECTS_ROUTE, sessionRoute } from '../routes'
 import type { SetStatusbarItemGroup } from '../shell/statusbar-controls'
 
 // Mirror the backend per-file content cap (_FILE_CONTENT_MAX). Validate here so
@@ -75,13 +74,6 @@ import type { SetStatusbarItemGroup } from '../shell/statusbar-controls'
 const KNOWLEDGE_CONTENT_MAX = 200_000
 // Fallback name for pasted text when the user leaves the name field blank.
 const PASTED_KNOWLEDGE_NAME = 'note.md'
-// Mirror the backend KNOWLEDGE_CONTEXT_MAX inject budget. The capacity meter
-// shows how much of this budget the project's knowledge files consume; content
-// past it is truncated server-side at agent build.
-const KNOWLEDGE_BUDGET = 32_000
-// Mirror the backend per-entry memory cap (routes _MEMORY_CONTENT_MAX). Validate
-// here so an oversized note fails fast with a friendly message instead of a 4xx.
-const MEMORY_CONTENT_MAX = 4_000
 // Cron job names surface in the global Scheduled dashboard, so derive a short one
 // from the prompt rather than dumping the whole instruction into the name slot.
 const SCHEDULED_NAME_MAX = 60
@@ -178,7 +170,7 @@ function ProjectsLanding({
   const navigate = useNavigate()
 
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto">
+    <div className="h-full min-h-0 overflow-y-auto">
       <div className="mx-auto max-w-4xl px-5 py-6">
         <p className="text-[length:var(--conversation-caption-font-size)] leading-(--conversation-caption-line-height) text-(--ui-text-tertiary)">
           {p.subtitle}
@@ -232,7 +224,7 @@ function ProjectWorkspace({ onEdit, project }: { onEdit: () => void; project: Ch
   const [deleteOpen, setDeleteOpen] = useState(false)
 
   return (
-    <div className="flex min-h-0 flex-1">
+    <div className="flex h-full min-h-0">
       <main className="min-w-0 flex-1 overflow-y-auto">
         <div className="mx-auto max-w-3xl space-y-6 px-5 py-6">
           <div className="flex items-start gap-2">
@@ -250,8 +242,8 @@ function ProjectWorkspace({ onEdit, project }: { onEdit: () => void; project: Ch
           <ChatsSection project={project} />
         </div>
       </main>
-      <aside className="hidden w-80 shrink-0 overflow-y-auto border-l border-(--ui-divider) lg:block">
-        <div className="space-y-4 px-4 py-5">
+      <aside className="hidden w-80 shrink-0 overflow-y-auto [scrollbar-gutter:stable] lg:block">
+        <div className="min-w-0 space-y-3 py-5 pl-2 pr-4">
           <InstructionsCard onEdit={onEdit} project={project} />
           <ScheduledCard project={project} />
           <ContextCard project={project} />
@@ -294,15 +286,15 @@ function ProjectComposer({ project }: { project: ChatGroup }) {
   }
 
   return (
-    <div className="rounded-2xl border border-(--ui-divider) bg-(--ui-control-background) px-3 py-2.5 shadow-sm focus-within:border-(--ui-stroke-tertiary)">
+    <div className="rounded-3xl border border-(--ui-divider) bg-(--ui-control-background) px-4 py-3.5 shadow-sm transition-colors focus-within:border-(--ui-stroke-tertiary)">
       <Textarea
-        className="min-h-[3rem] resize-none border-0 bg-transparent px-1 shadow-none focus-visible:ring-0"
+        className="min-h-[4.5rem] resize-none border-0 bg-transparent px-1 text-[0.9375rem] shadow-none focus-visible:ring-0"
         onChange={event => setText(event.target.value)}
         onKeyDown={onKeyDown}
         placeholder={p.composerPlaceholder}
         value={text}
       />
-      <div className="mt-1 flex items-center gap-2">
+      <div className="mt-2 flex items-center gap-2">
         <button
           className="flex items-center gap-1 rounded-md px-1.5 py-1 text-xs text-(--ui-text-tertiary) transition-colors hover:bg-(--chrome-action-hover) hover:text-foreground"
           onClick={() => setModelPickerOpen(true)}
@@ -369,14 +361,14 @@ function ProjectCard({
   children: React.ReactNode
   collapsed?: boolean
   controls?: React.ReactNode
-  icon: React.ReactNode
+  icon?: React.ReactNode
   onToggle?: () => void
   title: string
 }) {
   return (
-    <section className="rounded-xl border border-(--ui-divider) p-3.5">
+    <section className="overflow-hidden rounded-2xl border border-(--ui-divider) bg-(--ui-bg-elevated) p-4">
       <div className="flex items-center gap-2">
-        <span className="grid size-4 shrink-0 place-items-center text-(--ui-text-tertiary)">{icon}</span>
+        {icon && <span className="grid size-4 shrink-0 place-items-center text-(--ui-text-tertiary)">{icon}</span>}
         <h4 className="min-w-0 flex-1 truncate text-[0.8125rem] font-semibold tracking-tight">{title}</h4>
         {controls}
         {onToggle && (
@@ -415,7 +407,6 @@ function InstructionsCard({ onEdit, project }: { onEdit: () => void; project: Ch
           <Pencil className="size-3.5" />
         </button>
       }
-      icon={<FileText className="size-3.5" />}
       onToggle={() => setCollapsed(prev => !prev)}
       title={p.instructionsTitle}
     >
@@ -432,6 +423,143 @@ function InstructionsCard({ onEdit, project }: { onEdit: () => void; project: Ch
   )
 }
 
+type ScheduleMode = 'once' | 'daily' | 'weekly' | 'monthly'
+
+interface ScheduleFields {
+  date: string
+  time: string
+  weekday: string
+  monthday: string
+}
+
+// Translate the friendly picker selections into a schedule string the cron
+// backend's parse_schedule understands: an ISO local datetime for one-shots,
+// and a "minute hour dom month dow" cron expression for recurring runs. Returns
+// '' when the required fields for the chosen mode are missing so callers can
+// keep the create button disabled.
+function buildScheduleString(mode: ScheduleMode, fields: ScheduleFields): string {
+  const time = fields.time.trim()
+  const [rawHour, rawMinute] = time.split(':')
+  const hour = Number.parseInt(rawHour ?? '', 10)
+  const minute = Number.parseInt(rawMinute ?? '', 10)
+
+  if (mode === 'once') {
+    const date = fields.date.trim()
+
+    return date && time ? `${date}T${time}` : ''
+  }
+
+  if (!Number.isFinite(hour) || !Number.isFinite(minute)) {
+    return ''
+  }
+
+  if (mode === 'weekly') {
+    return `${minute} ${hour} * * ${fields.weekday}`
+  }
+
+  if (mode === 'monthly') {
+    return `${minute} ${hour} ${fields.monthday} * *`
+  }
+
+  return `${minute} ${hour} * * *`
+}
+
+// Render a clock time (hour/minute numbers) the way the user's locale shows
+// times, e.g. "6:15 AM". Falls back to a zero-padded 24h string if Intl chokes.
+function formatClock(hour: number, minute: number): string {
+  if (!Number.isFinite(hour) || !Number.isFinite(minute)) {
+    return ''
+  }
+
+  try {
+    const fmt = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' })
+
+    return fmt.format(new Date(Date.UTC(2023, 0, 1, hour, minute)))
+  } catch {
+    return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`
+  }
+}
+
+// Turn the stored schedule string back into the friendly phrasing the picker
+// produces, so a Scheduled row reads "Daily at 6:15 AM" instead of a raw cron
+// expression. Mirrors buildScheduleString's output shapes (ISO one-shot + the
+// four recurring cron layouts); anything unrecognized falls through to the raw
+// string so custom/legacy jobs still show something truthful.
+function humanizeSchedule(schedule: string): string {
+  const value = schedule.trim()
+
+  if (!value) {
+    return ''
+  }
+
+  // ISO one-shot: YYYY-MM-DDThh:mm (optionally with seconds).
+  const isoMatch = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(value)
+
+  if (isoMatch) {
+    const [, year, month, day, hour, minute] = isoMatch
+
+    const when = new Date(
+      Date.UTC(Number(year), Number(month) - 1, Number(day), Number(hour), Number(minute))
+    )
+
+    const date = new Intl.DateTimeFormat(undefined, {
+      day: 'numeric',
+      month: 'short',
+      timeZone: 'UTC',
+      weekday: 'short'
+    }).format(when)
+
+    return `Once on ${date} at ${formatClock(Number(hour), Number(minute))}`
+  }
+
+  const parts = value.split(/\s+/)
+
+  if (parts.length < 5) {
+    return value
+  }
+
+  const [rawMinute, rawHour, dom, , dow] = parts
+  const minute = Number.parseInt(rawMinute, 10)
+
+  if (!Number.isFinite(minute)) {
+    return value
+  }
+
+  // Hourly: wildcard hour, fixed minute, wildcards across dom/month/dow.
+  if (rawHour === '*' && dom === '*' && dow === '*') {
+    return `Hourly at :${String(minute).padStart(2, '0')}`
+  }
+
+  const hour = Number.parseInt(rawHour, 10)
+
+  if (!Number.isFinite(hour)) {
+    return value
+  }
+
+  const at = `at ${formatClock(hour, minute)}`
+
+  // Weekly: a single day-of-week, every day-of-month/month.
+  if (dom === '*' && /^[0-6]$/.test(dow)) {
+    const weekday = new Intl.DateTimeFormat(undefined, { weekday: 'long' }).format(
+      new Date(Date.UTC(2023, 0, 1 + Number(dow)))
+    )
+
+    return `Weekly on ${weekday} ${at}`
+  }
+
+  // Monthly: a fixed day-of-month, every month, any day-of-week.
+  if (dow === '*' && /^\d{1,2}$/.test(dom)) {
+    return `Monthly on day ${Number(dom)} ${at}`
+  }
+
+  // Daily: wildcards across dom/month/dow.
+  if (dom === '*' && dow === '*') {
+    return `Daily ${at}`
+  }
+
+  return value
+}
+
 // Project-scoped scheduling: lists the cron jobs tagged with this project's
 // group_id and lets you add one without leaving the workspace. Backed by the
 // real cron subsystem (multi-profile aggregation happens server-side), so a row
@@ -440,10 +568,37 @@ function ScheduledCard({ project }: { project: ChatGroup }) {
   const { t } = useI18n()
   const p = t.sidebar.projects.page
   const [jobs, setJobs] = useState<CronJob[] | null>(null)
+  const [collapsed, setCollapsed] = useState(false)
   const [adding, setAdding] = useState(false)
   const [prompt, setPrompt] = useState('')
-  const [schedule, setSchedule] = useState('')
+  const [mode, setMode] = useState<ScheduleMode>('daily')
+  const [date, setDate] = useState('')
+  const [time, setTime] = useState('09:00')
+  const [weekday, setWeekday] = useState('1')
+  const [monthday, setMonthday] = useState('1')
   const [busy, setBusy] = useState(false)
+
+  const scheduleString = buildScheduleString(mode, { date, monthday, time, weekday })
+
+  // Localized weekday names indexed to cron's day-of-week (0 = Sunday). The
+  // reference date 2023-01-01 is a Sunday, so +i days walks Sun..Sat.
+  const weekdayNames = useMemo(() => {
+    const fmt = new Intl.DateTimeFormat(undefined, { weekday: 'long' })
+
+    return Array.from({ length: 7 }, (_, i) => fmt.format(new Date(Date.UTC(2023, 0, 1 + i))))
+  }, [])
+
+  const monthdayOptions = useMemo(() => Array.from({ length: 31 }, (_, i) => i + 1), [])
+
+  function resetForm() {
+    setAdding(false)
+    setPrompt('')
+    setMode('daily')
+    setDate('')
+    setTime('09:00')
+    setWeekday('1')
+    setMonthday('1')
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -468,9 +623,8 @@ function ScheduledCard({ project }: { project: ChatGroup }) {
 
   async function create() {
     const trimmedPrompt = prompt.trim()
-    const trimmedSchedule = schedule.trim()
 
-    if (!trimmedPrompt || !trimmedSchedule) {
+    if (!trimmedPrompt || !scheduleString) {
       return
     }
 
@@ -481,12 +635,11 @@ function ScheduledCard({ project }: { project: ChatGroup }) {
         group_id: project.id,
         name: trimmedPrompt.slice(0, SCHEDULED_NAME_MAX),
         prompt: trimmedPrompt,
-        schedule: trimmedSchedule
+        schedule: scheduleString
       })
+
       setJobs(current => [...(current ?? []), created])
-      setPrompt('')
-      setSchedule('')
-      setAdding(false)
+      resetForm()
       notify({ durationMs: 2_000, kind: 'success', message: p.scheduledCreated })
     } catch (err) {
       notifyError(err, p.scheduledCreateFailed)
@@ -516,12 +669,16 @@ function ScheduledCard({ project }: { project: ChatGroup }) {
 
   return (
     <ProjectCard
+      collapsed={collapsed}
       controls={
         !adding && (
           <button
             aria-label={p.scheduledAdd}
             className="grid size-6 shrink-0 place-items-center rounded-sm text-(--ui-text-tertiary) hover:bg-(--ui-control-hover-background) hover:text-foreground"
-            onClick={() => setAdding(true)}
+            onClick={() => {
+              setCollapsed(false)
+              setAdding(true)
+            }}
             title={p.scheduledAdd}
             type="button"
           >
@@ -529,7 +686,7 @@ function ScheduledCard({ project }: { project: ChatGroup }) {
           </button>
         )
       }
-      icon={<Clock className="size-3.5" />}
+      onToggle={() => setCollapsed(prev => !prev)}
       title={p.scheduledTitle}
     >
       <div className="grid gap-1">
@@ -542,35 +699,49 @@ function ScheduledCard({ project }: { project: ChatGroup }) {
         ) : (
           jobs.map(job => (
             <div
-              className="flex items-center gap-2 rounded-md border border-(--ui-divider) px-3 py-2"
+              className="group flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-(--ui-row-hover-background)"
               key={job.id}
             >
               <div className="min-w-0 flex-1">
-                <p className="truncate text-[0.8125rem]">{job.name?.trim() || job.prompt?.trim() || job.id}</p>
+                <div className="flex items-center gap-1.5">
+                  <p className="truncate text-[0.8125rem]">{job.name?.trim() || job.prompt?.trim() || job.id}</p>
+                  <span
+                    className={cn(
+                      'shrink-0 rounded-full px-1.5 py-px text-[0.6rem] font-medium',
+                      job.enabled
+                        ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
+                        : 'bg-(--ui-divider) text-(--ui-text-tertiary)',
+                    )}
+                  >
+                    {job.enabled ? p.scheduledActive : p.scheduledPaused}
+                  </span>
+                </div>
                 <p className="truncate text-[0.66rem] text-(--ui-text-tertiary)">
-                  {job.schedule_display?.trim() || p.scheduledNoCadence}
-                  {!job.enabled && ` · ${p.scheduledPaused}`}
+                  {humanizeSchedule(job.schedule?.expr || job.schedule_display || '') ||
+                    p.scheduledNoCadence}
                 </p>
               </div>
-              <button
-                aria-label={job.enabled ? p.scheduledPause : p.scheduledResume}
-                className="shrink-0 rounded-sm px-1.5 py-1 text-[0.66rem] text-(--ui-text-tertiary) hover:bg-(--ui-control-hover-background) hover:text-foreground"
-                onClick={() => void toggle(job)}
-                title={job.enabled ? p.scheduledPause : p.scheduledResume}
-                type="button"
-              >
-                {job.enabled ? p.scheduledPause : p.scheduledResume}
-              </button>
-              <Button
-                aria-label={p.scheduledDelete}
-                className="size-7 shrink-0"
-                onClick={() => void remove(job.id)}
-                size="icon"
-                title={p.scheduledDelete}
-                variant="ghost"
-              >
-                <Trash2 className="size-3.5" />
-              </Button>
+              <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
+                <button
+                  aria-label={job.enabled ? p.scheduledPause : p.scheduledResume}
+                  className="rounded-sm px-1.5 py-1 text-[0.66rem] text-(--ui-text-tertiary) hover:bg-(--ui-control-hover-background) hover:text-foreground"
+                  onClick={() => void toggle(job)}
+                  title={job.enabled ? p.scheduledPause : p.scheduledResume}
+                  type="button"
+                >
+                  {job.enabled ? p.scheduledPause : p.scheduledResume}
+                </button>
+                <Button
+                  aria-label={p.scheduledDelete}
+                  className="size-7"
+                  onClick={() => void remove(job.id)}
+                  size="icon"
+                  title={p.scheduledDelete}
+                  variant="ghost"
+                >
+                  <Trash2 className="size-3.5" />
+                </Button>
+              </div>
             </div>
           ))
         )}
@@ -584,26 +755,88 @@ function ScheduledCard({ project }: { project: ChatGroup }) {
             placeholder={p.scheduledPromptPlaceholder}
             value={prompt}
           />
-          <Input
-            aria-label={p.scheduledCadenceLabel}
-            onChange={event => setSchedule(event.target.value)}
-            placeholder={p.scheduledCadencePlaceholder}
-            value={schedule}
-          />
+          <div className="grid gap-2">
+            <div className="grid gap-1">
+              <span className="text-[0.66rem] font-medium text-(--ui-text-tertiary)">{p.scheduledRepeatLabel}</span>
+              <Select onValueChange={value => setMode(value as ScheduleMode)} value={mode}>
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="once">{p.scheduledRepeatOnce}</SelectItem>
+                  <SelectItem value="daily">{p.scheduledRepeatDaily}</SelectItem>
+                  <SelectItem value="weekly">{p.scheduledRepeatWeekly}</SelectItem>
+                  <SelectItem value="monthly">{p.scheduledRepeatMonthly}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              {mode === 'once' && (
+                <div className="grid gap-1">
+                  <span className="text-[0.66rem] font-medium text-(--ui-text-tertiary)">{p.scheduledDateLabel}</span>
+                  <Input
+                    aria-label={p.scheduledDateLabel}
+                    onChange={event => setDate(event.target.value)}
+                    type="date"
+                    value={date}
+                  />
+                </div>
+              )}
+
+              {mode === 'weekly' && (
+                <div className="grid gap-1">
+                  <span className="text-[0.66rem] font-medium text-(--ui-text-tertiary)">{p.scheduledWeekdayLabel}</span>
+                  <Select onValueChange={setWeekday} value={weekday}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {weekdayNames.map((name, index) => (
+                        <SelectItem key={name} value={String(index)}>
+                          {name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              {mode === 'monthly' && (
+                <div className="grid gap-1">
+                  <span className="text-[0.66rem] font-medium text-(--ui-text-tertiary)">{p.scheduledMonthdayLabel}</span>
+                  <Select onValueChange={setMonthday} value={monthday}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {monthdayOptions.map(day => (
+                        <SelectItem key={day} value={String(day)}>
+                          {day}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              <div className="grid gap-1">
+                <span className="text-[0.66rem] font-medium text-(--ui-text-tertiary)">{p.scheduledTimeLabel}</span>
+                <Input
+                  aria-label={p.scheduledTimeLabel}
+                  onChange={event => setTime(event.target.value)}
+                  type="time"
+                  value={time}
+                />
+              </div>
+            </div>
+          </div>
+
           <div className="flex items-center justify-end gap-2">
-            <Button
-              disabled={busy}
-              onClick={() => {
-                setAdding(false)
-                setPrompt('')
-                setSchedule('')
-              }}
-              size="sm"
-              variant="ghost"
-            >
+            <Button disabled={busy} onClick={resetForm} size="sm" variant="ghost">
               {p.scheduledCancel}
             </Button>
-            <Button disabled={busy || !prompt.trim() || !schedule.trim()} onClick={() => void create()} size="sm">
+            <Button disabled={busy || !prompt.trim() || !scheduleString} onClick={() => void create()} size="sm">
               <Plus className="size-3.5" />
               {p.scheduledCreate}
             </Button>
@@ -614,15 +847,47 @@ function ScheduledCard({ project }: { project: ChatGroup }) {
   )
 }
 
+// Single aside "Context" panel mirrors Claude's layout: the project's knowledge
+// files, then the durable memory the agent keeps. The card header carries the
+// title; the Memory subheading separates the two within the one card.
 function ContextCard({ project }: { project: ChatGroup }) {
   const { t } = useI18n()
   const p = t.sidebar.projects.page
+  const [collapsed, setCollapsed] = useState(false)
+  const [adding, setAdding] = useState(false)
 
   return (
-    <ProjectCard icon={<FolderOpen className="size-3.5" />} title={p.contextTitle}>
-      <KnowledgeSection project={project} />
-      <div className="my-4 border-t border-(--ui-divider)" />
-      <MemorySection project={project} />
+    <ProjectCard
+      collapsed={collapsed}
+      controls={
+        !adding && (
+          <button
+            aria-label={p.addKnowledge}
+            className="grid size-6 shrink-0 place-items-center rounded-sm text-(--ui-text-tertiary) hover:bg-(--ui-control-hover-background) hover:text-foreground"
+            onClick={() => {
+              setCollapsed(false)
+              setAdding(true)
+            }}
+            title={p.addKnowledge}
+            type="button"
+          >
+            <Plus className="size-3.5" />
+          </button>
+        )
+      }
+      onToggle={() => setCollapsed(prev => !prev)}
+      title={p.contextTitle}
+    >
+      <KnowledgeSection adding={adding} onAddingChange={setAdding} project={project} />
+      <div className="mt-5">
+        <div className="flex items-center gap-1.5 text-muted-foreground">
+          <Brain className="size-3.5" />
+          <SectionTitle>{p.memoryTitle}</SectionTitle>
+        </div>
+        <div className="mt-2">
+          <MemorySection project={project} />
+        </div>
+      </div>
     </ProjectCard>
   )
 }
@@ -680,7 +945,15 @@ function DeleteProjectDialog({
   )
 }
 
-function KnowledgeSection({ project }: { project: ChatGroup }) {
+function KnowledgeSection({
+  adding,
+  onAddingChange,
+  project
+}: {
+  adding: boolean
+  onAddingChange: (adding: boolean) => void
+  project: ChatGroup
+}) {
   const { t } = useI18n()
   const p = t.sidebar.projects.page
   const [files, setFiles] = useState<ChatKnowledgeFile[] | null>(null)
@@ -710,12 +983,6 @@ function KnowledgeSection({ project }: { project: ChatGroup }) {
     }
   }, [project.id, p.knowledgeLoadFailed])
 
-  // Sum of stored characters across the project's knowledge files, capped at the
-  // inject budget for the meter fill (content past it is truncated server-side).
-  const used = (files ?? []).reduce((total, file) => total + file.size, 0)
-  const pct = Math.min(100, Math.round((used / KNOWLEDGE_BUDGET) * 100))
-  const full = used >= KNOWLEDGE_BUDGET
-
   async function add(content: string, fileName: string, contentType?: string) {
     if (content.length > KNOWLEDGE_CONTENT_MAX) {
       notify({ durationMs: 3_000, kind: 'error', message: p.fileTooLarge })
@@ -730,6 +997,7 @@ function KnowledgeSection({ project }: { project: ChatGroup }) {
       setFiles(current => [...(current ?? []), created])
       setPaste('')
       setName('')
+      onAddingChange(false)
       notify({ durationMs: 2_000, kind: 'success', message: p.knowledgeAdded })
     } catch (err) {
       notifyError(err, p.knowledgeAddFailed)
@@ -773,46 +1041,24 @@ function KnowledgeSection({ project }: { project: ChatGroup }) {
 
   return (
     <section>
-      <SectionTitle>{p.knowledgeTitle}</SectionTitle>
-      <p className="mt-1 text-[length:var(--conversation-caption-font-size)] leading-(--conversation-caption-line-height) text-(--ui-text-tertiary)">
-        {p.knowledgeHint}
-      </p>
-
-      <div className="mt-3">
-        <div className="flex items-center justify-between text-[0.66rem] text-(--ui-text-tertiary)">
-          <span>{p.capacityTitle}</span>
-          <span className="tabular-nums">{p.capacityUsage(used, KNOWLEDGE_BUDGET)}</span>
-        </div>
-        <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-(--ui-divider)">
-          <div
-            className={full ? 'h-full rounded-full bg-destructive' : 'h-full rounded-full bg-(--ui-text-tertiary)'}
-            style={{ width: `${pct}%` }}
-          />
-        </div>
-        {full && <p className="mt-1 text-[0.66rem] text-destructive">{p.capacityFull}</p>}
-      </div>
-
-      <div className="mt-3 grid gap-1">
+      <div className="grid gap-0.5">
         {files === null ? (
           <p className="text-[length:var(--conversation-caption-font-size)] text-(--ui-text-tertiary)">…</p>
-        ) : files.length === 0 ? (
-          <p className="text-[length:var(--conversation-caption-font-size)] text-(--ui-text-tertiary)">
+        ) : files.length === 0 && !adding ? (
+          <p className="text-[length:var(--conversation-caption-font-size)] leading-(--conversation-caption-line-height) text-(--ui-text-tertiary)">
             {p.knowledgeEmpty}
           </p>
         ) : (
           files.map(file => (
             <div
-              className="flex items-center gap-2 rounded-md border border-(--ui-divider) px-3 py-2"
+              className="group flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-(--ui-row-hover-background)"
               key={file.id}
             >
-              <FileText className="size-4 shrink-0 text-(--ui-text-tertiary)" />
+              <FolderOpen className="size-3.5 shrink-0 text-(--ui-text-tertiary)" />
               <span className="min-w-0 flex-1 truncate text-[0.8125rem]">{file.name}</span>
-              <span className="shrink-0 text-[0.66rem] text-(--ui-text-tertiary) tabular-nums">
-                {p.fileBytes(file.size)}
-              </span>
               <Button
                 aria-label={p.removeFile}
-                className="size-7 shrink-0"
+                className="size-6 shrink-0 opacity-0 group-hover:opacity-100"
                 onClick={() => void remove(file.id)}
                 size="icon"
                 title={p.removeFile}
@@ -825,52 +1071,55 @@ function KnowledgeSection({ project }: { project: ChatGroup }) {
         )}
       </div>
 
-      <div className="mt-4 space-y-2 rounded-lg border border-(--ui-divider) p-3">
-        <div className="flex items-center gap-2">
-          <Input
-            aria-label={p.fileNameLabel}
-            onChange={event => setName(event.target.value)}
-            placeholder={p.fileNamePlaceholder}
-            value={name}
+      {adding && (
+        <div className="mt-3 space-y-2 rounded-lg border border-(--ui-divider) p-3">
+          <div className="flex items-center gap-2">
+            <Input
+              aria-label={p.fileNameLabel}
+              onChange={event => setName(event.target.value)}
+              placeholder={p.fileNamePlaceholder}
+              value={name}
+            />
+            <Button disabled={busy} onClick={() => fileInputRef.current?.click()} size="sm" variant="textStrong">
+              {p.addFile}
+            </Button>
+            <input
+              accept=".txt,.md,.markdown,.mdx,.text,text/*"
+              className="hidden"
+              onChange={event => void onFilePicked(event)}
+              ref={fileInputRef}
+              type="file"
+            />
+          </div>
+          <Textarea
+            aria-label={p.pasteLabel}
+            onChange={event => setPaste(event.target.value)}
+            placeholder={p.pastePlaceholder}
+            value={paste}
           />
-          <Button disabled={busy} onClick={() => fileInputRef.current?.click()} size="sm" variant="textStrong">
-            {p.addFile}
-          </Button>
-          <input
-            accept=".txt,.md,.markdown,.mdx,.text,text/*"
-            className="hidden"
-            onChange={event => void onFilePicked(event)}
-            ref={fileInputRef}
-            type="file"
-          />
+          <div className="flex justify-end gap-2">
+            <Button onClick={() => onAddingChange(false)} size="sm" variant="ghost">
+              {t.common.cancel}
+            </Button>
+            <Button disabled={busy || !paste.trim()} onClick={() => void addPasted()} size="sm">
+              <Plus className="size-3.5" />
+              {p.addKnowledge}
+            </Button>
+          </div>
         </div>
-        <Textarea
-          aria-label={p.pasteLabel}
-          onChange={event => setPaste(event.target.value)}
-          placeholder={p.pastePlaceholder}
-          value={paste}
-        />
-        <div className="flex justify-end">
-          <Button disabled={busy || !paste.trim()} onClick={() => void addPasted()} size="sm">
-            <Plus className="size-3.5" />
-            {p.addKnowledge}
-          </Button>
-        </div>
-      </div>
+      )}
     </section>
   )
 }
 
 // Project memory: short durable notes injected into every chat in the project.
-// Mirrors KnowledgeSection's list/add/delete shape. Entries carry a `source`
-// ('user' or 'agent') so agent-written notes get a small badge — the agent
-// writes its own via the project_memory tool; this UI only adds user notes.
+// Read-only here, matching Claude — the agent writes its own via the
+// project_memory tool; the user asks it to remember rather than typing notes.
+// Entries carry a `source` ('user' or 'agent') so agent notes get a small badge.
 function MemorySection({ project }: { project: ChatGroup }) {
   const { t } = useI18n()
   const p = t.sidebar.projects.page
   const [entries, setEntries] = useState<ChatMemoryEntry[] | null>(null)
-  const [text, setText] = useState('')
-  const [busy, setBusy] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -893,33 +1142,6 @@ function MemorySection({ project }: { project: ChatGroup }) {
     }
   }, [project.id, p.memoryLoadFailed])
 
-  async function add() {
-    const content = text.trim()
-
-    if (!content) {
-      return
-    }
-
-    if (content.length > MEMORY_CONTENT_MAX) {
-      notify({ durationMs: 3_000, kind: 'error', message: p.memoryTooLong })
-
-      return
-    }
-
-    setBusy(true)
-
-    try {
-      const created = await addMemoryEntry(project.id, content)
-      setEntries(current => [...(current ?? []), created])
-      setText('')
-      notify({ durationMs: 2_000, kind: 'success', message: p.memoryAdded })
-    } catch (err) {
-      notifyError(err, p.memoryAddFailed)
-    } finally {
-      setBusy(false)
-    }
-  }
-
   async function remove(entryId: string) {
     try {
       await deleteMemoryEntry(project.id, entryId)
@@ -932,16 +1154,11 @@ function MemorySection({ project }: { project: ChatGroup }) {
 
   return (
     <section>
-      <SectionTitle>{p.memoryTitle}</SectionTitle>
-      <p className="mt-1 text-[length:var(--conversation-caption-font-size)] leading-(--conversation-caption-line-height) text-(--ui-text-tertiary)">
-        {p.memoryHint}
-      </p>
-
-      <div className="mt-3 grid gap-1">
+      <div className="grid gap-1">
         {entries === null ? (
           <p className="text-[length:var(--conversation-caption-font-size)] text-(--ui-text-tertiary)">…</p>
         ) : entries.length === 0 ? (
-          <p className="text-[length:var(--conversation-caption-font-size)] text-(--ui-text-tertiary)">
+          <p className="text-[length:var(--conversation-caption-font-size)] leading-(--conversation-caption-line-height) text-(--ui-text-tertiary)">
             {p.memoryEmpty}
           </p>
         ) : (
@@ -971,23 +1188,32 @@ function MemorySection({ project }: { project: ChatGroup }) {
           ))
         )}
       </div>
-
-      <div className="mt-3 space-y-2 rounded-lg border border-(--ui-divider) p-3">
-        <Textarea
-          aria-label={p.memoryPlaceholder}
-          onChange={event => setText(event.target.value)}
-          placeholder={p.memoryPlaceholder}
-          value={text}
-        />
-        <div className="flex justify-end">
-          <Button disabled={busy || !text.trim()} onClick={() => void add()} size="sm">
-            <Plus className="size-3.5" />
-            {p.memoryAdd}
-          </Button>
-        </div>
-      </div>
     </section>
   )
+}
+
+// Compact "last active" stamp for Recents rows: Just now / 5m / 3h / 2d, then a
+// locale date once a week has passed. Input is epoch seconds (SessionInfo.last_active).
+function formatRelative(epochSeconds: number, justNowLabel: string): string {
+  const diffMs = Date.now() - epochSeconds * 1000
+
+  if (diffMs < 60_000) {
+    return justNowLabel
+  }
+
+  if (diffMs < 3_600_000) {
+    return `${Math.round(diffMs / 60_000)}m`
+  }
+
+  if (diffMs < 86_400_000) {
+    return `${Math.round(diffMs / 3_600_000)}h`
+  }
+
+  if (diffMs < 604_800_000) {
+    return `${Math.round(diffMs / 86_400_000)}d`
+  }
+
+  return new Date(epochSeconds * 1000).toLocaleDateString()
 }
 
 function ChatsSection({ project }: { project: ChatGroup }) {
@@ -1036,20 +1262,44 @@ function ChatsSection({ project }: { project: ChatGroup }) {
         ) : (
           project.session_ids.map(sessionId => {
             const session = sessionById.get(sessionId)
+
             const title = projectMemberTitle(
               session,
               sessionMeta[sessionId],
               t.sidebar.row.untitledPlaceholder
             )
 
+            const preview = session?.preview?.trim()
+            const lastActive = session?.last_active
+            const isScheduled = sessionId.startsWith('cron_')
+
             return (
               <button
-                className="truncate rounded-md px-3 py-2 text-left text-[0.8125rem] text-(--ui-text-secondary) transition-colors hover:bg-(--ui-row-hover-background) hover:text-foreground"
+                className="group flex w-full flex-col gap-0.5 rounded-md px-3 py-2 text-left transition-colors hover:bg-(--ui-row-hover-background)"
                 key={sessionId}
                 onClick={() => navigate(sessionRoute(sessionId))}
                 type="button"
               >
-                {title}
+                <div className="flex w-full items-center gap-2">
+                  <span className="min-w-0 flex-1 truncate text-[0.8125rem] text-(--ui-text-secondary) group-hover:text-foreground">
+                    {title}
+                  </span>
+                  {isScheduled && (
+                    <span className="shrink-0 rounded-full bg-(--ui-control-background) px-1.5 py-px text-[0.6rem] font-medium text-(--ui-text-tertiary)">
+                      {p.recentScheduled}
+                    </span>
+                  )}
+                  {lastActive ? (
+                    <span className="shrink-0 text-[0.66rem] text-(--ui-text-tertiary)">
+                      {formatRelative(lastActive, p.recentJustNow)}
+                    </span>
+                  ) : null}
+                </div>
+                {preview ? (
+                  <span className="block w-full truncate text-[0.66rem] text-(--ui-text-tertiary)">
+                    {preview}
+                  </span>
+                ) : null}
               </button>
             )
           })

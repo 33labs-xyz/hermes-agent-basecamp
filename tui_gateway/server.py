@@ -3507,6 +3507,28 @@ def _make_agent(
             requested=requested_provider,
             target_model=model or None,
         )
+    # Project (chat-group) context steers every chat in a project: its
+    # instructions, attached knowledge files, and memory are appended to the
+    # ephemeral system prompt so they apply to new and resumed desktop/TUI
+    # sessions, mirroring HermesCLI._setup_agent (cli_agent_setup_mixin). The
+    # call resolves to "" for ungrouped sessions, so this is a no-op there.
+    ephemeral_prompt = system_prompt or None
+    _effective_session_db = session_db if session_db is not None else _get_db()
+    _effective_session_id = session_id or key
+    if _effective_session_db is not None and _effective_session_id:
+        try:
+            _project_context = (
+                _effective_session_db.build_project_context(_effective_session_id)
+                or ""
+            )
+        except Exception:
+            _project_context = ""
+        if _project_context:
+            ephemeral_prompt = (
+                f"{ephemeral_prompt}\n\n{_project_context}"
+                if ephemeral_prompt
+                else _project_context
+            )
     _pr = _load_provider_routing()
     return AIAgent(
         model=model,
@@ -3547,7 +3569,7 @@ def _make_agent(
         platform="tui",
         session_id=session_id or key,
         session_db=session_db if session_db is not None else _get_db(),
-        ephemeral_system_prompt=system_prompt or None,
+        ephemeral_system_prompt=ephemeral_prompt,
         checkpoints_enabled=is_truthy_value(os.environ.get("HERMES_TUI_CHECKPOINTS")),
         pass_session_id=is_truthy_value(os.environ.get("HERMES_TUI_PASS_SESSION_ID")),
         skip_context_files=is_truthy_value(os.environ.get("HERMES_IGNORE_RULES")),

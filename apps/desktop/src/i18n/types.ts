@@ -926,6 +926,8 @@ export interface Translations {
         back: string
         newChat: string
         recentChats: string
+        recentJustNow: string
+        recentScheduled: string
         noChats: string
         notFound: string
         instructionsTitle: string
@@ -972,6 +974,7 @@ export interface Translations {
         scheduledDeleted: string
         scheduledDelete: string
         scheduledDeleteFailed: string
+        scheduledActive: string
         scheduledPause: string
         scheduledPaused: string
         scheduledResume: string
@@ -980,6 +983,15 @@ export interface Translations {
         scheduledPromptPlaceholder: string
         scheduledCadenceLabel: string
         scheduledCadencePlaceholder: string
+        scheduledRepeatLabel: string
+        scheduledRepeatOnce: string
+        scheduledRepeatDaily: string
+        scheduledRepeatWeekly: string
+        scheduledRepeatMonthly: string
+        scheduledDateLabel: string
+        scheduledTimeLabel: string
+        scheduledWeekdayLabel: string
+        scheduledMonthdayLabel: string
         contextTitle: string
         memoryTitle: string
         memoryHint: string

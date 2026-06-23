@@ -9,6 +9,18 @@ import os
 from unittest.mock import MagicMock, patch
 
 
+def _ungrouped_db():
+    """A SessionDB mock for a session that belongs to no Project.
+
+    build_project_context returns "" (its real ungrouped value) so the
+    project-context injection in _make_agent is a no-op — a bare MagicMock
+    would instead return a truthy MagicMock and pollute ephemeral_system_prompt.
+    """
+    db = MagicMock()
+    db.build_project_context.return_value = ""
+    return db
+
+
 def test_make_agent_passes_resolved_provider():
     """_make_agent forwards provider/base_url/api_key/api_mode from
     resolve_runtime_provider to AIAgent."""
@@ -30,7 +42,7 @@ def test_make_agent_passes_resolved_provider():
 
     with (
         patch("tui_gateway.server._load_cfg", return_value=fake_cfg),
-        patch("tui_gateway.server._get_db", return_value=MagicMock()),
+        patch("tui_gateway.server._get_db", return_value=_ungrouped_db()),
         patch("tui_gateway.server._load_tool_progress_mode", return_value="compact"),
         patch("tui_gateway.server._load_reasoning_config", return_value=None),
         patch("tui_gateway.server._load_service_tier", return_value=None),
@@ -94,7 +106,7 @@ def test_make_agent_forwards_provider_routing():
 
     with (
         patch("tui_gateway.server._load_cfg", return_value=fake_cfg),
-        patch("tui_gateway.server._get_db", return_value=MagicMock()),
+        patch("tui_gateway.server._get_db", return_value=_ungrouped_db()),
         patch("tui_gateway.server._load_reasoning_config", return_value=None),
         patch("tui_gateway.server._load_service_tier", return_value=None),
         patch("tui_gateway.server._load_enabled_toolsets", return_value=None),
@@ -134,7 +146,7 @@ def test_make_agent_provider_routing_defaults_when_unset():
 
     with (
         patch("tui_gateway.server._load_cfg", return_value=fake_cfg),
-        patch("tui_gateway.server._get_db", return_value=MagicMock()),
+        patch("tui_gateway.server._get_db", return_value=_ungrouped_db()),
         patch("tui_gateway.server._load_reasoning_config", return_value=None),
         patch("tui_gateway.server._load_service_tier", return_value=None),
         patch("tui_gateway.server._load_enabled_toolsets", return_value=None),
@@ -181,7 +193,7 @@ def test_make_agent_ignores_display_personality_without_system_prompt():
 
     with (
         patch("tui_gateway.server._load_cfg", return_value=fake_cfg),
-        patch("tui_gateway.server._get_db", return_value=MagicMock()),
+        patch("tui_gateway.server._get_db", return_value=_ungrouped_db()),
         patch(
             "hermes_cli.runtime_provider.resolve_runtime_provider",
             return_value=fake_runtime,
@@ -218,7 +230,7 @@ def test_make_agent_honors_tui_launch_env_flags():
             },
         ),
         patch("tui_gateway.server._load_cfg", return_value=fake_cfg),
-        patch("tui_gateway.server._get_db", return_value=MagicMock()),
+        patch("tui_gateway.server._get_db", return_value=_ungrouped_db()),
         patch(
             "hermes_cli.runtime_provider.resolve_runtime_provider",
             return_value=fake_runtime,
@@ -283,7 +295,7 @@ def test_make_agent_tolerates_null_config_sections():
 
     with (
         patch("tui_gateway.server._load_cfg", return_value=null_cfg),
-        patch("tui_gateway.server._get_db", return_value=MagicMock()),
+        patch("tui_gateway.server._get_db", return_value=_ungrouped_db()),
         patch(
             "hermes_cli.runtime_provider.resolve_runtime_provider",
             return_value=fake_runtime,
@@ -316,7 +328,7 @@ def test_make_agent_tolerates_null_personalities_with_active_personality():
 
     with (
         patch("tui_gateway.server._load_cfg", return_value=cfg),
-        patch("tui_gateway.server._get_db", return_value=MagicMock()),
+        patch("tui_gateway.server._get_db", return_value=_ungrouped_db()),
         patch("cli.load_cli_config", return_value={"agent": {"personalities": None}}),
         patch(
             "hermes_cli.runtime_provider.resolve_runtime_provider",
@@ -370,7 +382,7 @@ def test_make_agent_honors_per_session_model_override():
         # be consulted when an override is present).
         patch.dict(os.environ, {}, clear=False),
         patch("tui_gateway.server._load_cfg", return_value=fake_cfg),
-        patch("tui_gateway.server._get_db", return_value=MagicMock()),
+        patch("tui_gateway.server._get_db", return_value=_ungrouped_db()),
         patch("tui_gateway.server._load_reasoning_config", return_value=None),
         patch("tui_gateway.server._load_service_tier", return_value=None),
         patch("tui_gateway.server._load_enabled_toolsets", return_value=None),
@@ -467,3 +479,89 @@ def test_apply_model_switch_does_not_leak_process_env():
     # Sibling session is completely untouched.
     assert sess_a["model_override"] is None
     assert sess_a["agent"].model == "minimax/m3"
+
+
+def test_make_agent_appends_project_context_to_ephemeral_prompt():
+    """Desktop/TUI chats in a Project must be steered by the project's
+    instructions + knowledge + memory.
+
+    Regression: the desktop dashboard built agents via _make_agent, which set
+    ephemeral_system_prompt from config only and never called
+    build_project_context — so chats ignored project instructions (e.g. a
+    "reply in pirate speak" project produced plain replies). _make_agent must
+    append SessionDB.build_project_context(session_id) like HermesCLI does.
+    """
+
+    fake_runtime = {
+        "provider": "anthropic",
+        "base_url": "https://api.anthropic.com",
+        "api_key": "sk-test",
+        "api_mode": "anthropic_messages",
+        "command": None,
+        "args": None,
+        "credential_pool": None,
+    }
+    fake_cfg = {"agent": {"system_prompt": "base prompt"}, "model": {"default": "glm-5"}}
+
+    fake_db = MagicMock()
+    fake_db.build_project_context.return_value = (
+        "You are a pirate. Reply to everything in pirate speak."
+    )
+
+    with (
+        patch("tui_gateway.server._load_cfg", return_value=fake_cfg),
+        patch("tui_gateway.server._get_db", return_value=fake_db),
+        patch("tui_gateway.server._load_reasoning_config", return_value=None),
+        patch("tui_gateway.server._load_service_tier", return_value=None),
+        patch("tui_gateway.server._load_enabled_toolsets", return_value=None),
+        patch(
+            "hermes_cli.runtime_provider.resolve_runtime_provider",
+            return_value=fake_runtime,
+        ),
+        patch("run_agent.AIAgent") as mock_agent,
+    ):
+        from tui_gateway.server import _make_agent
+
+        _make_agent("sid-proj", "20260623_051457_cdafa2")
+
+        fake_db.build_project_context.assert_called_once_with("20260623_051457_cdafa2")
+        ephemeral = mock_agent.call_args.kwargs["ephemeral_system_prompt"]
+        assert "base prompt" in ephemeral
+        assert "pirate speak" in ephemeral
+
+
+def test_make_agent_no_project_context_leaves_base_prompt_unchanged():
+    """Ungrouped sessions resolve to "" so the base ephemeral prompt is used
+    verbatim — the injection is a no-op outside a Project."""
+
+    fake_runtime = {
+        "provider": "anthropic",
+        "base_url": "https://api.anthropic.com",
+        "api_key": "sk-test",
+        "api_mode": "anthropic_messages",
+        "command": None,
+        "args": None,
+        "credential_pool": None,
+    }
+    fake_cfg = {"agent": {"system_prompt": "base prompt"}, "model": {"default": "glm-5"}}
+
+    fake_db = MagicMock()
+    fake_db.build_project_context.return_value = ""
+
+    with (
+        patch("tui_gateway.server._load_cfg", return_value=fake_cfg),
+        patch("tui_gateway.server._get_db", return_value=fake_db),
+        patch("tui_gateway.server._load_reasoning_config", return_value=None),
+        patch("tui_gateway.server._load_service_tier", return_value=None),
+        patch("tui_gateway.server._load_enabled_toolsets", return_value=None),
+        patch(
+            "hermes_cli.runtime_provider.resolve_runtime_provider",
+            return_value=fake_runtime,
+        ),
+        patch("run_agent.AIAgent") as mock_agent,
+    ):
+        from tui_gateway.server import _make_agent
+
+        _make_agent("sid-plain", "key-plain")
+
+        assert mock_agent.call_args.kwargs["ephemeral_system_prompt"] == "base prompt"
