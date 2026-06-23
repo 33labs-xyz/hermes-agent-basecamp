@@ -39,6 +39,7 @@ const { waitForDashboardPort } = require('./backend-ready.cjs')
 const { serializeJsonBody, setJsonRequestHeaders } = require('./oauth-net-request.cjs')
 const { fetchMarketplaceThemes, searchMarketplaceThemes } = require('./vscode-marketplace.cjs')
 const { buildDesktopBackendEnv, normalizeHermesHomeRoot } = require('./backend-env.cjs')
+const { initAutoUpdater, checkForUpdatesManual } = require('./auto-updater.cjs')
 const { readWindowsUserEnvVar } = require('./windows-user-env.cjs')
 const { readDirForIpc } = require('./fs-read-dir.cjs')
 const { gitRootForIpc } = require('./git-root.cjs')
@@ -3376,7 +3377,15 @@ function buildApplicationMenu() {
   const template = []
   const checkForUpdatesItem = {
     label: 'Check for Updates…',
-    click: () => sendOpenUpdatesRequested()
+    click: () => {
+      // Packaged tester build -> real electron-updater check (download +
+      // restart prompt). Dev/source build -> existing git-rebuild overlay.
+      if (app.isPackaged) {
+        checkForUpdatesManual()
+        return
+      }
+      sendOpenUpdatesRequested()
+    }
   }
   if (IS_MAC) {
     template.push({
@@ -5281,6 +5290,9 @@ function createWindow() {
     restorePersistedZoomLevel(mainWindow)
     broadcastBootProgress()
     sendWindowStateChanged()
+    // Packaged tester builds: wire electron-updater against the GitHub Releases
+    // feed. No-op in dev (app.isPackaged false), where the git flow stays.
+    initAutoUpdater(() => mainWindow)
     startHermes().catch(error => rememberLog(error.stack || error.message))
   })
 }
@@ -6188,8 +6200,16 @@ ipcMain.handle('hermes:version', async () => ({
   electronVersion: process.versions.electron,
   nodeVersion: process.versions.node,
   platform: process.platform,
-  hermesRoot: resolveUpdateRoot()
+  hermesRoot: resolveUpdateRoot(),
+  // Packaged tester builds use the electron-updater flow (GitHub Releases);
+  // source builds keep the git-rebuild updates UI. The About card switches on
+  // this so testers get a working "Check for Updates" button.
+  isPackaged: app.isPackaged
 }))
+
+// Manual update check for packaged tester builds (About card + menu). Drives
+// electron-updater; native dialogs report "up to date" / restart prompt.
+ipcMain.handle('hermes:updates:run-auto-check', async () => checkForUpdatesManual())
 
 // ===========================================================================
 // Uninstall — remove the Chat GUI (and optionally the agent / user data).

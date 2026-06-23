@@ -75,6 +75,7 @@
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
     "dnd-core": "^14.0.1",
+    "electron-updater": "^6.8.9",
     "hast-util-from-html-isomorphic": "^2.0.0",
     "hast-util-to-text": "^4.0.2",
     "ignore": "^7.0.5",
@@ -139,6 +140,13 @@
     "appId": "xyz.getnifty.basecamp",
     "productName": "Basecamp",
     "executableName": "Basecamp",
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "33labs-xyz",
+        "repo": "hermes-agent-basecamp"
+      }
+    ],
     "protocols": [
       {
         "name": "Basecamp Protocol",

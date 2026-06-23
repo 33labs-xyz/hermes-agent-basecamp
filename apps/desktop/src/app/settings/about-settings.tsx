@@ -61,11 +61,20 @@ export function AboutSettings() {
   }, [])
 
   const behind = status?.behind ?? 0
+  // Packaged tester builds update via electron-updater (GitHub Releases), not
+  // the git-rebuild flow, so the git-derived `supported`/`behind` signals do
+  // not apply. The native updater reports its own outcome via dialogs.
+  const packaged = version?.isPackaged === true
   const supported = status?.supported !== false
   const applying = apply.applying || apply.stage === 'restart'
 
   const handleCheck = async () => {
     setJustChecked(false)
+    if (packaged) {
+      await window.hermesDesktop?.checkForUpdates?.()
+      setJustChecked(true)
+      return
+    }
     const next = await checkUpdates()
     setJustChecked(Boolean(next))
   }
@@ -73,7 +82,9 @@ export function AboutSettings() {
   let statusLine: string
   let statusTone: 'idle' | 'available' | 'error' = 'idle'
 
-  if (!supported) {
+  if (packaged) {
+    statusLine = a.tapCheck
+  } else if (!supported) {
     statusLine = status?.message ?? a.cantUpdate
     statusTone = 'error'
   } else if (status?.error) {
@@ -131,7 +142,7 @@ export function AboutSettings() {
 
           <div className="mt-3 flex flex-wrap items-center gap-4">
             <Button
-              disabled={checking || applying || !supported}
+              disabled={checking || applying || (!supported && !packaged)}
               onClick={() => void handleCheck()}
               size="sm"
               variant="textStrong"
@@ -140,7 +151,7 @@ export function AboutSettings() {
               {checking ? a.checking : a.checkNow}
             </Button>
 
-            {behind > 0 && supported && !applying && (
+            {!packaged && behind > 0 && supported && !applying && (
               <Button onClick={() => openUpdatesWindow()} size="sm">
                 {a.seeWhatsNew}
               </Button>

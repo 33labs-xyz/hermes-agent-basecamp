@@ -102,6 +102,7 @@ declare global {
       cancelBootstrap: () => Promise<{ ok: boolean; cancelled: boolean }>
       onBootstrapEvent: (callback: (payload: DesktopBootstrapEvent) => void) => () => void
       getVersion: () => Promise<DesktopVersionInfo>
+      checkForUpdates: () => Promise<{ ok: boolean; current?: string; latest?: string; reason?: string }>
       updates: {
         check: () => Promise<DesktopUpdateStatus>
         apply: (opts?: DesktopUpdateApplyOptions) => Promise<DesktopUpdateApplyResult>
@@ -164,6 +165,7 @@ export interface DesktopVersionInfo {
   nodeVersion: string
   platform: string
   hermesRoot: string
+  isPackaged?: boolean
 }
 
 export type DesktopUninstallMode = 'full' | 'gui' | 'lite'
