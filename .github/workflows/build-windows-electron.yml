@@ -1,0 +1,67 @@
+name: Build Windows Installer (Electron, unsigned)
+
+# Branded Basecamp Windows installer for tester distribution.
+#
+# Builds the Electron desktop app (apps/desktop) into an NSIS .exe. On first
+# launch it runs the same in-app branded bootstrap (scripts/install.ps1) that
+# the Mac .dmg runs via scripts/install.sh -- one model for both platforms.
+# This is the unified replacement for the standalone Tauri bootstrap-installer
+# (apps/bootstrap-installer), which is retired once this path is verified.
+#
+# Unsigned: testers see a Windows SmartScreen "unknown publisher" prompt and
+# must click "More info" -> "Run anyway". Code signing is a separate, later
+# step (flip build.win.signAndEditExecutable and add an Azure sign step here).
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Basecamp Windows NSIS (unsigned)
+    runs-on: windows-latest
+    timeout-minutes: 40
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # node-pty 1.x ships N-API prebuilts (prebuilds/win32-x64), so no compile
+      # is normally needed. Python is here only as a node-gyp fallback in case a
+      # native dep has to build from source on the runner.
+      - name: Setup Python (node-gyp fallback)
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405  # v6.2.0
+        with:
+          python-version: '3.11'
+
+      # Root install is mandatory: apps/desktop's build runs
+      # scripts/assert-root-install.cjs, which fails if deps were installed from
+      # the app subdir instead of the workspace root.
+      - name: Install npm dependencies (workspace root)
+        run: npm ci
+
+      - name: Build Electron NSIS installer
+        working-directory: apps/desktop
+        run: npm run dist:win:nsis
+        env:
+          # Unsigned tester build -- skip code-signing identity discovery so the
+          # build never blocks on a missing certificate.
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+
+      - name: Upload NSIS installer
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: Basecamp-Setup-win-x64
+          # electron-builder artifactName: Basecamp-${version}-win-x64.exe
+          path: apps/desktop/release/Basecamp-*-win-x64.exe
+          if-no-files-found: error
