@@ -1190,6 +1190,22 @@ function Install-Repository {
                     git -c windows.appendAtomically=false stash push --include-untracked -m "$stashName"
                     if ($LASTEXITCODE -eq 0) { $autostashRef = "stash@{0}" }
                 }
+                # Repair the origin remote before fetching. An interrupted
+                # clone, or the ZIP fallback's ``git remote add origin ... 2>$null``
+                # silently failing, can leave a ``.git`` with no origin -- or one
+                # pointing at the wrong URL. Either makes the fetch below die with
+                # exit 128 ("'origin' does not appear to be a git repository"),
+                # which is the failure testers hit on a retry after a half-done
+                # first install (#bootstrap-exit128). Re-point it at the canonical
+                # HTTPS URL so the fetch can succeed.
+                $originUrl = (git -c windows.appendAtomically=false remote get-url origin 2>$null) -join ""
+                if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($originUrl)) {
+                    Write-Info "No origin remote found, adding it..."
+                    git -c windows.appendAtomically=false remote add origin $RepoUrlHttps 2>$null
+                } elseif ($originUrl.Trim() -ne $RepoUrlHttps -and $originUrl.Trim() -ne $RepoUrlSsh) {
+                    Write-Info "Origin remote points elsewhere ($($originUrl.Trim())), re-pointing at $RepoUrlHttps..."
+                    git -c windows.appendAtomically=false remote set-url origin $RepoUrlHttps 2>$null
+                }
                 git -c windows.appendAtomically=false fetch origin $Branch
                 if ($LASTEXITCODE -ne 0) { throw "git fetch failed (exit $LASTEXITCODE)" }
                 # Precedence: Commit > Tag > Branch.  Commit and Tag check
