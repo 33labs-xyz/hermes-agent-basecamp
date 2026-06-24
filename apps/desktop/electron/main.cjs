@@ -231,17 +231,16 @@ if (INSTALL_STAMP) {
 // scripts/install.ps1's $HermesHome and scripts/install.sh's $HERMES_HOME.
 //
 // Defaults:
-//   Windows: %LOCALAPPDATA%\hermes (matches install.ps1)
-//   macOS / Linux: ~/.hermes (matches install.sh)
+//   Windows: %LOCALAPPDATA%\basecamp
+//   macOS / Linux: ~/.basecamp
 //
-// Special case for Windows: if the user has a legacy ~/.hermes directory
-// (e.g., from a prior pip install or a manual setup) AND no
-// %LOCALAPPDATA%\hermes yet, prefer the legacy path so we don't orphan their
-// existing config / sessions / .env. New installs go to %LOCALAPPDATA%.
+// The desktop app uses its own ~/.basecamp root. The `hermes` CLI installers
+// (scripts/install.sh / install.ps1) still default to ~/.hermes; Basecamp does
+// NOT adopt an existing ~/.hermes, so a fresh install always starts clean.
 //
 // HERMES_DESKTOP_USER_DATA_DIR (used by test:desktop:fresh) puts the sandbox
 // HERMES_HOME beneath the throwaway userData dir so a fresh-install run never
-// touches the user's real ~/.hermes / %LOCALAPPDATA%\hermes.
+// touches the user's real ~/.basecamp / %LOCALAPPDATA%\basecamp.
 function resolveHermesHome() {
   if (process.env.HERMES_HOME) return normalizeHermesHomeRoot(process.env.HERMES_HOME)
   if (USER_DATA_OVERRIDE) return path.join(path.resolve(USER_DATA_OVERRIDE), 'hermes-home')
@@ -256,20 +255,17 @@ function resolveHermesHome() {
     if (fromRegistry) return normalizeHermesHomeRoot(fromRegistry)
   }
   if (IS_WINDOWS && process.env.LOCALAPPDATA) {
-    const localappdata = path.join(process.env.LOCALAPPDATA, 'hermes')
-    const legacy = path.join(app.getPath('home'), '.hermes')
-    // Migrate transparently to LOCALAPPDATA, but honour an existing legacy
-    // ~/.hermes setup (no LOCALAPPDATA install yet) so users don't lose state.
-    if (!directoryExists(localappdata) && directoryExists(legacy)) return legacy
-    return localappdata
+    // Basecamp uses its own LOCALAPPDATA root; a fresh install starts clean and
+    // never adopts an existing %LOCALAPPDATA%\hermes from a prior build.
+    return path.join(process.env.LOCALAPPDATA, 'basecamp')
   }
-  return path.join(app.getPath('home'), '.hermes')
+  return path.join(app.getPath('home'), '.basecamp')
 }
 
 const HERMES_HOME = resolveHermesHome()
-// ACTIVE_HERMES_ROOT — the canonical mutable Hermes install. Same path
-// install.ps1 / install.sh use, so a desktop-only user and a CLI-only user end
-// up with identical layouts and can share one install.
+// ACTIVE_HERMES_ROOT - the canonical mutable agent install, under the app's
+// own HERMES_HOME (~/.basecamp). Layout matches install.ps1 / install.sh, but
+// the desktop app's root is separate from a `hermes` CLI install (~/.hermes).
 const ACTIVE_HERMES_ROOT = path.join(HERMES_HOME, 'hermes-agent')
 // VENV_ROOT — venv lives inside the repo, exactly like install.ps1 does it.
 const VENV_ROOT = path.join(ACTIVE_HERMES_ROOT, 'venv')
