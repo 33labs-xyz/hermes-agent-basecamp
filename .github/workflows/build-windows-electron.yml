@@ -52,7 +52,12 @@ jobs:
 
       - name: Build Electron NSIS installer
         working-directory: apps/desktop
-        run: npm run dist:win:nsis
+        # --publish never: build the artifact only. On CI, electron-builder
+        # otherwise auto-creates a GitHub Releases publisher and fails for lack
+        # of GH_TOKEN ("artifactCreatedWithoutExplicitPublishConfig"). We ship
+        # via actions/upload-artifact below, not GitHub Releases, so disable
+        # publishing entirely. (dist:win:nsis = build + electron-builder --win nsis.)
+        run: npm run build && npm run builder -- --win nsis --publish never
         env:
           # Unsigned tester build -- skip code-signing identity discovery so the
           # build never blocks on a missing certificate.
