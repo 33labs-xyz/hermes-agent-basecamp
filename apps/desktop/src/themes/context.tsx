@@ -45,8 +45,12 @@ const resolveMode = (mode: ThemeMode, systemDark = matchesQuery('(prefers-color-
 const normalizeSkin = (name: string | null): string =>
   name && resolveTheme(name) && !RETIRED_SKINS.has(name) ? name : DEFAULT_SKIN_NAME
 
+// Fresh installs have no persisted mode. The default skin (midnight) is a
+// dark-only theme, so an unset/garbage value must resolve to 'dark'. Otherwise
+// the dark skin gets rendered through synthLightColors() and boots washed-out
+// light. Explicit user picks ('light'/'system') are still honoured.
 const normalizeMode = (value: string | null): ThemeMode =>
-  value === 'light' || value === 'dark' || value === 'system' ? value : 'light'
+  value === 'light' || value === 'dark' || value === 'system' ? value : 'dark'
 
 // ─── Per-profile appearance persistence ─────────────────────────────────────
 // Skin and mode are each stored per profile. "default" isn't a real profile —

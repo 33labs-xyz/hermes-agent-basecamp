@@ -1088,6 +1088,23 @@ export function ChatSidebar({
           </div>
         )}
 
+        {/* When there are no sessions yet the entire session block above is
+            hidden, which also hides Projects. Render Projects on its own in that
+            empty state so a fresh install can still see the section and create
+            its first project. Mutually exclusive with the in-gate Projects above
+            (that one only renders when showSessionSections is true), so Projects
+            appears exactly once and the populated layout is unchanged. */}
+        {contentVisible && !showSessionSections && !trimmedQuery && (
+          <div className="flex shrink-0 flex-col">
+            <SidebarProjectsSection
+              label={s.projects.label}
+              onOpenChat={onResumeSession}
+              onToggle={() => setSidebarProjectsOpen(!projectsOpen)}
+              open={projectsOpen}
+            />
+          </div>
+        )}
+
         {contentVisible && !showSessionSections && <div className="min-h-0 flex-1" />}
 
         {contentVisible && (
