@@ -9,12 +9,16 @@
    (this variant) flatten everything into one shared scroll. See ChatSidebar. */
 @custom-variant compact (@media (max-height: 768px));
 
+/* Collapse — the brand wordmark display face. Vendored locally (like JetBrains
+   Mono below) because a node_modules path escaping src/ does not resolve at
+   Vite build time, so the packaged app 404s the font and the wordmark falls
+   back to a plain system face. Local path bundles it into dist. */
 @font-face {
   font-family: 'Collapse';
   font-style: normal;
   font-weight: 700;
   font-display: swap;
-  src: url('../../../node_modules/@nous-research/ui/dist/fonts/Collapse-Bold.woff2') format('woff2');
+  src: url('./fonts/Collapse-Bold.woff2') format('woff2');
 }
 
 /* JetBrains Mono — bundled terminal font (Apache-2.0) so bold/italic share the

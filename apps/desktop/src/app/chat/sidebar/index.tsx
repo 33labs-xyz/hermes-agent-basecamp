@@ -96,7 +96,7 @@ import {
   sessionPinId
 } from '@/store/session'
 
-import { type AppView, ARTIFACTS_ROUTE, MESSAGING_ROUTE, SKILLS_ROUTE } from '../../routes'
+import { type AppView, ARTIFACTS_ROUTE, MESSAGING_ROUTE, PROJECTS_ROUTE, SKILLS_ROUTE } from '../../routes'
 import { SidebarPanelLabel } from '../../shell/sidebar-label'
 import type { SidebarNavItem } from '../../types'
 
@@ -126,6 +126,10 @@ const SIDEBAR_NAV: SidebarNavItem[] = [
     icon: props => <Codicon name="robot" {...props} />,
     action: 'new-session'
   },
+  // Projects promoted to the always-visible nav rail (directly below New
+  // Session) so it is reachable on a fresh install regardless of session
+  // state. Routes to the same /projects page the in-list section links to.
+  { id: 'projects', label: 'Projects', icon: props => <Codicon name="project" {...props} />, route: PROJECTS_ROUTE },
   {
     id: 'skills',
     label: '',
@@ -819,7 +823,8 @@ export function ChatSidebar({
                 const active =
                   (item.id === 'skills' && currentView === 'skills') ||
                   (item.id === 'messaging' && currentView === 'messaging') ||
-                  (item.id === 'artifacts' && currentView === 'artifacts')
+                  (item.id === 'artifacts' && currentView === 'artifacts') ||
+                  (item.id === 'projects' && currentView === 'projects')
 
                 const isNewSession = item.id === 'new-session'
 
@@ -1085,23 +1090,6 @@ export function ChatSidebar({
                 open={cronOpen}
               />
             )}
-          </div>
-        )}
-
-        {/* When there are no sessions yet the entire session block above is
-            hidden, which also hides Projects. Render Projects on its own in that
-            empty state so a fresh install can still see the section and create
-            its first project. Mutually exclusive with the in-gate Projects above
-            (that one only renders when showSessionSections is true), so Projects
-            appears exactly once and the populated layout is unchanged. */}
-        {contentVisible && !showSessionSections && !trimmedQuery && (
-          <div className="flex shrink-0 flex-col">
-            <SidebarProjectsSection
-              label={s.projects.label}
-              onOpenChat={onResumeSession}
-              onToggle={() => setSidebarProjectsOpen(!projectsOpen)}
-              open={projectsOpen}
-            />
           </div>
         )}
 
