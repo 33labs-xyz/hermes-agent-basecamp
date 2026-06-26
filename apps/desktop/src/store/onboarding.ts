@@ -20,7 +20,11 @@ type PkceStart = Extract<OAuthStartResponse, { flow: 'pkce' }>
 type DeviceStart = Extract<OAuthStartResponse, { flow: 'device_code' }>
 type LoopbackStart = Extract<OAuthStartResponse, { flow: 'loopback' }>
 
-export type OnboardingMode = 'apikey' | 'oauth'
+// 'openrouter' is the streamlined first-run landing: the overlay opens straight
+// on the OpenRouter API-key entry (the suggested, guided provider) instead of
+// the full OAuth picker. 'oauth' = the full provider picker (manual add/switch,
+// or reached via "use a different provider"); 'apikey' = the full API-key grid.
+export type OnboardingMode = 'apikey' | 'oauth' | 'openrouter'
 
 export type OnboardingFlow =
   | { status: 'idle' }
@@ -150,7 +154,7 @@ function writeCachedSkipped(value: boolean) {
 const INITIAL: DesktopOnboardingState = {
   configured: readCachedConfigured(),
   flow: { status: 'idle' },
-  mode: 'oauth',
+  mode: 'openrouter',
   providers: null,
   reason: null,
   requested: false,
@@ -374,7 +378,12 @@ async function refreshProviders() {
   providersRefreshPromise = (async () => {
     try {
       const { providers } = await listOAuthProviders()
-      patch({ mode: providers.length > 0 ? 'oauth' : 'apikey', providers })
+      // First run lands on the streamlined OpenRouter key screen; manual
+      // add/switch keeps the full OAuth picker. No OAuth providers at all =>
+      // fall back to the full API-key grid (nothing to feature).
+      const { manual } = $desktopOnboarding.get()
+      const mode = providers.length === 0 ? 'apikey' : manual ? 'oauth' : 'openrouter'
+      patch({ mode, providers })
     } catch {
       patch({ mode: 'apikey', providers: [] })
     } finally {

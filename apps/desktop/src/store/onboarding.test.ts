@@ -148,6 +148,56 @@ describe('refreshOnboarding', () => {
   })
 })
 
+describe('onboarding mode selection', () => {
+  beforeEach(() => {
+    window.localStorage.clear()
+    $desktopOnboarding.set(baseState())
+  })
+
+  afterEach(() => {
+    window.localStorage.clear()
+    $desktopOnboarding.set(baseState())
+    vi.restoreAllMocks()
+  })
+
+  function oauthApi(providers: OAuthProvider[]) {
+    return vi.fn(async ({ path }: { path: string }) => {
+      if (path === '/api/providers/oauth') {
+        return { providers }
+      }
+
+      throw new Error(`unexpected api path: ${path}`)
+    })
+  }
+
+  it('lands first-run onboarding on the streamlined OpenRouter mode', async () => {
+    installApiMock(oauthApi([provider('nous', 'Nous Portal')]))
+
+    await refreshOnboarding(onboardingContext(runtimeMismatchGateway()))
+
+    expect($desktopOnboarding.get().mode).toBe('openrouter')
+    expect($desktopOnboarding.get().providers?.map(p => p.id)).toEqual(['nous'])
+  })
+
+  it('keeps the full OAuth picker in manual (add-provider) mode', async () => {
+    installApiMock(oauthApi([provider('nous', 'Nous Portal')]))
+    // Start from the streamlined mode to prove manual forces it back to oauth.
+    $desktopOnboarding.set(baseState({ manual: true, mode: 'openrouter' }))
+
+    await refreshOnboarding(onboardingContext(runtimeMismatchGateway()))
+
+    expect($desktopOnboarding.get().mode).toBe('oauth')
+  })
+
+  it('falls back to the API-key grid when no OAuth providers exist', async () => {
+    installApiMock(oauthApi([]))
+
+    await refreshOnboarding(onboardingContext(runtimeMismatchGateway()))
+
+    expect($desktopOnboarding.get().mode).toBe('apikey')
+  })
+})
+
 describe('OAuth onboarding', () => {
   beforeEach(() => {
     window.localStorage.clear()

@@ -100,3 +100,33 @@ describe('onboarding Picker', () => {
     expect(screen.queryByRole('button', { name: "I'll choose a provider later" })).toBeNull()
   })
 })
+
+describe('onboarding Picker — OpenRouter-first run', () => {
+  it('lands directly on the OpenRouter key form with no provider grid', () => {
+    setProviders([provider('nous', 'Nous Portal')])
+    $desktopOnboarding.set({ ...$desktopOnboarding.get(), mode: 'openrouter' })
+    render(<Picker ctx={ctx} />)
+
+    // Streamlined view: OpenRouter heading + single key field, and neither the
+    // OAuth featured card nor its "Recommended" badge.
+    expect(screen.getByText('OpenRouter')).toBeTruthy()
+    expect(screen.queryByText('Nous Portal')).toBeNull()
+    expect(screen.queryByText('Recommended')).toBeNull()
+
+    // Both escapes remain: opt into the full picker, or defer entirely.
+    expect(screen.getByRole('button', { name: 'Use a different provider' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: "I'll choose a provider later" })).toBeTruthy()
+  })
+
+  it('reveals the full OAuth picker via "use a different provider"', () => {
+    setProviders([provider('nous', 'Nous Portal')])
+    $desktopOnboarding.set({ ...$desktopOnboarding.get(), mode: 'openrouter' })
+    render(<Picker ctx={ctx} />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Use a different provider' }))
+
+    expect($desktopOnboarding.get().mode).toBe('oauth')
+    // The featured OAuth provider now shows in place of the OpenRouter landing.
+    expect(screen.getByText('Nous Portal')).toBeTruthy()
+  })
+})

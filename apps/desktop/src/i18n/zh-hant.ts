@@ -1600,6 +1600,7 @@ export const zhHant = defineLocale({
       }
     },
     backToSignIn: '返回登入',
+    useDifferentProvider: '使用其他供應商',
     getKey: '取得金鑰',
     replaceCurrent: '取代目前值',
     pasteApiKey: '貼上 API 金鑰',

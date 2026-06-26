@@ -1227,6 +1227,7 @@ export interface Translations {
     openRouterPitch: string
     apiKeyOptions: Record<string, { short: string; description: string }>
     backToSignIn: string
+    useDifferentProvider: string
     getKey: string
     replaceCurrent: string
     pasteApiKey: string

@@ -1760,6 +1760,7 @@ export const zh: Translations = {
       }
     },
     backToSignIn: '返回登录',
+    useDifferentProvider: '使用其他提供商',
     getKey: '获取密钥',
     replaceCurrent: '替换当前值',
     pasteApiKey: '粘贴 API 密钥',

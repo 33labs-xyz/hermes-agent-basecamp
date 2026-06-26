@@ -1654,6 +1654,7 @@ export const ja = defineLocale({
       }
     },
     backToSignIn: 'サインインに戻る',
+    useDifferentProvider: '別のプロバイダーを使用',
     getKey: 'キーを取得',
     replaceCurrent: '現在の値を置き換え',
     pasteApiKey: 'API キーを貼り付け',

@@ -436,6 +436,29 @@ export function Picker({ ctx }: { ctx: OnboardingContext }) {
   const hasOauth = ordered.length > 0
   const apiKeyOptions = useApiKeyCatalog()
 
+  // First-run streamlined landing: skip straight to OpenRouter key entry (the
+  // suggested provider). "Use a different provider" drops back to the full OAuth
+  // picker; "choose later" still escapes into the app. Manual add/switch and the
+  // local-endpoint flow opt out — they get the full surfaces below.
+  if (mode === 'openrouter' && !manual && !localEndpoint) {
+    return (
+      <div className="grid gap-3">
+        <ApiKeyForm
+          backLabel={t.onboarding.useDifferentProvider}
+          canGoBack
+          initialEnvKey="OPENROUTER_API_KEY"
+          onBack={() => setOnboardingMode('oauth')}
+          onSave={(envKey, value, name, apiKey) => saveOnboardingApiKey(envKey, value, name, ctx, apiKey)}
+          options={apiKeyOptions}
+          singleProvider
+        />
+        <div className="flex justify-center border-t border-(--ui-stroke-tertiary) pt-3">
+          <ChooseLaterLink />
+        </div>
+      </div>
+    )
+  }
+
   // localEndpoint forces the key form regardless of `mode` (which a manual
   // provider refresh may flip back to 'oauth'); it preselects the local option
   // and hides the "back to sign in" link since the user came specifically to
@@ -634,6 +657,7 @@ export function ProviderRow({
 // double as a manage surface). Keep it free of store/ctx coupling so both
 // surfaces render the identical form.
 export function ApiKeyForm({
+  backLabel,
   canGoBack,
   initialEnvKey,
   isSet,
@@ -641,8 +665,12 @@ export function ApiKeyForm({
   onClear,
   onSave,
   options = API_KEY_OPTIONS,
-  redactedValue
+  redactedValue,
+  singleProvider
 }: {
+  /** Override the back-link copy (e.g. "Use a different provider" on the
+   *  streamlined OpenRouter screen). Defaults to "Back to sign in". */
+  backLabel?: string
   canGoBack: boolean
   /** Preselect a specific option by env key (e.g. 'OPENAI_BASE_URL' to land on
    *  the local / custom endpoint form). Falls back to the first option. */
@@ -658,6 +686,9 @@ export function ApiKeyForm({
   ) => Promise<{ message?: string; ok: boolean }>
   options?: ApiKeyOption[]
   redactedValue?: (envKey: string) => null | string | undefined
+  /** Hide the provider-catalog grid and pin to the preselected option — used by
+   *  the streamlined OpenRouter-first landing so only one key field shows. */
+  singleProvider?: boolean
 }) {
   const { t } = useI18n()
 
@@ -739,33 +770,38 @@ export function ApiKeyForm({
           variant="text"
         >
           <ChevronLeft className="size-3" />
-          {t.onboarding.backToSignIn}
+          {backLabel ?? t.onboarding.backToSignIn}
         </Button>
       ) : null}
 
-      <div className="grid max-h-[42dvh] gap-2 overflow-y-auto p-1 sm:grid-cols-2">
-        {options.map(o => (
-          <button
-            className={cn(
-              'rounded-2xl border bg-background/60 p-3 text-left transition hover:bg-accent/50',
-              option.envKey === o.envKey ? 'border-primary ring-2 ring-primary/20' : 'border-transparent'
-            )}
-            key={o.envKey}
-            onClick={() => pick(o)}
-            type="button"
-          >
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-sm font-medium">{o.name}</span>
-              {isSet?.(o.envKey) ? <Check className="size-3.5 text-muted-foreground" /> : null}
-            </div>
-            {(t.onboarding.apiKeyOptions[o.id]?.short ?? o.short) ? (
-              <p className="mt-1 text-xs text-muted-foreground">{t.onboarding.apiKeyOptions[o.id]?.short ?? o.short}</p>
-            ) : null}
-          </button>
-        ))}
-      </div>
+      {singleProvider ? null : (
+        <div className="grid max-h-[42dvh] gap-2 overflow-y-auto p-1 sm:grid-cols-2">
+          {options.map(o => (
+            <button
+              className={cn(
+                'rounded-2xl border bg-background/60 p-3 text-left transition hover:bg-accent/50',
+                option.envKey === o.envKey ? 'border-primary ring-2 ring-primary/20' : 'border-transparent'
+              )}
+              key={o.envKey}
+              onClick={() => pick(o)}
+              type="button"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-sm font-medium">{o.name}</span>
+                {isSet?.(o.envKey) ? <Check className="size-3.5 text-muted-foreground" /> : null}
+              </div>
+              {(t.onboarding.apiKeyOptions[o.id]?.short ?? o.short) ? (
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {t.onboarding.apiKeyOptions[o.id]?.short ?? o.short}
+                </p>
+              ) : null}
+            </button>
+          ))}
+        </div>
+      )}
 
       <div className="grid scroll-mt-4 gap-2" ref={entryRef}>
+        {singleProvider ? <p className="text-sm font-semibold">{option.name}</p> : null}
         <div className="flex items-center justify-between gap-3">
           <p className="text-sm leading-6 text-muted-foreground">{optionDescription}</p>
           {option.docsUrl ? <DocsLink href={option.docsUrl}>{t.onboarding.getKey}</DocsLink> : null}

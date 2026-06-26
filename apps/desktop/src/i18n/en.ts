@@ -1578,6 +1578,7 @@ export const en: Translations = {
       }
     },
     backToSignIn: 'Back to sign in',
+    useDifferentProvider: 'Use a different provider',
     getKey: 'Get a key',
     replaceCurrent: 'Replace current value',
     pasteApiKey: 'Paste API key',
