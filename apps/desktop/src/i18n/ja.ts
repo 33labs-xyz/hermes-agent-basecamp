@@ -1729,6 +1729,7 @@ export const ja = defineLocale({
     modelMenu: {
       search: 'モデルを検索',
       noModels: 'モデルが見つかりません',
+      connectModel: 'モデルを接続',
       editModels: 'モデルを編集…',
       fast: '高速',
       medium: '中'

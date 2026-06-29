@@ -1654,6 +1654,7 @@ export const en: Translations = {
     modelMenu: {
       search: 'Search models',
       noModels: 'No models found',
+      connectModel: 'Connect a model',
       editModels: 'Edit Models…',
       fast: 'Fast',
       medium: 'Med'

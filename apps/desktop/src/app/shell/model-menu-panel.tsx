@@ -30,6 +30,7 @@ import {
   modelVisibilityKey,
   setModelVisibilityOpen
 } from '@/store/model-visibility'
+import { startManualOnboarding } from '@/store/onboarding'
 import {
   $activeSessionId,
   $currentFastMode,
@@ -40,6 +41,7 @@ import {
 import type { ModelOptionProvider, ModelOptionsResponse } from '@/types/hermes'
 
 import { ModelEditSubmenu, resolveFastControl } from './model-edit-submenu'
+import { hasAuthenticatedModels } from './model-menu-helpers'
 
 // Lets the host dropdown (model-pill) hand the panel a way to dismiss itself so
 // clicking a model row commits + closes, while the hover-revealed edit submenu
@@ -99,6 +101,10 @@ export function ModelMenuPanel({ gateway, onSelectModel, requestGateway }: Model
     : null
 
   const providers = modelOptions.data?.providers
+
+  // No authenticated provider => nothing to list; offer to connect one instead
+  // of a dead "No models found" row (mirrors the dialog picker's Add-provider).
+  const hasModels = hasAuthenticatedModels(providers)
 
   const effectiveVisibleModels = useMemo(
     () => effectiveVisibleKeys(visibleModels, providers ?? []),
@@ -169,9 +175,25 @@ export function ModelMenuPanel({ gateway, onSelectModel, requestGateway }: Model
           {error}
         </DropdownMenuItem>
       ) : groups.length === 0 ? (
-        <DropdownMenuItem className={dropdownMenuRow} disabled>
-          {copy.noModels}
-        </DropdownMenuItem>
+        hasModels ? (
+          // Authenticated providers exist but search/visibility hid every row.
+          <DropdownMenuItem className={dropdownMenuRow} disabled>
+            {copy.noModels}
+          </DropdownMenuItem>
+        ) : (
+          // No authenticated provider at all — launch provider setup instead of
+          // dead-ending. Mirrors the dialog picker's "Add provider" button.
+          <DropdownMenuItem
+            className={dropdownMenuRow}
+            onSelect={() => {
+              startManualOnboarding()
+              closeMenu()
+            }}
+          >
+            <Codicon name="add" size="0.75rem" />
+            {copy.connectModel}
+          </DropdownMenuItem>
+        )
       ) : (
         <div className="max-h-80 overflow-y-auto py-0.5">
           {groups.map(group => (
@@ -266,14 +288,18 @@ export function ModelMenuPanel({ gateway, onSelectModel, requestGateway }: Model
         </div>
       )}
 
-      <DropdownMenuSeparator className="mx-0" />
+      {hasModels ? (
+        <>
+          <DropdownMenuSeparator className="mx-0" />
 
-      <DropdownMenuItem
-        className={cn(dropdownMenuRow, 'text-(--ui-text-tertiary)')}
-        onSelect={() => setModelVisibilityOpen(true)}
-      >
-        {copy.editModels}
-      </DropdownMenuItem>
+          <DropdownMenuItem
+            className={cn(dropdownMenuRow, 'text-(--ui-text-tertiary)')}
+            onSelect={() => setModelVisibilityOpen(true)}
+          >
+            {copy.editModels}
+          </DropdownMenuItem>
+        </>
+      ) : null}
     </>
   )
 }

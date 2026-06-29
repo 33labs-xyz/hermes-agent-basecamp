@@ -198,6 +198,76 @@ describe('onboarding mode selection', () => {
   })
 })
 
+describe('refreshOnboarding first-launch gate', () => {
+  beforeEach(() => {
+    window.localStorage.clear()
+    $desktopOnboarding.set(baseState())
+  })
+
+  afterEach(() => {
+    window.localStorage.clear()
+    $desktopOnboarding.set(baseState())
+    vi.restoreAllMocks()
+  })
+
+  function oauthApi(providers: OAuthProvider[]) {
+    return vi.fn(async ({ path }: { path: string }) => {
+      if (path === '/api/providers/oauth') {
+        return { providers }
+      }
+
+      throw new Error(`unexpected api path: ${path}`)
+    })
+  }
+
+  function readyGateway(): OnboardingContext['requestGateway'] {
+    return async method => {
+      if (method === 'setup.status') {
+        return { provider_configured: true } as never
+      }
+
+      if (method === 'setup.runtime_check') {
+        return { ok: true } as never
+      }
+
+      throw new Error(`unexpected gateway method: ${method}`)
+    }
+  }
+
+  it('forces the OpenRouter screen on a true first launch even when the runtime resolves ready', async () => {
+    installApiMock(oauthApi([provider('nous', 'Nous Portal')]))
+
+    const ready = await refreshOnboarding(onboardingContext(readyGateway()))
+
+    // A persistent ~/.basecamp credential (or ambient env var) would make the
+    // runtime ready and silently skip onboarding — the first-launch gate must
+    // override that and present the OpenRouter setup screen instead.
+    expect(ready).toBe(false)
+    expect($desktopOnboarding.get().configured).toBe(false)
+    expect($desktopOnboarding.get().mode).toBe('openrouter')
+    // Not a real "missing provider" problem, so no alarm banner.
+    expect($desktopOnboarding.get().reason).toBeNull()
+  })
+
+  it('completes immediately for a returning onboarded install when the runtime is ready', async () => {
+    window.localStorage.setItem('hermes-desktop-onboarded-v1', '1')
+
+    const ready = await refreshOnboarding(onboardingContext(readyGateway()))
+
+    expect(ready).toBe(true)
+    expect($desktopOnboarding.get().configured).toBe(true)
+  })
+
+  it('does not re-force onboarding once the user skipped the first-run picker', async () => {
+    window.localStorage.setItem('hermes-onboarding-skipped-v1', '1')
+
+    const ready = await refreshOnboarding(onboardingContext(readyGateway()))
+
+    expect(ready).toBe(true)
+    expect($desktopOnboarding.get().configured).toBe(true)
+  })
+})
+
 describe('OAuth onboarding', () => {
   beforeEach(() => {
     window.localStorage.clear()

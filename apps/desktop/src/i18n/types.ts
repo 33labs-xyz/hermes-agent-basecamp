@@ -1296,6 +1296,7 @@ export interface Translations {
     modelMenu: {
       search: string
       noModels: string
+      connectModel: string
       editModels: string
       fast: string
       medium: string

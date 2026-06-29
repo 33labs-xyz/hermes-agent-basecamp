@@ -516,7 +516,16 @@ export async function refreshOnboarding(ctx: OnboardingContext) {
 
   const runtime = await checkRuntime(ctx)
 
-  if (runtime.ready) {
+  // First-ever launch: proactively surface the OpenRouter setup screen even when
+  // a credential already resolves the runtime. A persistent ~/.basecamp/.env or
+  // auth.json (survives reinstalls) — or an ambient provider env var — would
+  // otherwise auto-complete onboarding and hide the screen entirely. The "I'll
+  // choose a provider later" button (dismissFirstRunOnboarding, which writes the
+  // skip flag) is the escape; once skipped or actually onboarded this stops
+  // firing.
+  const readyFirstLaunch = runtime.ready && readCachedConfigured() === null && !readCachedSkipped()
+
+  if (runtime.ready && !readyFirstLaunch) {
     completeDesktopOnboarding()
     ctx.onCompleted?.()
 
@@ -524,10 +533,12 @@ export async function refreshOnboarding(ctx: OnboardingContext) {
   }
 
   const state = $desktopOnboarding.get()
-  const reason = runtime.reason || state.reason || DEFAULT_ONBOARDING_REASON
+  // Ready-but-first-launch isn't a real "no provider configured" problem, so
+  // skip the alarm banner and just feature the OpenRouter screen.
+  const reason = readyFirstLaunch ? null : runtime.reason || state.reason || DEFAULT_ONBOARDING_REASON
 
   writeCachedConfigured(false)
-  patch({ configured: false, reason })
+  patch(readyFirstLaunch ? { configured: false, mode: 'openrouter', reason } : { configured: false, reason })
 
   if (state.providers !== null && !state.requested) {
     return false
