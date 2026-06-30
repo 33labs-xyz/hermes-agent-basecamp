@@ -2,7 +2,7 @@
   "name": "basecamp",
   "productName": "Basecamp",
   "private": true,
-  "version": "0.15.1",
+  "version": "0.15.2",
   "description": "Basecamp - native desktop app powered by the Hermes agent.",
   "author": "33labs",
   "type": "module",
@@ -144,7 +144,8 @@
       {
         "provider": "github",
         "owner": "33labs-xyz",
-        "repo": "hermes-agent-basecamp"
+        "repo": "hermes-agent-basecamp",
+        "releaseType": "release"
       }
     ],
     "protocols": [
