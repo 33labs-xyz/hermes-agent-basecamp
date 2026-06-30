@@ -361,8 +361,13 @@ function applyRuntimeInfo(info: SessionRuntimeInfo | undefined): SessionRuntimeS
   return sessionState
 }
 
-function applyStoredSessionPreviewRuntimeInfo(stored: { model?: null | string } | undefined) {
-  setCurrentModel(stored?.model || '')
+export function applyStoredSessionPreviewRuntimeInfo(stored: { model?: null | string } | undefined) {
+  // Resuming a stored session reflects ITS settings in the composer. When the
+  // session has no recorded model (older sessions, untagged rows), preserve the
+  // sticky pick instead of clearing to '' — an empty model lets the next new
+  // chat refill the profile default (e.g. opus 4.6) via refreshCurrentModel,
+  // silently overwriting the user's last selection.
+  setCurrentModel(current => stored?.model || current)
   setCurrentProvider('')
   setCurrentReasoningEffort('')
   setCurrentServiceTier('')

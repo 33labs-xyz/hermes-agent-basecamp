@@ -4,11 +4,11 @@ import { useEffect } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { $activeGatewayProfile, $newChatProfile } from '@/store/profile'
-import { $currentCwd } from '@/store/session'
+import { $currentCwd, $currentModel, setCurrentModel } from '@/store/session'
 
 import type { ClientSessionState } from '../../types'
 
-import { useSessionActions } from './use-session-actions'
+import { applyStoredSessionPreviewRuntimeInfo, useSessionActions } from './use-session-actions'
 
 vi.mock('@/hermes', async importOriginal => ({
   ...(await importOriginal<Record<string, unknown>>()),
@@ -115,5 +115,38 @@ describe('createBackendSessionForSend profile routing', () => {
     })
 
     expect(params).toMatchObject({ profile: 'default' })
+  })
+})
+
+describe('applyStoredSessionPreviewRuntimeInfo model stickiness', () => {
+  afterEach(() => {
+    setCurrentModel('')
+  })
+
+  it('preserves the sticky composer model when the resumed session has no recorded model', () => {
+    // Resuming an old (model-less) chat must NOT wipe the user's last pick. A
+    // cleared model lets the next new chat refill the profile default (opus 4.6)
+    // via refreshCurrentModel, silently overwriting the sticky selection.
+    setCurrentModel('anthropic/claude-sonnet-4-6')
+
+    applyStoredSessionPreviewRuntimeInfo({ model: null })
+
+    expect($currentModel.get()).toBe('anthropic/claude-sonnet-4-6')
+  })
+
+  it('reflects the resumed session model when one was recorded', () => {
+    setCurrentModel('anthropic/claude-sonnet-4-6')
+
+    applyStoredSessionPreviewRuntimeInfo({ model: 'openai/gpt-5' })
+
+    expect($currentModel.get()).toBe('openai/gpt-5')
+  })
+
+  it('leaves an empty composer empty for a brand-new user with no sticky pick', () => {
+    setCurrentModel('')
+
+    applyStoredSessionPreviewRuntimeInfo({ model: null })
+
+    expect($currentModel.get()).toBe('')
   })
 })
