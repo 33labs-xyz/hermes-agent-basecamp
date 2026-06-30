@@ -1630,7 +1630,7 @@ export const en: Translations = {
     unknown: '(unknown)',
     search: 'Filter providers and models...',
     noModels: 'No models found.',
-    addProvider: 'Add provider',
+    addProvider: 'Add more models…',
     loadFailed: 'Could not load models',
     noAuthenticatedProviders: 'No authenticated providers.',
     pro: 'Pro',

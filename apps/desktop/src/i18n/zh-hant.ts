@@ -1649,7 +1649,7 @@ export const zhHant = defineLocale({
     unknown: '（未知）',
     search: '篩選提供方和模型...',
     noModels: '找不到模型。',
-    addProvider: '新增提供方',
+    addProvider: '新增更多模型…',
     loadFailed: '無法載入模型',
     noAuthenticatedProviders: '沒有已驗證的提供方。',
     pro: 'Pro',

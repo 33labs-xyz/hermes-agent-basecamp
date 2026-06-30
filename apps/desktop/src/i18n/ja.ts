@@ -1705,7 +1705,7 @@ export const ja = defineLocale({
     unknown: '(不明)',
     search: 'プロバイダーとモデルをフィルター...',
     noModels: 'モデルが見つかりません。',
-    addProvider: 'プロバイダーを追加',
+    addProvider: 'モデルをさらに追加…',
     loadFailed: 'モデルを読み込めませんでした',
     noAuthenticatedProviders: '認証済みプロバイダーがありません。',
     pro: 'Pro',
