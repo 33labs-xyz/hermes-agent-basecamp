@@ -122,8 +122,70 @@ declare global {
         // returns the most-installed themes.
         searchMarketplace: (query: string) => Promise<DesktopMarketplaceSearchItem[]>
       }
+      // Generative-AI Studio: OS-encrypted Muapi key, CORS-bypass HTTP proxy,
+      // and the on-disk local generation library. Optional so non-desktop or
+      // older preload builds degrade gracefully.
+      studio?: {
+        getKey: () => Promise<string>
+        setKey: (key: string) => Promise<boolean>
+        request: (req: StudioProxyRequest) => Promise<StudioProxyResponse>
+        upload: (req: StudioUploadRequest) => Promise<StudioProxyResponse>
+        gen: {
+          save: (payload: StudioSaveInput) => Promise<StudioGenerationEntry>
+          list: () => Promise<StudioGenerationEntry[]>
+          archive: (id: string) => Promise<StudioGenerationEntry | null>
+          restore: (id: string) => Promise<StudioGenerationEntry | null>
+          deleteForever: (id: string) => Promise<boolean>
+          setFolder: (id: string, folder: string) => Promise<StudioGenerationEntry | null>
+          organise: () => Promise<StudioGenerationEntry[]>
+        }
+      }
     }
   }
+}
+
+export interface StudioProxyRequest {
+  url: string
+  method?: string
+  headers?: Record<string, string>
+  body?: string | null
+}
+
+export interface StudioProxyResponse {
+  ok: boolean
+  status: number
+  statusText: string
+  body: string
+}
+
+export interface StudioUploadRequest {
+  url: string
+  apiKey: string
+  name: string
+  type: string
+  bytes: ArrayBuffer
+}
+
+export interface StudioSaveInput {
+  url: string
+  prompt?: string
+  model?: string
+  tab?: string
+}
+
+export interface StudioGenerationEntry {
+  id: string
+  ext: string
+  kind: 'image' | 'video' | 'audio' | 'other'
+  folder: string
+  prompt: string
+  model: string
+  tab: string
+  sourceUrl: string
+  createdAt: string
+  archived: boolean
+  /** Absolute on-disk path, added by list/save (not persisted in the index). */
+  path?: string
 }
 
 export interface DesktopMarketplaceSearchItem {

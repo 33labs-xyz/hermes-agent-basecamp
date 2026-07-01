@@ -159,5 +159,21 @@ contextBridge.exposeInMainWorld('hermesDesktop', {
   themes: {
     fetchMarketplace: id => ipcRenderer.invoke('hermes:vscode-theme:fetch', id),
     searchMarketplace: query => ipcRenderer.invoke('hermes:vscode-theme:search', query)
+  },
+  // Generative-AI Studio: Muapi key + CORS-bypass proxy + local library.
+  studio: {
+    getKey: () => ipcRenderer.invoke('studio:key:get'),
+    setKey: key => ipcRenderer.invoke('studio:key:set', key),
+    request: req => ipcRenderer.invoke('studio:muapi:request', req),
+    upload: req => ipcRenderer.invoke('studio:muapi:upload', req),
+    gen: {
+      save: payload => ipcRenderer.invoke('studio:gen:save', payload),
+      list: () => ipcRenderer.invoke('studio:gen:list'),
+      archive: id => ipcRenderer.invoke('studio:gen:archive', id),
+      restore: id => ipcRenderer.invoke('studio:gen:restore', id),
+      deleteForever: id => ipcRenderer.invoke('studio:gen:deleteForever', id),
+      setFolder: (id, folder) => ipcRenderer.invoke('studio:gen:setFolder', id, folder),
+      organise: () => ipcRenderer.invoke('studio:gen:organise')
+    }
   }
 })

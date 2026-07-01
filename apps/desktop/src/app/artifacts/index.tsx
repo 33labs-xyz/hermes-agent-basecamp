@@ -22,8 +22,9 @@ import { getSessionMessages, listAllProfileSessions } from '@/hermes'
 import { type Translations, useI18n } from '@/i18n'
 import { sessionTitle } from '@/lib/chat-runtime'
 import { ExternalLink, ExternalLinkIcon, hostPathLabel, urlSlugTitleLabel, useLinkTitle } from '@/lib/external-link'
+import type { StudioGenerationEntry } from '@/global'
 import { FileImage, FileText, FolderOpen, Link2 } from '@/lib/icons'
-import { mediaExternalUrl } from '@/lib/media'
+import { mediaExternalUrl, mediaName } from '@/lib/media'
 import { cn } from '@/lib/utils'
 import { notifyError } from '@/store/notifications'
 import type { SessionInfo, SessionMessage } from '@/types/hermes'
@@ -32,7 +33,7 @@ import { useRefreshHotkey } from '../hooks/use-refresh-hotkey'
 import { useRouteEnumParam } from '../hooks/use-route-enum-param'
 import { PAGE_INSET_NEG_X, PAGE_INSET_X } from '../layout-constants'
 import { PageSearchShell } from '../page-search-shell'
-import { sessionRoute } from '../routes'
+import { sessionRoute, STUDIO_ROUTE } from '../routes'
 import type { SetStatusbarItemGroup } from '../shell/statusbar-controls'
 
 type ArtifactKind = 'image' | 'file' | 'link'
@@ -48,6 +49,9 @@ interface ArtifactRecord {
   sessionId: string
   sessionTitle: string
   timestamp: number
+  // 'studio' records come from the local generation library, not a chat
+  // session; their session action opens the Studio view instead of a chat.
+  source?: 'session' | 'studio'
 }
 
 const MARKDOWN_IMAGE_RE = /!\[([^\]]*)\]\(([^)\s]+)\)/g
@@ -305,6 +309,46 @@ export function collectArtifactsForSession(session: SessionInfo, messages: Sessi
   return Array.from(found.values())
 }
 
+// Surface locally-saved Studio generations alongside chat artifacts. Only
+// active (non-archived) entries appear; archived ones are hidden until restored.
+export async function collectStudioArtifacts(): Promise<ArtifactRecord[]> {
+  const gen = window.hermesDesktop?.studio?.gen
+
+  if (!gen) {
+    return []
+  }
+
+  let entries: StudioGenerationEntry[]
+
+  try {
+    entries = await gen.list()
+  } catch {
+    return []
+  }
+
+  const records: ArtifactRecord[] = []
+
+  for (const entry of entries) {
+    if (entry.archived || !entry.path) {
+      continue
+    }
+
+    records.push({
+      id: `studio:${entry.id}`,
+      kind: entry.kind === 'image' ? 'image' : 'file',
+      value: entry.path,
+      href: mediaExternalUrl(entry.path),
+      label: entry.prompt.trim() || mediaName(entry.path),
+      sessionId: '',
+      sessionTitle: `Studio · ${entry.folder}`,
+      timestamp: Date.parse(entry.createdAt) || 0,
+      source: 'studio'
+    })
+  }
+
+  return records
+}
+
 function formatArtifactTime(timestamp: number): string {
   return ARTIFACT_TIME_FMT.format(new Date(timestamp))
 }
@@ -348,7 +392,7 @@ function paginationItems(page: number, pageCount: number): Array<number | 'ellip
 
 type CellCtx = {
   onOpen: (href: string) => void | Promise<void>
-  onOpenChat: (sessionId: string) => void
+  onOpenChat: (artifact: ArtifactRecord) => void
 }
 
 interface ArtifactColumn {
@@ -396,6 +440,8 @@ export function ArtifactsView({ setStatusbarItemGroup: _setStatusbarItemGroup, .
         const session = sessions[index]
         nextArtifacts.push(...collectArtifactsForSession(session, result.value.messages))
       })
+
+      nextArtifacts.push(...(await collectStudioArtifacts()))
 
       setArtifacts(nextArtifacts.sort((left, right) => right.timestamp - left.timestamp))
     } catch (err) {
@@ -499,9 +545,16 @@ export function ArtifactsView({ setStatusbarItemGroup: _setStatusbarItemGroup, .
     })
   }, [])
 
+  // Studio artifacts have no chat session; their action opens the Studio view.
+  const openArtifactSource = useCallback(
+    (artifact: ArtifactRecord) =>
+      navigate(artifact.source === 'studio' ? STUDIO_ROUTE : sessionRoute(artifact.sessionId)),
+    [navigate]
+  )
+
   const cellCtx: CellCtx = {
     onOpen: openArtifact,
-    onOpenChat: sessionId => navigate(sessionRoute(sessionId))
+    onOpenChat: openArtifactSource
   }
 
   return (
@@ -579,7 +632,7 @@ export function ArtifactsView({ setStatusbarItemGroup: _setStatusbarItemGroup, .
                       failedImage={failedImageIds.has(artifact.id)}
                       key={artifact.id}
                       onImageError={markImageFailed}
-                      onOpenChat={sessionId => navigate(sessionRoute(sessionId))}
+                      onOpenChat={openArtifactSource}
                     />
                   ))}
                 </div>
@@ -673,7 +726,7 @@ interface ArtifactImageCardProps {
   artifact: ArtifactRecord
   failedImage: boolean
   onImageError: (id: string) => void
-  onOpenChat: (sessionId: string) => void
+  onOpenChat: (artifact: ArtifactRecord) => void
 }
 
 function ArtifactImageCard({ artifact, failedImage, onImageError, onOpenChat }: ArtifactImageCardProps) {
@@ -720,7 +773,7 @@ function ArtifactImageCard({ artifact, failedImage, onImageError, onOpenChat }: 
         </div>
 
         <div className="flex flex-wrap gap-1.5">
-          <Button onClick={() => onOpenChat(artifact.sessionId)} size="xs" type="button" variant="textStrong">
+          <Button onClick={() => onOpenChat(artifact)} size="xs" type="button" variant="textStrong">
             <FolderOpen className="size-3" />
             {a.chat}
           </Button>
@@ -824,7 +877,7 @@ function LocationCell({ artifact }: { artifact: ArtifactRecord; ctx: CellCtx }) 
 
 function SessionCell({ artifact, ctx }: { artifact: ArtifactRecord; ctx: CellCtx }) {
   return (
-    <ArtifactCellAction onClick={() => ctx.onOpenChat(artifact.sessionId)} title={artifact.sessionTitle}>
+    <ArtifactCellAction onClick={() => ctx.onOpenChat(artifact)} title={artifact.sessionTitle}>
       <span className="flex min-w-0 flex-col">
         <span className="truncate">{artifact.sessionTitle}</span>
         <span className="truncate text-[0.6875rem] font-normal text-(--ui-text-tertiary)">

@@ -96,7 +96,7 @@ import {
   sessionPinId
 } from '@/store/session'
 
-import { type AppView, ARTIFACTS_ROUTE, MESSAGING_ROUTE, PROJECTS_ROUTE, SKILLS_ROUTE } from '../../routes'
+import { type AppView, ARTIFACTS_ROUTE, MESSAGING_ROUTE, PROJECTS_ROUTE, SKILLS_ROUTE, STUDIO_ROUTE } from '../../routes'
 import { SidebarPanelLabel } from '../../shell/sidebar-label'
 import type { SidebarNavItem } from '../../types'
 
@@ -137,7 +137,9 @@ const SIDEBAR_NAV: SidebarNavItem[] = [
     route: SKILLS_ROUTE
   },
   { id: 'messaging', label: '', icon: props => <Codicon name="comment" {...props} />, route: MESSAGING_ROUTE },
-  { id: 'artifacts', label: '', icon: props => <Codicon name="files" {...props} />, route: ARTIFACTS_ROUTE }
+  { id: 'artifacts', label: '', icon: props => <Codicon name="files" {...props} />, route: ARTIFACTS_ROUTE },
+  // Studio is the last nav item: the local generative-AI studio (Muapi BYOK).
+  { id: 'studio', label: 'Studio', icon: props => <Codicon name="sparkle" {...props} />, route: STUDIO_ROUTE }
 ]
 
 const WORKSPACE_PAGE = 5
@@ -824,6 +826,7 @@ export function ChatSidebar({
                   (item.id === 'skills' && currentView === 'skills') ||
                   (item.id === 'messaging' && currentView === 'messaging') ||
                   (item.id === 'artifacts' && currentView === 'artifacts') ||
+                  (item.id === 'studio' && currentView === 'studio') ||
                   (item.id === 'projects' && currentView === 'projects')
 
                 const isNewSession = item.id === 'new-session'

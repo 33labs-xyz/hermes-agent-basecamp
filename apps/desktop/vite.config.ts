@@ -37,6 +37,10 @@ export default defineConfig({
     alias: {
       '@': path.resolve(__dirname, './src'),
       '@hermes/shared': path.resolve(__dirname, '../shared/src'),
+      // Shims so the vendored generative-AI studio (authored for Next.js) runs
+      // unmodified under Vite. Only the two Next modules it touches are mapped.
+      'next/navigation': path.resolve(__dirname, './src/app/studio/shims/next-navigation.ts'),
+      'next/dynamic': path.resolve(__dirname, './src/app/studio/shims/next-dynamic.ts'),
       react: path.resolve(__dirname, '../../node_modules/react'),
       'react-dom': path.resolve(__dirname, '../../node_modules/react-dom'),
       'react/jsx-dev-runtime': path.resolve(__dirname, '../../node_modules/react/jsx-dev-runtime.js'),

@@ -55,6 +55,7 @@ const {
   uninstallArgsForMode
 } = require('./desktop-uninstall.cjs')
 const { isPackagedInstallPath: isPackagedInstallPathUnderRoots } = require('./workspace-cwd.cjs')
+const { registerStudioIpc } = require('./studio.cjs')
 const {
   authModeFromStatus,
   buildGatewayWsUrl,
@@ -5740,6 +5741,9 @@ ipcMain.handle('hermes:writeClipboard', (_event, text) => {
   clipboard.writeText(String(text || ''))
   return true
 })
+
+// Studio (generative-AI) backend: Muapi key/proxy + local generation library.
+registerStudioIpc({ ipcMain, app, safeStorage })
 
 ipcMain.handle('hermes:saveImageFromUrl', (_event, url) => saveImageFromUrl(String(url || '')))
 
