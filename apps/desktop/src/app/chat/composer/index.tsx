@@ -53,6 +53,7 @@ import {
 } from '@/store/composer-queue'
 import { $statusItemsBySession } from '@/store/composer-status'
 import { notify } from '@/store/notifications'
+import { takeProjectHandoffSend } from '@/store/projects'
 import { $gatewayState, $messages, setSessionPickerOpen } from '@/store/session'
 import { $threadScrolledUp } from '@/store/thread-scroll'
 import { useTheme } from '@/themes'
@@ -1622,6 +1623,23 @@ export function ChatBar({
 
     focusInput()
   }
+
+  // Project handoff auto-send. When a chat opens from a project's launchpad
+  // composer that had a draft, that composer armed a one-shot send flag and
+  // stashed the draft. The draft-load effect above is earlier in source order,
+  // so on mount it restores the draft into draftRef before this runs; here we
+  // send it in place so the user stays framed in the project instead of landing
+  // on a prefilled blank "normal chat box". takeProjectHandoffSend is an atomic
+  // read-and-clear, so a StrictMode double-invoke can't send twice.
+  useEffect(() => {
+    if (activeQueueSessionKey !== null) {
+      return
+    }
+
+    if (draftRef.current.trim() && takeProjectHandoffSend()) {
+      submitDraft()
+    }
+  }, [activeQueueSessionKey]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const submitUrl = () => {
     const url = urlValue.trim()

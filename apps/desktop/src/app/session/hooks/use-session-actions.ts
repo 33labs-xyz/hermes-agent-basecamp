@@ -12,7 +12,7 @@ import { clearQueuedPrompts } from '@/store/composer-queue'
 import { $pinnedSessionIds } from '@/store/layout'
 import { clearNotifications, notify, notifyError } from '@/store/notifications'
 import { requestDesktopOnboarding } from '@/store/onboarding'
-import { consumePendingProjectAssignment } from '@/store/projects'
+import { clearPendingProjectAssignment, consumePendingProjectAssignment } from '@/store/projects'
 import { $activeGatewayProfile, $newChatProfile, $profiles, ensureGatewayProfile, normalizeProfileKey } from '@/store/profile'
 import {
   $currentCwd,
@@ -502,6 +502,10 @@ export function useSessionActions({
           // that project now that it has a stored id. Fire-and-forget — the send
           // must not wait on (or fail from) the membership write.
           void consumePendingProjectAssignment(stored)
+        } else {
+          // No stored id to assign — drop the arm so a later unrelated chat
+          // can't inherit this project.
+          clearPendingProjectAssignment()
         }
 
         setFreshDraftReady(false)

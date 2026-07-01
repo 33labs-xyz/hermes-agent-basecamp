@@ -37,13 +37,68 @@ export function setSidebarProjectsOpen(open: boolean) {
 // lands in the project without the page re-implementing the whole send flow.
 export const $pendingProjectGroupId = atom<string | null>(null)
 
+// Companion one-shot: the launchpad composer already stashes the typed draft for
+// the fresh chat to prefill; this tells that chat to also SEND it on arrival, so
+// the user's Enter in the project actually sends instead of parking a prefilled
+// draft in a blank chat (the "leads me outside to a normal chat box" bug). The
+// blank "New chat" button leaves this false — it should open an empty chat.
+export const $pendingProjectHandoffSend = atom(false)
+
 export function setPendingProjectForNewChat(groupId: string | null) {
   $pendingProjectGroupId.set(groupId)
 }
 
+export function setProjectHandoffSend(next: boolean) {
+  $pendingProjectHandoffSend.set(next)
+}
+
+// Read-and-clear the auto-send flag. Synchronous get/set makes it atomic, so a
+// double effect invocation (e.g. React StrictMode) can't send the draft twice.
+export function takeProjectHandoffSend(): boolean {
+  const armed = $pendingProjectHandoffSend.get()
+
+  if (armed) {
+    $pendingProjectHandoffSend.set(false)
+  }
+
+  return armed
+}
+
+// Drop the whole handoff arm without assigning — used when a send produced no
+// stored session id, so a later unrelated chat can't inherit this project.
+export function clearPendingProjectAssignment() {
+  $pendingProjectGroupId.set(null)
+  $pendingProjectHandoffSend.set(false)
+}
+
+// Optimistically add a session to a group's members in the local store so the
+// chat's project pill (resolved off session_ids) shows from the first frame,
+// before the network assign + refresh lands. Immutable update mirroring
+// reorderProjects; a no-op if the member is already present.
+export function addOptimisticMembership(groupId: string, sessionId: string) {
+  $projects.set(
+    $projects.get().map(group =>
+      group.id === groupId && !group.session_ids.includes(sessionId)
+        ? { ...group, session_ids: [...group.session_ids, sessionId] }
+        : group
+    )
+  )
+}
+
+function removeOptimisticMembership(groupId: string, sessionId: string) {
+  $projects.set(
+    $projects.get().map(group =>
+      group.id === groupId
+        ? { ...group, session_ids: group.session_ids.filter(id => id !== sessionId) }
+        : group
+    )
+  )
+}
+
 // Called once a new session's stored id exists. If a project was armed, assign
-// the chat to it and clear the arm. Best-effort: a failed assign just leaves the
-// chat ungrouped rather than blocking the send.
+// the chat to it and clear the arm. Optimistically shows membership so the pill
+// is instant; rolls back if the network assign fails (the send already
+// succeeded, so the chat is simply left ungrouped).
 export async function consumePendingProjectAssignment(storedSessionId: string): Promise<void> {
   const groupId = $pendingProjectGroupId.get()
 
@@ -52,11 +107,14 @@ export async function consumePendingProjectAssignment(storedSessionId: string): 
   }
 
   $pendingProjectGroupId.set(null)
+  $pendingProjectHandoffSend.set(false)
+
+  addOptimisticMembership(groupId, storedSessionId)
 
   try {
     await addSessionToProject(groupId, storedSessionId)
   } catch {
-    // Leave the chat ungrouped — the send already succeeded.
+    removeOptimisticMembership(groupId, storedSessionId)
   }
 }
 

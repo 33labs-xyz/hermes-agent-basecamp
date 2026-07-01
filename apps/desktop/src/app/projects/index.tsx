@@ -53,7 +53,8 @@ import {
   $projectsLoading,
   deleteProject,
   ensureProjectMemberSessions,
-  setPendingProjectForNewChat
+  setPendingProjectForNewChat,
+  setProjectHandoffSend
 } from '@/store/projects'
 import {
   $cronSessions,
@@ -153,6 +154,8 @@ export function ProjectsView({ setStatusbarItemGroup: _setStatusbarItemGroup, ..
 // session created for a send consumes the arm and lands in this project.
 function startNewChat(projectId: string, navigate: (to: string) => void) {
   setPendingProjectForNewChat(projectId)
+  // Blank chat: assign to the project but never auto-send (no draft to send).
+  setProjectHandoffSend(false)
   navigate(NEW_CHAT_ROUTE)
 }
 
@@ -270,6 +273,11 @@ function ProjectComposer({ project }: { project: ChatGroup }) {
   function submit() {
     const draft = text.trim()
     setPendingProjectForNewChat(project.id)
+    // Auto-send only when there's a draft: the handed-off chat sends it on
+    // arrival instead of parking a prefilled draft in a blank chat (the "leads
+    // me outside to a normal chat box" bug). An empty submit just opens the
+    // project's new chat, same as the "New chat" button.
+    setProjectHandoffSend(Boolean(draft))
 
     if (draft) {
       stashSessionDraft(null, draft, [])
