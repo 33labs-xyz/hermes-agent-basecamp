@@ -544,6 +544,13 @@ export const en: Translations = {
       reasoningOff: 'Off',
       defaultsFailed: 'Failed to save model defaults',
       auxiliaryTitle: 'Auxiliary models',
+      claudeSubscription: {
+        connect: 'Connect',
+        connected: 'Connected',
+        connectedHint: 'Basecamp is using your Claude login on this computer.',
+        disconnectedHint: 'Use your existing Claude login instead of an API key.',
+        title: 'Claude subscription'
+      },
       resetAllToMain: 'Reset all to main',
       auxiliaryDesc: 'Helper tasks run on the main model by default. Assign a dedicated model to any task to override.',
       setToMain: 'Set to main',

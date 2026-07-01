@@ -647,6 +647,13 @@ export const zhHant = defineLocale({
       model: '模型',
       applying: '套用中...',
       auxiliaryTitle: '輔助模型',
+      claudeSubscription: {
+        connect: 'Connect',
+        connected: 'Connected',
+        connectedHint: 'Basecamp is using your Claude login on this computer.',
+        disconnectedHint: 'Use your existing Claude login instead of an API key.',
+        title: 'Claude subscription'
+      },
       resetAllToMain: '全部重設為主要模型',
       auxiliaryDesc: '輔助任務預設使用主要模型。您可以為任何任務指定專用模型。',
       setToMain: '設為主要模型',
