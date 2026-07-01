@@ -1843,6 +1843,8 @@ export const zh: Translations = {
       search: '搜索模型',
       noModels: '未找到模型',
       connectModel: '连接模型',
+      connectClaude: 'Connect Claude subscription',
+      useOpenRouter: 'Use OpenRouter',
       editModels: '编辑模型…',
       fast: '快速',
       medium: '中'

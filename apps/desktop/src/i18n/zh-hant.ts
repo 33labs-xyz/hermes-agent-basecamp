@@ -1682,6 +1682,8 @@ export const zhHant = defineLocale({
       search: '搜尋模型',
       noModels: '找不到模型',
       connectModel: '連接模型',
+      connectClaude: 'Connect Claude subscription',
+      useOpenRouter: 'Use OpenRouter',
       editModels: '編輯模型…',
       fast: '快速',
       medium: '中'

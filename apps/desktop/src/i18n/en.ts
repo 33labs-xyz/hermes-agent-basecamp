@@ -1663,6 +1663,8 @@ export const en: Translations = {
       search: 'Search models',
       noModels: 'No models found',
       connectModel: 'Connect a model',
+      connectClaude: 'Connect Claude subscription',
+      useOpenRouter: 'Use OpenRouter',
       editModels: 'Edit Models…',
       fast: 'Fast',
       medium: 'Med'

@@ -1738,6 +1738,8 @@ export const ja = defineLocale({
       search: 'モデルを検索',
       noModels: 'モデルが見つかりません',
       connectModel: 'モデルを接続',
+      connectClaude: 'Connect Claude subscription',
+      useOpenRouter: 'Use OpenRouter',
       editModels: 'モデルを編集…',
       fast: '高速',
       medium: '中'

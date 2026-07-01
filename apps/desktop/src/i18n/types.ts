@@ -1305,6 +1305,8 @@ export interface Translations {
       search: string
       noModels: string
       connectModel: string
+      connectClaude: string
+      useOpenRouter: string
       editModels: string
       fast: string
       medium: string

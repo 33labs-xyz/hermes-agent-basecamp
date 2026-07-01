@@ -30,7 +30,7 @@ import {
   modelVisibilityKey,
   setModelVisibilityOpen
 } from '@/store/model-visibility'
-import { startManualOnboarding } from '@/store/onboarding'
+import { startManualApiKey, startManualProviderOAuth } from '@/store/onboarding'
 import {
   $activeSessionId,
   $currentFastMode,
@@ -181,18 +181,19 @@ export function ModelMenuPanel({ gateway, onSelectModel, requestGateway }: Model
             {copy.noModels}
           </DropdownMenuItem>
         ) : (
-          // No authenticated provider at all — launch provider setup instead of
-          // dead-ending. Mirrors the dialog picker's "Add provider" button.
-          <DropdownMenuItem
-            className={dropdownMenuRow}
-            onSelect={() => {
-              startManualOnboarding()
+          // No authenticated provider at all: offer the two quick paths instead
+          // of dead-ending. Mirrors the first-run start chooser.
+          <EmptyModelActions
+            copy={{ connectClaude: copy.connectClaude, useOpenRouter: copy.useOpenRouter }}
+            onConnectClaude={() => {
+              startManualProviderOAuth('claude-code')
               closeMenu()
             }}
-          >
-            <Codicon name="add" size="0.75rem" />
-            {copy.connectModel}
-          </DropdownMenuItem>
+            onUseOpenRouter={() => {
+              startManualApiKey('OPENROUTER_API_KEY')
+              closeMenu()
+            }}
+          />
         )
       ) : (
         <div className="max-h-80 overflow-y-auto py-0.5">
@@ -300,6 +301,32 @@ export function ModelMenuPanel({ gateway, onSelectModel, requestGateway }: Model
           </DropdownMenuItem>
         </>
       ) : null}
+    </>
+  )
+}
+
+// Empty-state quick actions, mirroring the first-run start chooser: pick
+// OpenRouter (one key) or connect the Claude subscription already on this
+// machine. Exported and callback-driven so it tests without the store.
+export function EmptyModelActions({
+  copy,
+  onConnectClaude,
+  onUseOpenRouter
+}: {
+  copy: { connectClaude: string; useOpenRouter: string }
+  onConnectClaude: () => void
+  onUseOpenRouter: () => void
+}) {
+  return (
+    <>
+      <DropdownMenuItem className={dropdownMenuRow} onSelect={onUseOpenRouter}>
+        <Codicon name="add" size="0.75rem" />
+        {copy.useOpenRouter}
+      </DropdownMenuItem>
+      <DropdownMenuItem className={dropdownMenuRow} onSelect={onConnectClaude}>
+        <Codicon name="add" size="0.75rem" />
+        {copy.connectClaude}
+      </DropdownMenuItem>
     </>
   )
 }
