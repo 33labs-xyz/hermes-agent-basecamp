@@ -2,7 +2,7 @@
   "name": "basecamp",
   "productName": "Basecamp",
   "private": true,
-  "version": "0.15.2",
+  "version": "0.15.3",
   "description": "Basecamp - native desktop app powered by the Hermes agent.",
   "author": "33labs",
   "type": "module",
