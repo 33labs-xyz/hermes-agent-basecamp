@@ -168,14 +168,14 @@ function useApiKeyCatalog(): ApiKeyOption[] {
 
 const PROVIDER_DISPLAY: Record<string, { order: number; title: string }> = {
   nous: { order: 0, title: 'Nous Portal' },
-  'openai-codex': { order: 1, title: 'OpenAI OAuth (ChatGPT)' },
-  'minimax-oauth': { order: 2, title: 'MiniMax' },
-  'qwen-oauth': { order: 3, title: 'Qwen Code' },
-  'xai-oauth': { order: 4, title: 'xAI Grok' },
-  // Both Anthropic entries sit at the bottom: the API-key path first, then
-  // the subscription OAuth path (only works with extra usage credits).
-  anthropic: { order: 5, title: 'Anthropic API Key' },
-  'claude-code': { order: 6, title: 'Anthropic OAuth: Required Extra Usage Credits to Use Subscription' }
+  // The Claude subscription sits near the top: it is a first-class connect
+  // path (reuses the existing external claude-code login), not a last resort.
+  'claude-code': { order: 2, title: 'Claude subscription' },
+  'openai-codex': { order: 3, title: 'OpenAI OAuth (ChatGPT)' },
+  'minimax-oauth': { order: 4, title: 'MiniMax' },
+  'qwen-oauth': { order: 5, title: 'Qwen Code' },
+  'xai-oauth': { order: 6, title: 'xAI Grok' },
+  anthropic: { order: 7, title: 'Anthropic API Key' }
 }
 
 const assetPath = (path: string) => `${import.meta.env.BASE_URL}${path.replace(/^\/+/, '')}`

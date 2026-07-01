@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { $desktopOnboarding, type DesktopOnboardingState, type OnboardingContext } from '@/store/onboarding'
 import type { OAuthProvider } from '@/types/hermes'
 
-import { Picker } from './desktop-onboarding-overlay'
+import { Picker, providerTitle } from './desktop-onboarding-overlay'
 
 function provider(id: string, name = id): OAuthProvider {
   return {
@@ -128,5 +128,15 @@ describe('onboarding Picker — OpenRouter-first run', () => {
     expect($desktopOnboarding.get().mode).toBe('oauth')
     // The featured OAuth provider now shows in place of the OpenRouter landing.
     expect(screen.getByText('Nous Portal')).toBeTruthy()
+  })
+})
+
+describe('providerTitle', () => {
+  it('labels the claude-code provider "Claude subscription"', () => {
+    expect(providerTitle(provider('claude-code', 'Claude Code'))).toBe('Claude subscription')
+  })
+
+  it('uses no em dash or en dash in the claude-code label', () => {
+    expect(providerTitle(provider('claude-code', 'Claude Code'))).not.toMatch(/[–—]/)
   })
 })
