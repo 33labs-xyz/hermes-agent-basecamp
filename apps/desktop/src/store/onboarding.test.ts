@@ -34,6 +34,7 @@ function baseState(overrides: Partial<DesktopOnboardingState> = {}): DesktopOnbo
     firstRunSkipped: false,
     manual: false,
     localEndpoint: false,
+    initialApiKeyEnv: null,
     ...overrides
   }
 }

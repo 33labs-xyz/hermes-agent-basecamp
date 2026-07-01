@@ -81,6 +81,13 @@ export interface DesktopOnboardingState {
    *  custom endpoint"). Forces the API-key form with the local option
    *  preselected instead of the OAuth picker. */
   localEndpoint: boolean
+  /** When non-null, the overlay opens directly on the plain API-key form
+   *  pre-selected to this env var (e.g. 'OPENROUTER_API_KEY') instead of the
+   *  OAuth picker. Set by startManualApiKey (the model picker's "Use OpenRouter"
+   *  quick action). Mirrors `localEndpoint` but for a hosted provider key, not a
+   *  custom endpoint. Durable state — not `mode` — because refreshProviders
+   *  flips `mode` back to 'oauth' whenever OAuth providers exist. */
+  initialApiKeyEnv: null | string
 }
 
 export interface OnboardingContext {
@@ -160,7 +167,8 @@ const INITIAL: DesktopOnboardingState = {
   requested: false,
   firstRunSkipped: readCachedSkipped(),
   manual: false,
-  localEndpoint: false
+  localEndpoint: false,
+  initialApiKeyEnv: null
 }
 
 export const $desktopOnboarding = atom<DesktopOnboardingState>(INITIAL)
@@ -408,12 +416,34 @@ export function startManualOnboarding(reason: null | string = DEFAULT_MANUAL_ONB
     manual: true,
     requested: true,
     localEndpoint: false,
+    initialApiKeyEnv: null,
     // `null` opts out of the prompt banner entirely (e.g. when the user already
     // picked a specific provider and we auto-start its sign-in).
     reason: reason ? reason.trim() || DEFAULT_ONBOARDING_REASON : null,
     flow: { status: 'idle' }
   })
   void refreshProviders()
+}
+
+// Open the onboarding overlay directly on a plain provider API-key form,
+// pre-selected to `initialEnvKey` (e.g. 'OPENROUTER_API_KEY'), bypassing the
+// OAuth picker. Used by the model picker's "Use OpenRouter" quick action so a
+// user with no model lands straight on the one-key entry. Unlike
+// startManualLocalEndpoint this is a hosted key (not a custom endpoint URL), so
+// it does NOT set localEndpoint. Durable `initialApiKeyEnv` (not `mode`) is what
+// the overlay reads, because refreshProviders would otherwise flip `mode` back
+// to 'oauth'.
+export function startManualApiKey(initialEnvKey: string, reason: null | string = null) {
+  pendingProviderOAuthId = null
+  patch({
+    manual: true,
+    requested: true,
+    localEndpoint: false,
+    initialApiKeyEnv: initialEnvKey,
+    mode: 'apikey',
+    reason: reason ? reason.trim() || DEFAULT_ONBOARDING_REASON : null,
+    flow: { status: 'idle' }
+  })
 }
 
 // Open the onboarding overlay directly on the local / custom endpoint form
@@ -428,6 +458,7 @@ export function startManualLocalEndpoint(reason: null | string = null) {
     manual: true,
     requested: true,
     localEndpoint: true,
+    initialApiKeyEnv: null,
     mode: 'apikey',
     reason: reason ? reason.trim() || DEFAULT_ONBOARDING_REASON : null,
     flow: { status: 'idle' }
@@ -465,7 +496,7 @@ export function clearPendingProviderOAuth() {
 export function closeManualOnboarding() {
   pendingProviderOAuthId = null
 
-  patch({ manual: false, requested: false, localEndpoint: false, flow: { status: 'idle' } })
+  patch({ manual: false, requested: false, localEndpoint: false, initialApiKeyEnv: null, flow: { status: 'idle' } })
 }
 
 export function completeDesktopOnboarding() {
@@ -483,7 +514,8 @@ export function completeDesktopOnboarding() {
     requested: false,
     firstRunSkipped: false,
     manual: false,
-    localEndpoint: false
+    localEndpoint: false,
+    initialApiKeyEnv: null
   })
 }
 
@@ -496,7 +528,14 @@ export function completeDesktopOnboarding() {
 export function dismissFirstRunOnboarding() {
   clearPoll()
   writeCachedSkipped(true)
-  patch({ firstRunSkipped: true, requested: false, manual: false, localEndpoint: false, flow: { status: 'idle' } })
+  patch({
+    firstRunSkipped: true,
+    requested: false,
+    manual: false,
+    localEndpoint: false,
+    initialApiKeyEnv: null,
+    flow: { status: 'idle' }
+  })
 }
 
 export function setOnboardingMode(mode: OnboardingMode) {
