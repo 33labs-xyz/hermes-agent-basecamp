@@ -1561,6 +1561,13 @@ export const en: Translations = {
     otherProviders: 'Other providers',
     haveApiKey: 'I have an API key',
     chooseLater: "I'll choose a provider later",
+    startChoice: {
+      claudeSubtitle: 'Use the Claude login already on this computer',
+      claudeTitle: 'Claude subscription',
+      openRouterSubtitle: 'One key, many models',
+      openRouterTitle: 'Use OpenRouter',
+      otherProvider: 'Other provider'
+    },
     recommended: 'Recommended',
     connected: 'Connected',
     featuredPitch: 'One subscription, 300+ frontier models — the recommended way to run Basecamp',

@@ -1746,6 +1746,13 @@ export const zh: Translations = {
     otherProviders: '其他提供方',
     haveApiKey: '我有 API 密钥',
     chooseLater: '稍后再选择提供方',
+    startChoice: {
+      claudeSubtitle: 'Use the Claude login already on this computer',
+      claudeTitle: 'Claude subscription',
+      openRouterSubtitle: 'One key, many models',
+      openRouterTitle: 'Use OpenRouter',
+      otherProvider: 'Other provider'
+    },
     recommended: '推荐',
     connected: '已连接',
     featuredPitch: '一个订阅，300+ 前沿模型 — 运行 Basecamp 的推荐方式',

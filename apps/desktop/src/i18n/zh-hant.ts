@@ -1586,6 +1586,13 @@ export const zhHant = defineLocale({
     otherProviders: '其他提供方',
     haveApiKey: '我有 API 金鑰',
     chooseLater: '稍後再選擇提供方',
+    startChoice: {
+      claudeSubtitle: 'Use the Claude login already on this computer',
+      claudeTitle: 'Claude subscription',
+      openRouterSubtitle: 'One key, many models',
+      openRouterTitle: 'Use OpenRouter',
+      otherProvider: 'Other provider'
+    },
     recommended: '建議',
     connected: '已連線',
     featuredPitch: '一個訂閱，300+ 前沿模型 — 執行 Basecamp 的建議方式',

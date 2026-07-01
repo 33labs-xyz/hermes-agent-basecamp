@@ -104,32 +104,32 @@ describe('onboarding Picker', () => {
 })
 
 describe('onboarding Picker — OpenRouter-first run', () => {
-  it('lands directly on the OpenRouter key form with no provider grid', () => {
+  it('first run shows the start chooser, then OpenRouter on demand', () => {
     setProviders([provider('nous', 'Nous Portal')])
     $desktopOnboarding.set({ ...$desktopOnboarding.get(), mode: 'openrouter' })
     render(<Picker ctx={ctx} />)
 
-    // Streamlined view: OpenRouter heading + single key field, and neither the
-    // OAuth featured card nor its "Recommended" badge.
-    expect(screen.getByText('OpenRouter')).toBeTruthy()
+    // Chooser lands first: two hero cards, not the key form or provider grid.
+    expect(screen.getByText('Use OpenRouter')).toBeTruthy()
+    expect(screen.getByText('Claude subscription')).toBeTruthy()
     expect(screen.queryByText('Nous Portal')).toBeNull()
-    expect(screen.queryByText('Recommended')).toBeNull()
 
-    // Both escapes remain: opt into the full picker, or defer entirely.
-    expect(screen.getByRole('button', { name: 'Use a different provider' })).toBeTruthy()
+    // Picking OpenRouter swaps in the streamlined key form plus the defer link.
+    fireEvent.click(screen.getByText('Use OpenRouter'))
+    expect(screen.getByText('OpenRouter')).toBeTruthy()
     expect(screen.getByRole('button', { name: "I'll choose a provider later" })).toBeTruthy()
   })
 
-  it('reveals the full OAuth picker via "use a different provider"', () => {
+  it('the Claude card starts the claude-code provider flow', () => {
     setProviders([provider('nous', 'Nous Portal')])
     $desktopOnboarding.set({ ...$desktopOnboarding.get(), mode: 'openrouter' })
     render(<Picker ctx={ctx} />)
 
-    fireEvent.click(screen.getByRole('button', { name: 'Use a different provider' }))
+    fireEvent.click(screen.getByText('Claude subscription'))
 
-    expect($desktopOnboarding.get().mode).toBe('oauth')
-    // The featured OAuth provider now shows in place of the OpenRouter landing.
-    expect(screen.getByText('Nous Portal')).toBeTruthy()
+    const state = $desktopOnboarding.get()
+    expect(state.manual).toBe(true)
+    expect(state.requested).toBe(true)
   })
 })
 

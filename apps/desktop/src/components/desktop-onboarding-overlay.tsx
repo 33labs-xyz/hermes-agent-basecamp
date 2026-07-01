@@ -2,6 +2,7 @@ import { useStore } from '@nanostores/react'
 import { useQuery } from '@tanstack/react-query'
 import { useEffect, useMemo, useRef, useState } from 'react'
 
+import { StartChoice } from '@/components/desktop-onboarding-start-choice'
 import { ModelPickerDialog } from '@/components/model-picker'
 import { Button } from '@/components/ui/button'
 import { Codicon } from '@/components/ui/codicon'
@@ -43,6 +44,7 @@ import {
   setOnboardingCode,
   setOnboardingMode,
   setOnboardingModel,
+  startManualProviderOAuth,
   startProviderOAuth,
   submitOnboardingCode
 } from '@/store/onboarding'
@@ -430,31 +432,50 @@ const persistShowAll = (value: boolean) => {
 
 export function Picker({ ctx }: { ctx: OnboardingContext }) {
   const { t } = useI18n()
-  const { localEndpoint, manual, mode, providers } = useStore($desktopOnboarding)
+  const { initialApiKeyEnv, localEndpoint, manual, mode, providers } = useStore($desktopOnboarding)
   const [showAll, setShowAll] = useState(readShowAll)
+  const [pickedOpenRouter, setPickedOpenRouter] = useState(false)
   const ordered = useMemo(() => (providers ? sortProviders(providers) : []), [providers])
   const hasOauth = ordered.length > 0
   const apiKeyOptions = useApiKeyCatalog()
 
-  // First-run streamlined landing: skip straight to OpenRouter key entry (the
-  // suggested provider). "Use a different provider" drops back to the full OAuth
-  // picker; "choose later" still escapes into the app. Manual add/switch and the
-  // local-endpoint flow opt out — they get the full surfaces below.
-  if (mode === 'openrouter' && !manual && !localEndpoint) {
+  const isFirstRun = mode === 'openrouter' && !manual && !localEndpoint
+
+  // First-run start screen: two hero cards plus two escapes. Picking OpenRouter
+  // flips a local gate to reveal the streamlined key form below. The Claude
+  // card, "other provider", and "choose later" hand off to existing actions.
+  if (isFirstRun && !pickedOpenRouter) {
+    return (
+      <StartChoice
+        onChooseLater={() => dismissFirstRunOnboarding()}
+        onConnectClaude={() => startManualProviderOAuth('claude-code')}
+        onOtherProvider={() => setOnboardingMode('oauth')}
+        onUseOpenRouter={() => setPickedOpenRouter(true)}
+      />
+    )
+  }
+
+  // Streamlined single-provider key entry. Reached two ways: (1) first run after
+  // the user picks the OpenRouter card, (2) a manual "Use OpenRouter" shortcut
+  // that set initialApiKeyEnv. A manual provider refresh flips `mode` to 'oauth',
+  // so the manual path keys off the durable initialApiKeyEnv flag, never `mode`.
+  if (isFirstRun || (manual && initialApiKeyEnv)) {
     return (
       <div className="grid gap-3">
         <ApiKeyForm
           backLabel={t.onboarding.useDifferentProvider}
-          canGoBack
-          initialEnvKey="OPENROUTER_API_KEY"
-          onBack={() => setOnboardingMode('oauth')}
+          canGoBack={!manual}
+          initialEnvKey={initialApiKeyEnv ?? 'OPENROUTER_API_KEY'}
+          onBack={() => setPickedOpenRouter(false)}
           onSave={(envKey, value, name, apiKey) => saveOnboardingApiKey(envKey, value, name, ctx, apiKey)}
           options={apiKeyOptions}
           singleProvider
         />
-        <div className="flex justify-center border-t border-(--ui-stroke-tertiary) pt-3">
-          <ChooseLaterLink />
-        </div>
+        {manual ? null : (
+          <div className="flex justify-center border-t border-(--ui-stroke-tertiary) pt-3">
+            <ChooseLaterLink />
+          </div>
+        )}
       </div>
     )
   }

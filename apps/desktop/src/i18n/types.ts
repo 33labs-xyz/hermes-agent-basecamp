@@ -1222,6 +1222,13 @@ export interface Translations {
     otherProviders: string
     haveApiKey: string
     chooseLater: string
+    startChoice: {
+      claudeSubtitle: string
+      claudeTitle: string
+      openRouterSubtitle: string
+      openRouterTitle: string
+      otherProvider: string
+    }
     recommended: string
     connected: string
     featuredPitch: string

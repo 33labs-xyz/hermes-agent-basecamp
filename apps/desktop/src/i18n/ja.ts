@@ -1636,6 +1636,13 @@ export const ja = defineLocale({
     otherProviders: 'その他のプロバイダー',
     haveApiKey: 'API キーをお持ちです',
     chooseLater: '後でプロバイダーを選択します',
+    startChoice: {
+      claudeSubtitle: 'Use the Claude login already on this computer',
+      claudeTitle: 'Claude subscription',
+      openRouterSubtitle: 'One key, many models',
+      openRouterTitle: 'Use OpenRouter',
+      otherProvider: 'Other provider'
+    },
     recommended: '推奨',
     connected: '接続済み',
     featuredPitch: '1 つのサブスクリプションで 300 以上の最先端モデル — Basecamp を実行するための推奨方法',
