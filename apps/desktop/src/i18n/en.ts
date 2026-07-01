@@ -57,6 +57,7 @@ export const en: Translations = {
       backgroundExitedDuringStartup: 'Basecamp background process exited during startup.',
       backendStopped: 'Backend stopped',
       desktopBootFailed: 'Desktop boot failed',
+      gatewayReconnectFailed: "Lost connection to the gateway and couldn't reconnect. Nothing here deletes your chats or settings.",
       gatewaySignInRequired: 'Gateway sign-in required',
       ipcBridgeUnavailable: 'Desktop IPC bridge is unavailable.'
     },

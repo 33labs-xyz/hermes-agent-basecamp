@@ -97,6 +97,13 @@ export function useGatewayBoot({
     // reconnect with backoff, and we nudge a reconnect on the OS/browser
     // signals that fire around wake (power resume, network online, the window
     // becoming visible).
+    // Escape hatch: after this many consecutive failed post-boot reconnects the
+    // socket is treated as durably down (dead remote, not a brief sleep/wake
+    // blip). We surface a recoverable boot error so the BootFailureOverlay (Use
+    // local gateway / Sign in / Retry) replaces the latched CONNECTING screen,
+    // instead of looping the backoff forever with no way out. The loop keeps
+    // retrying underneath, so a later clean open still auto-recovers.
+    const RECOVERABLE_RECONNECT_ATTEMPTS = 6
     let bootCompleted = false
     let reconnecting = false
     let reconnectTimer: ReturnType<typeof setTimeout> | null = null
@@ -184,6 +191,15 @@ export function useGatewayBoot({
       // 1s, 2s, 4s … capped at 15s.
       const delay = Math.min(15_000, 1_000 * 2 ** Math.min(reconnectAttempt, 4))
       reconnectAttempt += 1
+
+      // Once we've exhausted the grace window, raise the recoverable error so the
+      // user gets a recovery surface. Only after a healthy boot (a pre-boot dead
+      // remote is handled by boot()'s catch), and only once per episode — a clean
+      // reconnect clears it via completeDesktopBoot() in the onState handler.
+      if (bootCompleted && reconnectAttempt >= RECOVERABLE_RECONNECT_ATTEMPTS && !$desktopBoot.get().error) {
+        failDesktopBoot(translateNow('boot.errors.gatewayReconnectFailed'))
+      }
+
       reconnectTimer = setTimeout(() => {
         reconnectTimer = null
         void attemptReconnect()

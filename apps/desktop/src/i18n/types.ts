@@ -72,6 +72,7 @@ export interface Translations {
       backgroundExitedDuringStartup: string
       backendStopped: string
       desktopBootFailed: string
+      gatewayReconnectFailed: string
       gatewaySignInRequired: string
       ipcBridgeUnavailable: string
     }

@@ -57,6 +57,7 @@ export const zhHant = defineLocale({
       backgroundExitedDuringStartup: 'Basecamp 背景程序在啟動期間結束。',
       backendStopped: '後端已停止',
       desktopBootFailed: '桌面啟動失敗',
+      gatewayReconnectFailed: '與閘道的連線已中斷且無法重新連線。這裡的操作不會刪除您的聊天或設定。',
       gatewaySignInRequired: '需要閘道登入',
       ipcBridgeUnavailable: '桌面 IPC 橋接器不可用。'
     },

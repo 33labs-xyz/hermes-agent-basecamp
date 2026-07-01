@@ -57,6 +57,7 @@ export const ja = defineLocale({
       backgroundExitedDuringStartup: '起動中に Basecamp バックグラウンドプロセスが終了しました。',
       backendStopped: 'バックエンドが停止しました',
       desktopBootFailed: 'デスクトップの起動に失敗しました',
+      gatewayReconnectFailed: 'ゲートウェイとの接続が切断され、再接続できませんでした。チャットや設定は削除されません。',
       gatewaySignInRequired: 'ゲートウェイへのサインインが必要です',
       ipcBridgeUnavailable: 'デスクトップ IPC ブリッジが利用できません。'
     },

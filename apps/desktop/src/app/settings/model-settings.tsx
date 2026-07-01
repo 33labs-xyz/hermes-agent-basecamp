@@ -426,6 +426,11 @@ export function ModelSettings({ onMainModelChanged }: ModelSettingsProps) {
               {providerOptions.map(provider => (
                 <SelectItem key={provider.slug || 'none'} value={provider.slug || 'none'}>
                   {provider.name}
+                  {/* Flag unconfigured providers right in the list, so a needs-setup
+                      provider is visible before it's picked (not only after). */}
+                  {provider.slug && !isProviderReady(provider) && (
+                    <span className="ml-2 text-[0.65rem] text-muted-foreground">· set up</span>
+                  )}
                 </SelectItem>
               ))}
             </SelectContent>

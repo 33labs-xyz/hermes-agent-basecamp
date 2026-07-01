@@ -57,6 +57,7 @@ export const zh: Translations = {
       backgroundExitedDuringStartup: 'Basecamp 后台进程在启动期间退出。',
       backendStopped: '后端已停止',
       desktopBootFailed: '桌面启动失败',
+      gatewayReconnectFailed: '与网关的连接已断开且无法重新连接。这里的操作不会删除你的对话或设置。',
       gatewaySignInRequired: '需要登录网关',
       ipcBridgeUnavailable: '桌面 IPC 桥不可用。'
     },

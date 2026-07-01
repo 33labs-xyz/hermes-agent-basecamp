@@ -121,20 +121,27 @@ function EnvVarField({ envVar, isSet, onSaved, onCleared }: EnvVarFieldProps) {
             <p className="mt-0.5 text-[0.7rem] text-muted-foreground">{envVar.prompt}</p>
           )}
         </div>
-        {!editing && (
-          <EnvVarActionsMenu
-            clearDisabled={busy}
-            docsUrl={envVar.url}
-            isRevealed={revealed !== null}
-            isSet={isSet}
-            label={envVar.key}
-            onClear={() => void handleClear()}
-            onEdit={() => setEditing(true)}
-            onReveal={() => void handleReveal()}
-          >
-            <EnvVarActionsTrigger label={envVar.key} onClick={event => event.stopPropagation()} />
-          </EnvVarActionsMenu>
-        )}
+        {!editing &&
+          (isSet ? (
+            <EnvVarActionsMenu
+              clearDisabled={busy}
+              docsUrl={envVar.url}
+              isRevealed={revealed !== null}
+              isSet={isSet}
+              label={envVar.key}
+              onClear={() => void handleClear()}
+              onEdit={() => setEditing(true)}
+              onReveal={() => void handleReveal()}
+            >
+              <EnvVarActionsTrigger label={envVar.key} onClick={event => event.stopPropagation()} />
+            </EnvVarActionsMenu>
+          ) : (
+            // Unset key: expose the primary action directly rather than burying
+            // it in the ellipsis menu, so the "add a key" path is one click.
+            <Button onClick={() => setEditing(true)} size="sm" variant="outline">
+              {t.settings.envActions.set}
+            </Button>
+          ))}
       </div>
 
       {isSet && revealed !== null && (
