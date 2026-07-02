@@ -14,6 +14,11 @@ export default mergeConfig(
   defineConfig({
     test: {
       environment: 'jsdom',
+      // Only renderer tests belong to Vitest. electron/*.test.cjs and
+      // scripts/*.test.cjs run under `node --test` (see package.json), and
+      // build/ + release/ contain packaged vendor copies (node-pty) whose
+      // test files must never be swept into this suite.
+      include: ['src/**/*.test.{ts,tsx}'],
       setupFiles: ['./test-setup.ts']
     }
   })
