@@ -1,0 +1,90 @@
+name: Release (Electron auto-update)
+
+# Cuts a Basecamp release and PUBLISHES it to GitHub Releases so installed apps
+# auto-update. Builds the Windows NSIS installer (apps/desktop) and uploads
+# latest.yml + the .exe + .blockmap to a GitHub Release named from the
+# apps/desktop/package.json version. Already-installed Basecamp builds poll this
+# repo's Releases feed via electron-updater (apps/desktop/electron/auto-updater.cjs)
+# and prompt testers to "Restart Now" when a newer version is published.
+#
+# HOW TO CUT A RELEASE:
+#   1. Bump "version" in apps/desktop/package.json (e.g. 0.15.1 -> 0.15.2).
+#   2. Commit + push that bump to the app branch (feat/projects).
+#   3. Run this workflow against that branch:
+#        gh workflow run release.yml --ref feat/projects
+#      electron-builder creates the v<version> tag + GitHub Release at the built
+#      commit and uploads the assets.
+#
+# WHY workflow_dispatch and NOT a tag trigger: the first-launch backend bootstrap
+# pins to the build's git BRANCH via scripts/write-build-stamp.cjs (GITHUB_REF_NAME).
+# A tag push checks out a detached HEAD, which would stamp the branch as the tag
+# name and break the in-app backend update channel. Dispatching from the branch
+# keeps the stamp = feat/projects, identical to the distributed 0.15.1 build.
+#
+# WINDOWS ONLY by design: Mac auto-update needs Apple code signing (Squirrel.Mac
+# rejects unsigned updates), so this publishes no latest-mac.yml and Mac testers
+# keep installing the .dmg manually until signing is added.
+#
+# UNSIGNED: testers still get a one-time SmartScreen "unknown publisher" prompt on
+# first install; auto-updates after that download and apply in the background.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write # electron-builder creates the GitHub Release + uploads assets
+
+jobs:
+  release-windows:
+    name: Basecamp Windows NSIS -> GitHub Releases
+    runs-on: windows-latest
+    timeout-minutes: 40
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # node-pty ships N-API prebuilts; Python is only a node-gyp fallback in case
+      # a native dep has to build from source on the runner.
+      - name: Setup Python (node-gyp fallback)
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: '3.11'
+
+      # Root install is mandatory: apps/desktop's build runs
+      # scripts/assert-root-install.cjs, which fails if deps were installed from
+      # the app subdir instead of the workspace root.
+      - name: Install npm dependencies (workspace root)
+        run: npm ci
+
+      - name: Build + publish Electron NSIS installer
+        working-directory: apps/desktop
+        # --publish always: build the NSIS installer AND upload latest.yml + .exe +
+        # .blockmap to the GitHub Release. releaseType "release" in package.json
+        # publishes it immediately rather than as a draft. GH_TOKEN is the
+        # Actions-provided token and needs the contents: write permission set
+        # above -- no personal access token required.
+        run: npm run build && npm run builder -- --win nsis --publish always
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Unsigned tester build: skip code-signing identity discovery so the
+          # build never blocks on a missing certificate.
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+
+      - name: Summary
+        if: always()
+        shell: bash
+        run: |
+          echo "### Basecamp release" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Branch: \`${GITHUB_REF_NAME}\` @ \`${GITHUB_SHA}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- On success: published Windows NSIS + latest.yml to GitHub Releases." >> "$GITHUB_STEP_SUMMARY"
+          echo "- Installed Windows testers are prompted to update on next launch." >> "$GITHUB_STEP_SUMMARY"
