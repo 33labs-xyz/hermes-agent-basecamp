@@ -85,7 +85,7 @@ export interface DesktopOnboardingState {
    *  pre-selected to this env var (e.g. 'OPENROUTER_API_KEY') instead of the
    *  OAuth picker. Set by startManualApiKey (the model picker's "Use OpenRouter"
    *  quick action). Mirrors `localEndpoint` but for a hosted provider key, not a
-   *  custom endpoint. Durable state — not `mode` — because refreshProviders
+   *  custom endpoint. Durable state - not `mode` - because refreshProviders
    *  flips `mode` back to 'oauth' whenever OAuth providers exist. */
   initialApiKeyEnv: null | string
 }
