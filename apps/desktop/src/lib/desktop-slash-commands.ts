@@ -31,6 +31,7 @@ export interface DesktopThemeCommandOption {
 export type DesktopActionId =
   | 'branch'
   | 'browser'
+  | 'create-skill'
   | 'handoff'
   | 'help'
   | 'new'
@@ -103,6 +104,7 @@ const DESKTOP_COMMAND_SPECS: readonly DesktopCommandSpec[] = [
   { name: '/profile', description: 'Switch the active Basecamp profile', surface: action('profile') },
   { name: '/skin', description: 'Switch desktop theme or cycle to the next one', surface: action('skin'), args: true },
   { name: '/title', description: 'Rename the current session', surface: action('title') },
+  { name: '/create-skill', description: 'Create a new skill with a guided wizard', aliases: ['/new-skill'], surface: action('create-skill') },
   { name: '/help', description: 'Show desktop slash commands', aliases: ['/commands'], surface: action('help') },
   {
     name: '/browser',

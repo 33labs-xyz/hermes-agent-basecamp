@@ -36,6 +36,7 @@ import {
   updateComposerAttachment
 } from '@/store/composer'
 import { resetSessionBackground } from '@/store/composer-status'
+import { setCreateSkillOpen } from '@/store/create-skill'
 import { clearNotifications, notify, notifyError } from '@/store/notifications'
 import { requestDesktopOnboarding } from '@/store/onboarding'
 import { $activeGatewayProfile, $newChatProfile, ensureGatewayProfile, normalizeProfileKey } from '@/store/profile'
@@ -986,6 +987,12 @@ export function usePromptActions({
         },
         branch: async () => {
           await branchCurrentSession()
+        },
+        // /create-skill opens the shared Create Skill wizard overlay (the same
+        // overlay the Skills-page button uses), so a skill can be authored
+        // without leaving the chat. No arg: the wizard collects the fields.
+        'create-skill': async () => {
+          setCreateSkillOpen(true)
         },
         // /yolo maps to the status-bar YOLO control — a per-session approval
         // bypass, same scope as the TUI's Shift+Tab. With no session yet we arm

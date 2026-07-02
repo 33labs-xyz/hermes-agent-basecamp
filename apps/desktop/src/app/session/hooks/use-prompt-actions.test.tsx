@@ -4,6 +4,7 @@ import { useEffect, useRef } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { textPart } from '@/lib/chat-messages'
+import { $createSkillOpen } from '@/store/create-skill'
 import { $composerAttachments, type ComposerAttachment } from '@/store/composer'
 import { $busy, $connection, $messages, $sessions, setSessions } from '@/store/session'
 import type { SessionInfo } from '@/types/hermes'
@@ -214,6 +215,20 @@ describe('usePromptActions desktop slash pickers', () => {
     cleanup()
     vi.useRealTimers()
     vi.restoreAllMocks()
+    $createSkillOpen.set(false)
+  })
+
+  it('opens the Create Skill wizard for /create-skill without hitting the slash worker', async () => {
+    const requestGateway = vi.fn(async () => ({}) as never)
+    $createSkillOpen.set(false)
+
+    let handle: HarnessHandle | null = null
+    render(<Harness onReady={h => (handle = h)} refreshSessions={async () => undefined} requestGateway={requestGateway} />)
+
+    await handle!.submitText('/create-skill')
+
+    expect($createSkillOpen.get()).toBe(true)
+    expect(requestGateway).not.toHaveBeenCalledWith('slash.exec', expect.anything())
   })
 
   it('resumes an exact session id even when it is not in the loaded sidebar cache', async () => {
