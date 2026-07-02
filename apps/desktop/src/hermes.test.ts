@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { createSkill, getSessionMessages, listAllProfileSessions, listSessions } from './hermes'
+import { createSkill, getSessionMessages, listAllProfileSessions, listSessions, setApiRequestProfile } from './hermes'
 
 const emptySessionsResponse = {
   limit: 0,
@@ -71,6 +71,7 @@ describe('createSkill', () => {
   })
 
   afterEach(() => {
+    setApiRequestProfile(null)
     vi.restoreAllMocks()
     Reflect.deleteProperty(window, 'hermesDesktop')
   })
@@ -93,5 +94,22 @@ describe('createSkill', () => {
     expect(api).toHaveBeenCalledWith(
       expect.objectContaining({ body: { category: 'writing', content: 'body', name: 'my-skill' } })
     )
+  })
+
+  // The active profile must ride at the descriptor top level (so the desktop
+  // routes to that profile's own backend), NEVER inside the body. Moving it
+  // into the body would 404 a per-profile-remote-override backend, whose remote
+  // host has no profile by that name. This locks the integration contract.
+  it('rides the active profile at the descriptor top level, never in the body', async () => {
+    setApiRequestProfile('xiaoxuxu')
+
+    await createSkill('my-skill', 'body', 'writing')
+
+    expect(api).toHaveBeenCalledWith({
+      body: { category: 'writing', content: 'body', name: 'my-skill' },
+      method: 'POST',
+      path: '/api/skills',
+      profile: 'xiaoxuxu'
+    })
   })
 })
