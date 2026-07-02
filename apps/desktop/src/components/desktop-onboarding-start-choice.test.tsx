@@ -6,30 +6,29 @@ import { StartChoice } from './desktop-onboarding-start-choice'
 function renderChoice() {
   const onUseOpenRouter = vi.fn()
   const onConnectNous = vi.fn()
-  const onConnectClaude = vi.fn()
   const onOtherProvider = vi.fn()
   const onChooseLater = vi.fn()
+
   const rendered = render(
     <StartChoice
       onChooseLater={onChooseLater}
-      onConnectClaude={onConnectClaude}
       onConnectNous={onConnectNous}
       onOtherProvider={onOtherProvider}
       onUseOpenRouter={onUseOpenRouter}
     />
   )
 
-  return { onChooseLater, onConnectClaude, onConnectNous, onOtherProvider, onUseOpenRouter, rendered }
+  return { onChooseLater, onConnectNous, onOtherProvider, onUseOpenRouter, rendered }
 }
 
 describe('StartChoice', () => {
   afterEach(cleanup)
 
-  it('renders three equal hero cards and both escapes', () => {
+  it('renders two equal hero cards and both escapes', () => {
     const { rendered } = renderChoice()
     expect(rendered.getByText('Use OpenRouter')).toBeDefined()
     expect(rendered.getByText('Nous Portal')).toBeDefined()
-    expect(rendered.getByText('Claude subscription')).toBeDefined()
+    expect(rendered.queryByText('Claude subscription')).toBeNull()
     expect(rendered.getByText('Other provider')).toBeDefined()
     expect(rendered.getByText("I'll choose a provider later")).toBeDefined()
   })
@@ -40,15 +39,13 @@ describe('StartChoice', () => {
   })
 
   it('fires the right callback per control', () => {
-    const { onChooseLater, onConnectClaude, onConnectNous, onOtherProvider, onUseOpenRouter, rendered } = renderChoice()
+    const { onChooseLater, onConnectNous, onOtherProvider, onUseOpenRouter, rendered } = renderChoice()
     fireEvent.click(rendered.getByText('Use OpenRouter'))
     fireEvent.click(rendered.getByText('Nous Portal'))
-    fireEvent.click(rendered.getByText('Claude subscription'))
     fireEvent.click(rendered.getByText('Other provider'))
     fireEvent.click(rendered.getByText("I'll choose a provider later"))
     expect(onUseOpenRouter).toHaveBeenCalledOnce()
     expect(onConnectNous).toHaveBeenCalledOnce()
-    expect(onConnectClaude).toHaveBeenCalledOnce()
     expect(onOtherProvider).toHaveBeenCalledOnce()
     expect(onChooseLater).toHaveBeenCalledOnce()
   })

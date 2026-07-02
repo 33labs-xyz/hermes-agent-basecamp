@@ -1589,8 +1589,6 @@ export const en: Translations = {
     haveApiKey: 'I have an API key',
     chooseLater: "I'll choose a provider later",
     startChoice: {
-      claudeSubtitle: 'Use the Claude login already on this computer',
-      claudeTitle: 'Claude subscription',
       nousSubtitle: 'One subscription, many models',
       nousTitle: 'Nous Portal',
       openRouterSubtitle: 'One key, many models',
@@ -1690,6 +1688,7 @@ export const en: Translations = {
     modelMenu: {
       search: 'Search models',
       noModels: 'No models found',
+      notConnected: 'Not connected',
       connectModel: 'Connect a model',
       connectClaude: 'Connect Claude subscription',
       useOpenRouter: 'Use OpenRouter',

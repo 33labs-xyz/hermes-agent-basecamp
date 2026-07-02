@@ -7,7 +7,6 @@ const HERO_CARD_CLASS =
 
 interface StartChoiceProps {
   onChooseLater: () => void
-  onConnectClaude: () => void
   onConnectNous: () => void
   onOtherProvider: () => void
   onUseOpenRouter: () => void
@@ -27,18 +26,13 @@ function HeroCard({ onClick, subtitle, title }: { onClick: () => void; subtitle:
   )
 }
 
-// First-run start screen: three equal-weight hero cards (OpenRouter, Nous
-// Portal, Claude subscription) plus two always-visible escapes (other
-// provider, choose later). No card is badged "recommended" so startup never
-// pushes one provider over the others. Pure and callback-driven so the overlay
-// owns all store wiring.
-export function StartChoice({
-  onChooseLater,
-  onConnectClaude,
-  onConnectNous,
-  onOtherProvider,
-  onUseOpenRouter
-}: StartChoiceProps) {
+// First-run start screen: two equal-weight hero cards (OpenRouter, Nous
+// Portal) plus two always-visible escapes (other provider, choose later).
+// Claude subscription stays reachable via "Other provider" but is dropped
+// from the hero row so first run doesn't lead with a paid subscription. No
+// card is badged "recommended" so startup never pushes one provider.
+// Pure and callback-driven so the overlay owns all store wiring.
+export function StartChoice({ onChooseLater, onConnectNous, onOtherProvider, onUseOpenRouter }: StartChoiceProps) {
   const { t } = useI18n()
   const c = t.onboarding.startChoice
 
@@ -47,7 +41,6 @@ export function StartChoice({
       <div className="grid gap-2">
         <HeroCard onClick={onUseOpenRouter} subtitle={c.openRouterSubtitle} title={c.openRouterTitle} />
         <HeroCard onClick={onConnectNous} subtitle={c.nousSubtitle} title={c.nousTitle} />
-        <HeroCard onClick={onConnectClaude} subtitle={c.claudeSubtitle} title={c.claudeTitle} />
       </div>
       <div className="flex items-center justify-between gap-3 border-t border-(--ui-stroke-tertiary) pt-3">
         <Button className="font-medium" onClick={onChooseLater} size="xs" type="button" variant="text">

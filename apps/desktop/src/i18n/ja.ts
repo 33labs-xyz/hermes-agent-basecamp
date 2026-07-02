@@ -1644,8 +1644,6 @@ export const ja = defineLocale({
     haveApiKey: 'API キーをお持ちです',
     chooseLater: '後でプロバイダーを選択します',
     startChoice: {
-      claudeSubtitle: 'Use the Claude login already on this computer',
-      claudeTitle: 'Claude subscription',
       nousSubtitle: 'One subscription, many models',
       nousTitle: 'Nous Portal',
       openRouterSubtitle: 'One key, many models',
@@ -1745,6 +1743,7 @@ export const ja = defineLocale({
     modelMenu: {
       search: 'モデルを検索',
       noModels: 'モデルが見つかりません',
+      notConnected: '未接続',
       connectModel: 'モデルを接続',
       connectClaude: 'Connect Claude subscription',
       useOpenRouter: 'Use OpenRouter',

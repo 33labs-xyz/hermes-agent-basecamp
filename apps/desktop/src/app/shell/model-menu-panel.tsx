@@ -206,7 +206,11 @@ export function ModelMenuPanel({ gateway, inferenceStatus, onSelectModel, reques
         <div className="max-h-80 overflow-y-auto py-0.5">
           {groups.map(group => (
             <DropdownMenuGroup className="py-0.5" key={group.provider.slug}>
-              <DropdownMenuLabel className={dropdownMenuSectionLabel}>{group.provider.name}</DropdownMenuLabel>
+              <ProviderGroupLabel
+                authenticated={group.provider.authenticated}
+                name={group.provider.name}
+                notConnectedLabel={copy.notConnected}
+              />
               {group.families.map(family => {
                 // The active id may be the base or its -fast sibling; either
                 // way this one family row represents both.
@@ -335,6 +339,27 @@ export function EmptyModelActions({
         {copy.connectClaude}
       </DropdownMenuItem>
     </>
+  )
+}
+
+// Section header for one provider group. Providers the backend lists but has
+// not verified (authenticated === false) get a "Not connected" tag, so the
+// catalog of pickable models stays honest about which ones need setup first.
+// Exported and prop-driven so it tests without the store.
+export function ProviderGroupLabel({
+  authenticated,
+  name,
+  notConnectedLabel
+}: {
+  authenticated?: boolean
+  name: string
+  notConnectedLabel: string
+}) {
+  return (
+    <DropdownMenuLabel className={dropdownMenuSectionLabel}>
+      {name}
+      {authenticated === false ? <span className="ml-1.5 font-normal text-amber-600">{notConnectedLabel}</span> : null}
+    </DropdownMenuLabel>
   )
 }
 

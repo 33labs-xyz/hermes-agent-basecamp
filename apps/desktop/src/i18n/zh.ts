@@ -1773,8 +1773,6 @@ export const zh: Translations = {
     haveApiKey: '我有 API 密钥',
     chooseLater: '稍后再选择提供方',
     startChoice: {
-      claudeSubtitle: 'Use the Claude login already on this computer',
-      claudeTitle: 'Claude subscription',
       nousSubtitle: 'One subscription, many models',
       nousTitle: 'Nous Portal',
       openRouterSubtitle: 'One key, many models',
@@ -1869,6 +1867,7 @@ export const zh: Translations = {
     modelMenu: {
       search: '搜索模型',
       noModels: '未找到模型',
+      notConnected: '未连接',
       connectModel: '连接模型',
       connectClaude: 'Connect Claude subscription',
       useOpenRouter: 'Use OpenRouter',

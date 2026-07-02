@@ -439,13 +439,14 @@ export function Picker({ ctx }: { ctx: OnboardingContext }) {
   const isFirstRun = mode === 'openrouter' && !manual && !localEndpoint
 
   // First-run start screen: two hero cards plus two escapes. Picking OpenRouter
-  // flips a local gate to reveal the streamlined key form below. The Claude
-  // card, "other provider", and "choose later" hand off to existing actions.
+  // flips a local gate to reveal the streamlined key form below. "Other
+  // provider" and "choose later" hand off to existing actions. Claude
+  // subscription is not a hero card (it stays behind "Other provider") so
+  // first run doesn't lead with a paid subscription.
   if (isFirstRun && !pickedOpenRouter) {
     return (
       <StartChoice
         onChooseLater={() => dismissFirstRunOnboarding()}
-        onConnectClaude={() => startManualProviderOAuth('claude-code')}
         onConnectNous={() => startManualProviderOAuth('nous')}
         onOtherProvider={() => setOnboardingMode('oauth')}
         onUseOpenRouter={() => setPickedOpenRouter(true)}

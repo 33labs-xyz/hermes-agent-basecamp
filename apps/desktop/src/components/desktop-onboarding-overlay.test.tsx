@@ -119,35 +119,23 @@ describe('onboarding Picker', () => {
 })
 
 describe('onboarding Picker — OpenRouter-first run', () => {
-  it('first run shows the three-hero chooser, then OpenRouter on demand', () => {
+  it('first run shows the two-hero chooser, then OpenRouter on demand', () => {
     setProviders([provider('nous', 'Nous Portal')])
     $desktopOnboarding.set({ ...$desktopOnboarding.get(), mode: 'openrouter' })
     render(<Picker ctx={ctx} />)
 
-    // Chooser lands first: three equal hero cards, not the key form or grid.
+    // Chooser lands first: two equal hero cards, not the key form or grid.
     expect(screen.getByText('Use OpenRouter')).toBeTruthy()
     expect(screen.getByText('Nous Portal')).toBeTruthy()
-    expect(screen.getByText('Claude subscription')).toBeTruthy()
-    // No card is branded "recommended" — startup pushes no single provider.
+    // Claude subscription is not a hero card; it stays behind "Other provider".
+    expect(screen.queryByText('Claude subscription')).toBeNull()
+    // No card is branded "recommended" so startup pushes no single provider.
     expect(screen.queryByText('Recommended')).toBeNull()
 
     // Picking OpenRouter swaps in the streamlined key form plus the defer link.
     fireEvent.click(screen.getByText('Use OpenRouter'))
     expect(screen.getByText('OpenRouter')).toBeTruthy()
     expect(screen.getByRole('button', { name: "I'll choose a provider later" })).toBeTruthy()
-  })
-
-  it('the Claude card starts the claude-code provider flow', () => {
-    setProviders([provider('nous', 'Nous Portal')])
-    $desktopOnboarding.set({ ...$desktopOnboarding.get(), mode: 'openrouter' })
-    render(<Picker ctx={ctx} />)
-
-    fireEvent.click(screen.getByText('Claude subscription'))
-
-    const state = $desktopOnboarding.get()
-    expect(state.manual).toBe(true)
-    expect(state.requested).toBe(true)
-    expect(peekPendingProviderOAuth()).toBe('claude-code')
   })
 
   it('the Nous Portal card starts the nous provider flow', () => {

@@ -1249,8 +1249,6 @@ export interface Translations {
     haveApiKey: string
     chooseLater: string
     startChoice: {
-      claudeSubtitle: string
-      claudeTitle: string
       nousSubtitle: string
       nousTitle: string
       openRouterSubtitle: string
@@ -1331,6 +1329,7 @@ export interface Translations {
     modelMenu: {
       search: string
       noModels: string
+      notConnected: string
       connectModel: string
       connectClaude: string
       useOpenRouter: string

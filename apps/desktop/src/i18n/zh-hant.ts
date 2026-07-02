@@ -1594,8 +1594,6 @@ export const zhHant = defineLocale({
     haveApiKey: '我有 API 金鑰',
     chooseLater: '稍後再選擇提供方',
     startChoice: {
-      claudeSubtitle: 'Use the Claude login already on this computer',
-      claudeTitle: 'Claude subscription',
       nousSubtitle: 'One subscription, many models',
       nousTitle: 'Nous Portal',
       openRouterSubtitle: 'One key, many models',
@@ -1689,6 +1687,7 @@ export const zhHant = defineLocale({
     modelMenu: {
       search: '搜尋模型',
       noModels: '找不到模型',
+      notConnected: '未連接',
       connectModel: '連接模型',
       connectClaude: 'Connect Claude subscription',
       useOpenRouter: 'Use OpenRouter',
