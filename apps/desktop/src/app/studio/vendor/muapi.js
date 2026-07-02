@@ -243,8 +243,14 @@ export async function generateAudio(apiKey, params) {
     const payload = {};
     const skipKeys = ['_modelId', 'onRequestId'];
     for (const key in params) {
-        if (!skipKeys.includes(key) && params[key] !== undefined && params[key] !== null) {
-            payload[key] = params[key];
+        const value = params[key];
+        // Drop empty-string optionals. Audio forms seed defaultless fields to
+        // "" for controlled inputs, and the gateway validates enums like Suno's
+        // persona_model with a pydantic Literal, which rejects "" as a 422. The
+        // image/video builders above use falsy `if (params.x)` guards for the
+        // same reason. Keep genuine falsy values (false, 0), only skip "".
+        if (!skipKeys.includes(key) && value !== undefined && value !== null && value !== '') {
+            payload[key] = value;
         }
     }
     return submitAndPoll(endpoint, payload, apiKey, params.onRequestId, 900);
