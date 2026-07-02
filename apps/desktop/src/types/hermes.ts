@@ -513,6 +513,13 @@ export interface SkillInfo {
   name: string
 }
 
+export interface CreateSkillResult {
+  message: string
+  path: string
+  skill_md: string
+  success: boolean
+}
+
 export interface ToolsetInfo {
   configured: boolean
   description: string

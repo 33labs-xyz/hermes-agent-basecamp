@@ -9,6 +9,7 @@ import type {
   AuxiliaryModelsResponse,
   BackendUpdateCheckResponse,
   ConfigSchemaResponse,
+  CreateSkillResult,
   CronJob,
   CronJobCreatePayload,
   CronJobUpdates,
@@ -60,6 +61,7 @@ export type {
   BackendUpdateCheckResponse,
   ConfigFieldSchema,
   ConfigSchemaResponse,
+  CreateSkillResult,
   CronJob,
   CronJobCreatePayload,
   CronJobSchedule,
@@ -447,6 +449,15 @@ export function toggleSkill(name: string, enabled: boolean): Promise<{ ok: boole
     path: '/api/skills/toggle',
     method: 'PUT',
     body: { name, enabled }
+  })
+}
+
+export function createSkill(name: string, content: string, category?: string): Promise<CreateSkillResult> {
+  return window.hermesDesktop.api<CreateSkillResult>({
+    ...profileScoped(),
+    path: '/api/skills',
+    method: 'POST',
+    body: { name, content, ...(category ? { category } : {}) }
   })
 }
 

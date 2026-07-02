@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { getSessionMessages, listAllProfileSessions, listSessions } from './hermes'
+import { createSkill, getSessionMessages, listAllProfileSessions, listSessions } from './hermes'
 
 const emptySessionsResponse = {
   limit: 0,
@@ -56,5 +56,42 @@ describe('Hermes REST session helpers', () => {
       path: '/api/sessions/session-1/messages?profile=xiaoxuxu',
       profile: 'xiaoxuxu'
     })
+  })
+})
+
+describe('createSkill', () => {
+  let api: ReturnType<typeof vi.fn>
+
+  beforeEach(() => {
+    api = vi.fn().mockResolvedValue({ message: 'ok', path: '/x/SKILL.md', skill_md: '---', success: true })
+    Object.defineProperty(window, 'hermesDesktop', {
+      configurable: true,
+      value: { api }
+    })
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+    Reflect.deleteProperty(window, 'hermesDesktop')
+  })
+
+  it('POSTs name + content to /api/skills', async () => {
+    await createSkill('my-skill', '---\nname: my-skill\n---\n\nDo the thing.')
+
+    expect(api).toHaveBeenCalledWith(
+      expect.objectContaining({
+        body: { content: '---\nname: my-skill\n---\n\nDo the thing.', name: 'my-skill' },
+        method: 'POST',
+        path: '/api/skills'
+      })
+    )
+  })
+
+  it('includes category when provided', async () => {
+    await createSkill('my-skill', 'body', 'writing')
+
+    expect(api).toHaveBeenCalledWith(
+      expect.objectContaining({ body: { category: 'writing', content: 'body', name: 'my-skill' } })
+    )
   })
 })
