@@ -1249,6 +1249,8 @@ export interface Translations {
     startChoice: {
       claudeSubtitle: string
       claudeTitle: string
+      nousSubtitle: string
+      nousTitle: string
       openRouterSubtitle: string
       openRouterTitle: string
       otherProvider: string

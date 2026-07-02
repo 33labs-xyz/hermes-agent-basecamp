@@ -8,34 +8,46 @@ const HERO_CARD_CLASS =
 interface StartChoiceProps {
   onChooseLater: () => void
   onConnectClaude: () => void
+  onConnectNous: () => void
   onOtherProvider: () => void
   onUseOpenRouter: () => void
 }
 
-// First-run start screen: two equal-weight hero cards (OpenRouter, Claude
-// subscription) plus two always-visible escapes (other provider, choose
-// later). Pure and callback-driven so the overlay owns all store wiring.
-export function StartChoice({ onChooseLater, onConnectClaude, onOtherProvider, onUseOpenRouter }: StartChoiceProps) {
+// One hero card, kept identical across the three main providers so no single
+// path reads as the default. Title on the left with a chevron, subtitle below.
+function HeroCard({ onClick, subtitle, title }: { onClick: () => void; subtitle: string; title: string }) {
+  return (
+    <button className={HERO_CARD_CLASS} onClick={onClick} type="button">
+      <span className="flex w-full items-center justify-between gap-2 text-[length:var(--conversation-text-font-size)] font-semibold">
+        {title}
+        <ChevronRight className="size-4 shrink-0 text-primary transition group-hover:translate-x-0.5" />
+      </span>
+      <span className="text-xs leading-5 text-muted-foreground">{subtitle}</span>
+    </button>
+  )
+}
+
+// First-run start screen: three equal-weight hero cards (OpenRouter, Nous
+// Portal, Claude subscription) plus two always-visible escapes (other
+// provider, choose later). No card is badged "recommended" so startup never
+// pushes one provider over the others. Pure and callback-driven so the overlay
+// owns all store wiring.
+export function StartChoice({
+  onChooseLater,
+  onConnectClaude,
+  onConnectNous,
+  onOtherProvider,
+  onUseOpenRouter
+}: StartChoiceProps) {
   const { t } = useI18n()
   const c = t.onboarding.startChoice
 
   return (
     <div className="grid gap-3">
-      <div className="grid gap-2 sm:grid-cols-2">
-        <button className={HERO_CARD_CLASS} onClick={onUseOpenRouter} type="button">
-          <span className="flex w-full items-center justify-between gap-2 text-[length:var(--conversation-text-font-size)] font-semibold">
-            {c.openRouterTitle}
-            <ChevronRight className="size-4 shrink-0 text-primary transition group-hover:translate-x-0.5" />
-          </span>
-          <span className="text-xs leading-5 text-muted-foreground">{c.openRouterSubtitle}</span>
-        </button>
-        <button className={HERO_CARD_CLASS} onClick={onConnectClaude} type="button">
-          <span className="flex w-full items-center justify-between gap-2 text-[length:var(--conversation-text-font-size)] font-semibold">
-            {c.claudeTitle}
-            <ChevronRight className="size-4 shrink-0 text-primary transition group-hover:translate-x-0.5" />
-          </span>
-          <span className="text-xs leading-5 text-muted-foreground">{c.claudeSubtitle}</span>
-        </button>
+      <div className="grid gap-2">
+        <HeroCard onClick={onUseOpenRouter} subtitle={c.openRouterSubtitle} title={c.openRouterTitle} />
+        <HeroCard onClick={onConnectNous} subtitle={c.nousSubtitle} title={c.nousTitle} />
+        <HeroCard onClick={onConnectClaude} subtitle={c.claudeSubtitle} title={c.claudeTitle} />
       </div>
       <div className="flex items-center justify-between gap-3 border-t border-(--ui-stroke-tertiary) pt-3">
         <Button className="font-medium" onClick={onChooseLater} size="xs" type="button" variant="text">

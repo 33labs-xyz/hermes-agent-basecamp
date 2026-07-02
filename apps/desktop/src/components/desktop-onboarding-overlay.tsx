@@ -449,6 +449,7 @@ export function Picker({ ctx }: { ctx: OnboardingContext }) {
       <StartChoice
         onChooseLater={() => dismissFirstRunOnboarding()}
         onConnectClaude={() => startManualProviderOAuth('claude-code')}
+        onConnectNous={() => startManualProviderOAuth('nous')}
         onOtherProvider={() => setOnboardingMode('oauth')}
         onUseOpenRouter={() => setPickedOpenRouter(true)}
       />

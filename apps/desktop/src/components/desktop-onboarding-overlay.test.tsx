@@ -1,7 +1,12 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
 
-import { $desktopOnboarding, type DesktopOnboardingState, type OnboardingContext } from '@/store/onboarding'
+import {
+  $desktopOnboarding,
+  type DesktopOnboardingState,
+  type OnboardingContext,
+  peekPendingProviderOAuth
+} from '@/store/onboarding'
 import type { OAuthProvider } from '@/types/hermes'
 
 import { Picker, providerTitle } from './desktop-onboarding-overlay'
@@ -104,15 +109,17 @@ describe('onboarding Picker', () => {
 })
 
 describe('onboarding Picker — OpenRouter-first run', () => {
-  it('first run shows the start chooser, then OpenRouter on demand', () => {
+  it('first run shows the three-hero chooser, then OpenRouter on demand', () => {
     setProviders([provider('nous', 'Nous Portal')])
     $desktopOnboarding.set({ ...$desktopOnboarding.get(), mode: 'openrouter' })
     render(<Picker ctx={ctx} />)
 
-    // Chooser lands first: two hero cards, not the key form or provider grid.
+    // Chooser lands first: three equal hero cards, not the key form or grid.
     expect(screen.getByText('Use OpenRouter')).toBeTruthy()
+    expect(screen.getByText('Nous Portal')).toBeTruthy()
     expect(screen.getByText('Claude subscription')).toBeTruthy()
-    expect(screen.queryByText('Nous Portal')).toBeNull()
+    // No card is branded "recommended" — startup pushes no single provider.
+    expect(screen.queryByText('Recommended')).toBeNull()
 
     // Picking OpenRouter swaps in the streamlined key form plus the defer link.
     fireEvent.click(screen.getByText('Use OpenRouter'))
@@ -130,6 +137,20 @@ describe('onboarding Picker — OpenRouter-first run', () => {
     const state = $desktopOnboarding.get()
     expect(state.manual).toBe(true)
     expect(state.requested).toBe(true)
+    expect(peekPendingProviderOAuth()).toBe('claude-code')
+  })
+
+  it('the Nous Portal card starts the nous provider flow', () => {
+    setProviders([provider('nous', 'Nous Portal')])
+    $desktopOnboarding.set({ ...$desktopOnboarding.get(), mode: 'openrouter' })
+    render(<Picker ctx={ctx} />)
+
+    fireEvent.click(screen.getByText('Nous Portal'))
+
+    const state = $desktopOnboarding.get()
+    expect(state.manual).toBe(true)
+    expect(state.requested).toBe(true)
+    expect(peekPendingProviderOAuth()).toBe('nous')
   })
 })
 

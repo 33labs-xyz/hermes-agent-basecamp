@@ -1596,6 +1596,8 @@ export const zhHant = defineLocale({
     startChoice: {
       claudeSubtitle: 'Use the Claude login already on this computer',
       claudeTitle: 'Claude subscription',
+      nousSubtitle: 'One subscription, many models',
+      nousTitle: 'Nous Portal',
       openRouterSubtitle: 'One key, many models',
       openRouterTitle: 'Use OpenRouter',
       otherProvider: 'Other provider'
