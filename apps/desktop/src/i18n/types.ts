@@ -568,6 +568,8 @@ export interface Translations {
     createDescriptionPlaceholder: string
     createInstructionsLabel: string
     createInstructionsPlaceholder: string
+    createImportLabel: string
+    createImportFailed: string
     createPreviewLabel: string
     createSubmit: string
     createSubmitting: string

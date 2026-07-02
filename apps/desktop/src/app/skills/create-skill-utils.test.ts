@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest'
 
-import { buildSkillMarkdown, friendlyCreateSkillError, isValidSkillSlug, slugifySkillName } from './create-skill-utils'
+import {
+  buildSkillMarkdown,
+  friendlyCreateSkillError,
+  isValidSkillSlug,
+  parseImportedSkill,
+  slugifySkillName
+} from './create-skill-utils'
 
 describe('slugifySkillName', () => {
   it('lowercases and hyphenates whitespace', () => {
@@ -57,5 +63,63 @@ describe('friendlyCreateSkillError', () => {
 
   it('falls back for non-Error values', () => {
     expect(friendlyCreateSkillError('nope', 'fallback')).toBe('fallback')
+  })
+})
+
+describe('parseImportedSkill', () => {
+  it('dumps plain text with no frontmatter into instructions', () => {
+    expect(parseImportedSkill('Just do the thing.\nLine two.')).toEqual({
+      instructions: 'Just do the thing.\nLine two.'
+    })
+  })
+
+  it('extracts name and description from frontmatter and keeps the body', () => {
+    const file = '---\nname: weekly-report\ndescription: Does X.\n---\n\nStep one.\nStep two.'
+    expect(parseImportedSkill(file)).toEqual({
+      name: 'weekly-report',
+      description: 'Does X.',
+      instructions: 'Step one.\nStep two.'
+    })
+  })
+
+  it('strips surrounding single or double quotes from frontmatter values', () => {
+    const file = "---\nname: \"my-skill\"\ndescription: 'Use when X.'\n---\n\nBody."
+    expect(parseImportedSkill(file)).toEqual({
+      name: 'my-skill',
+      description: 'Use when X.',
+      instructions: 'Body.'
+    })
+  })
+
+  it('omits missing frontmatter keys', () => {
+    const file = '---\ndescription: Does X.\n---\n\nBody.'
+    expect(parseImportedSkill(file)).toEqual({
+      description: 'Does X.',
+      instructions: 'Body.'
+    })
+  })
+
+  it('normalizes CRLF line endings from Windows files', () => {
+    const file = '---\r\nname: win-skill\r\ndescription: From Windows.\r\n---\r\n\r\nBody line.'
+    expect(parseImportedSkill(file)).toEqual({
+      name: 'win-skill',
+      description: 'From Windows.',
+      instructions: 'Body line.'
+    })
+  })
+
+  it('treats an unterminated frontmatter fence as plain body', () => {
+    const file = '---\nname: broken\nno closing fence here'
+    expect(parseImportedSkill(file)).toEqual({
+      instructions: '---\nname: broken\nno closing fence here'
+    })
+  })
+
+  it('keeps a colon inside a description value', () => {
+    const file = '---\ndescription: Use when: the user asks.\n---\n\nBody.'
+    expect(parseImportedSkill(file)).toEqual({
+      description: 'Use when: the user asks.',
+      instructions: 'Body.'
+    })
   })
 })

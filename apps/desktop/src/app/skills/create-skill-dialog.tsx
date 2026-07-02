@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 import { ActionStatus } from '@/components/ui/action-status'
 import { Button } from '@/components/ui/button'
@@ -7,11 +7,17 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { createSkill } from '@/hermes'
 import { useI18n } from '@/i18n'
-import { AlertTriangle } from '@/lib/icons'
+import { AlertTriangle, FileText } from '@/lib/icons'
 import { bumpSkillsRefresh } from '@/store/create-skill'
 import { notify } from '@/store/notifications'
 
-import { buildSkillMarkdown, friendlyCreateSkillError, isValidSkillSlug, slugifySkillName } from './create-skill-utils'
+import {
+  buildSkillMarkdown,
+  friendlyCreateSkillError,
+  isValidSkillSlug,
+  parseImportedSkill,
+  slugifySkillName
+} from './create-skill-utils'
 
 interface CreateSkillDialogProps {
   open: boolean
@@ -33,6 +39,7 @@ export function CreateSkillDialog({ open, onOpenChange }: CreateSkillDialogProps
   const [instructions, setInstructions] = useState('')
   const [status, setStatus] = useState<'done' | 'idle' | 'saving'>('idle')
   const [error, setError] = useState<null | string>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const slug = slugifySkillName(name)
   const slugValid = isValidSkillSlug(slug)
@@ -67,6 +74,25 @@ export function CreateSkillDialog({ open, onOpenChange }: CreateSkillDialogProps
     } catch (err) {
       setStatus('idle')
       setError(friendlyCreateSkillError(err, t.skills.createFailed))
+    }
+  }
+
+  // Load a .md/.markdown/.txt file into the fields. Frontmatter name/description
+  // seed those fields (when present); the body always becomes the instructions.
+  // Any read failure surfaces inline rather than throwing.
+  async function importFile(file: File) {
+    try {
+      const parsed = parseImportedSkill(await file.text())
+      if (parsed.name) {
+        setName(parsed.name)
+      }
+      if (parsed.description) {
+        setDescription(parsed.description)
+      }
+      setInstructions(parsed.instructions)
+      setError(null)
+    } catch {
+      setError(t.skills.createImportFailed)
     }
   }
 
@@ -124,9 +150,35 @@ export function CreateSkillDialog({ open, onOpenChange }: CreateSkillDialogProps
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-sm font-medium" htmlFor="create-skill-instructions">
-              {t.skills.createInstructionsLabel}
-            </label>
+            <div className="flex items-center justify-between gap-2">
+              <label className="text-sm font-medium" htmlFor="create-skill-instructions">
+                {t.skills.createInstructionsLabel}
+              </label>
+              <Button
+                className="h-7 gap-1.5 px-2 text-xs text-muted-foreground"
+                disabled={busy}
+                onClick={() => fileInputRef.current?.click()}
+                type="button"
+                variant="ghost"
+              >
+                <FileText className="size-3.5" />
+                {t.skills.createImportLabel}
+              </Button>
+            </div>
+            <input
+              accept=".md,.markdown,.txt,text/markdown,text/plain"
+              className="hidden"
+              onChange={event => {
+                const file = event.target.files?.[0]
+                if (file) {
+                  void importFile(file)
+                }
+                // Reset so re-selecting the same file still fires a change event.
+                event.target.value = ''
+              }}
+              ref={fileInputRef}
+              type="file"
+            />
             <Textarea
               className="min-h-28"
               id="create-skill-instructions"

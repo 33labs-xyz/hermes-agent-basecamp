@@ -880,6 +880,8 @@ export const zh: Translations = {
     createDescriptionPlaceholder: '当用户需要每周报告时使用。生成 markdown 摘要。',
     createInstructionsLabel: '这个技能应让助手做什么？',
     createInstructionsPlaceholder: '逐步描述助手应执行的任务。',
+    createImportLabel: '导入文件',
+    createImportFailed: '无法读取该文件。请使用 .md 或 .txt 文件。',
     createPreviewLabel: '预览 (SKILL.md)',
     createSubmit: '创建技能',
     createSubmitting: '创建中',

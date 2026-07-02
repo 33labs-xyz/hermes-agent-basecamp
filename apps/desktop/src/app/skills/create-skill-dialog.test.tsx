@@ -62,6 +62,43 @@ describe('CreateSkillDialog', () => {
     await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))
   })
 
+  it('imports a markdown file: frontmatter fills fields, body fills instructions', async () => {
+    render(<CreateSkillDialog onOpenChange={() => {}} open />)
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement
+    const file = new File(
+      ['---\nname: imported-skill\ndescription: Imported one.\n---\n\nDo the imported thing.'],
+      'imported.md',
+      { type: 'text/markdown' }
+    )
+
+    fireEvent.change(input, { target: { files: [file] } })
+
+    await waitFor(() =>
+      expect((screen.getByLabelText("What's it called?") as HTMLInputElement).value).toBe('imported-skill')
+    )
+    expect((screen.getByLabelText('One line: what it does and when to use it') as HTMLInputElement).value).toBe(
+      'Imported one.'
+    )
+    expect(
+      (screen.getByLabelText('What should the skill tell the assistant to do?') as HTMLTextAreaElement).value
+    ).toBe('Do the imported thing.')
+  })
+
+  it('imports a plain text file into instructions only, leaving the name empty', async () => {
+    render(<CreateSkillDialog onOpenChange={() => {}} open />)
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement
+    const file = new File(['Raw body, no frontmatter.'], 'notes.txt', { type: 'text/plain' })
+
+    fireEvent.change(input, { target: { files: [file] } })
+
+    await waitFor(() =>
+      expect(
+        (screen.getByLabelText('What should the skill tell the assistant to do?') as HTMLTextAreaElement).value
+      ).toBe('Raw body, no frontmatter.')
+    )
+    expect((screen.getByLabelText("What's it called?") as HTMLInputElement).value).toBe('')
+  })
+
   it('on backend error keeps the panel open and shows the detail', async () => {
     createSkillMock.mockRejectedValue(new Error('400: {"detail":"Skill \'x\' already exists."}'))
     const onOpenChange = vi.fn()

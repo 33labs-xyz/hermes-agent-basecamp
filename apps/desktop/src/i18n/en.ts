@@ -691,6 +691,8 @@ export const en: Translations = {
     createDescriptionPlaceholder: 'Use when the user asks for a weekly report. Produces a markdown summary.',
     createInstructionsLabel: 'What should the skill tell the assistant to do?',
     createInstructionsPlaceholder: 'Step by step, describe the task the assistant should carry out.',
+    createImportLabel: 'Import file',
+    createImportFailed: 'Could not read that file. Use a .md or .txt file.',
     createPreviewLabel: 'Preview (SKILL.md)',
     createSubmit: 'Create skill',
     createSubmitting: 'Creating',
