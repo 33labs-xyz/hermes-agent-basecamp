@@ -26,6 +26,14 @@ export interface StudioProps {
   onFilesHandled?: () => void
 }
 
+// Remaining account credits for the connected key, returned by the Muapi
+// balance endpoint. The value is in Muapi credits and may carry decimals.
+export interface StudioBalance {
+  balance: number
+}
+
+export function getUserBalance(apiKey: string): Promise<StudioBalance>
+
 export const ImageStudio: ComponentType<StudioProps>
 export const VideoStudio: ComponentType<StudioProps>
 export const AudioStudio: ComponentType<StudioProps>

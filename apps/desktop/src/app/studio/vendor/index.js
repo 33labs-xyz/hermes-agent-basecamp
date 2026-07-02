@@ -10,3 +10,7 @@ export { default as LipSyncStudio } from './components/LipSyncStudio.jsx'
 export { default as MarketingStudio } from './components/MarketingStudio.jsx'
 export { default as RecastStudio } from './components/RecastStudio.jsx'
 export { default as VibeMotionStudio } from './components/VibeMotionStudio.jsx'
+
+// Account credit balance lookup. Routed through the same main-process proxy as
+// the studios (see muapi.js muFetch), so no CORS concerns inside Basecamp.
+export { getUserBalance } from './muapi.js'

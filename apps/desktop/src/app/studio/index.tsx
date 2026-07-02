@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils'
 import { PAGE_INSET_X } from '../layout-constants'
 import type { SetStatusbarItemGroup } from '../shell/statusbar-controls'
 import { StudioLibrary } from './library'
+import { StudioCredits } from './studio-credits'
 import {
   AudioStudio,
   CinemaStudio,
@@ -144,23 +145,26 @@ export function StudioView({ setStatusbarItemGroup }: StudioViewProps) {
 
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col">
-      <div className={cn('flex shrink-0 items-center gap-1 overflow-x-auto border-b border-border py-1.5', PAGE_INSET_X)}>
-        {STUDIO_TABS.map(tab => (
-          <button
-            aria-pressed={tab.id === active.id}
-            className={cn(
-              'shrink-0 rounded-[3px] px-2.5 py-1 text-xs font-medium transition-colors',
-              tab.id === active.id
-                ? 'bg-(--ui-bg-tertiary) text-foreground'
-                : 'text-muted-foreground hover:text-foreground'
-            )}
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            type="button"
-          >
-            {tab.label}
-          </button>
-        ))}
+      <div className={cn('flex shrink-0 items-center gap-2 border-b border-border py-1.5', PAGE_INSET_X)}>
+        <div className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto">
+          {STUDIO_TABS.map(tab => (
+            <button
+              aria-pressed={tab.id === active.id}
+              className={cn(
+                'shrink-0 rounded-[3px] px-2.5 py-1 text-xs font-medium transition-colors',
+                tab.id === active.id
+                  ? 'bg-(--ui-bg-tertiary) text-foreground'
+                  : 'text-muted-foreground hover:text-foreground'
+              )}
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              type="button"
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+        <StudioCredits apiKey={apiKey} refreshSignal={libraryVersion} />
       </div>
       <div className="min-h-0 flex-1 overflow-auto">
         {ActiveStudio ? (
