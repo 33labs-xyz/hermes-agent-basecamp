@@ -8,6 +8,7 @@ import { EmptyModelActions } from './model-menu-panel'
 function renderActions() {
   const onConnectClaude = vi.fn()
   const onUseOpenRouter = vi.fn()
+
   const rendered = render(
     <DropdownMenu open>
       <DropdownMenuContent>

@@ -70,11 +70,14 @@ export function AboutSettings() {
 
   const handleCheck = async () => {
     setJustChecked(false)
+
     if (packaged) {
       await window.hermesDesktop?.checkForUpdates?.()
       setJustChecked(true)
+
       return
     }
+
     const next = await checkUpdates()
     setJustChecked(Boolean(next))
   }

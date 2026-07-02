@@ -144,6 +144,7 @@ const inFlightSessionMeta = new Set<string>()
 // forget: each resolved fetch updates the cache, re-rendering subscribers.
 export function ensureProjectMemberSessions(ids: string[], knownIds: Set<string>): void {
   const cache = $projectSessionMeta.get()
+
   const missing = ids.filter(
     id => !knownIds.has(id) && !(id in cache) && !inFlightSessionMeta.has(id)
   )

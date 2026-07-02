@@ -7,6 +7,7 @@ import type { StudioGenerationEntry } from '@/global'
 import { cn } from '@/lib/utils'
 
 import { PAGE_INSET_X } from '../../layout-constants'
+
 import { loadGenerationDataUrl, useGenerations } from './use-generations'
 
 // Local generation manager. Auto-saved results land here grouped by folder.
@@ -25,6 +26,7 @@ export function StudioLibrary({ refreshKey }: { refreshKey: number }) {
 
   const runOrganise = async () => {
     setOrganising(true)
+
     try {
       await organise()
     } finally {
@@ -68,13 +70,13 @@ export function StudioLibrary({ refreshKey }: { refreshKey: number }) {
       ) : (
         <div className="min-h-0 flex-1 space-y-5 overflow-auto">
           {byFolder.map(([folder, items]) => (
-            <section key={folder} className="space-y-2">
+            <section className="space-y-2" key={folder}>
               <h3 className="text-xs font-medium text-foreground capitalize">{folder}</h3>
               <div className="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-2.5">
                 {items.map(entry => (
                   <GenerationCard
-                    key={entry.id}
                     entry={entry}
+                    key={entry.id}
                     onArchive={() => void archive(entry.id)}
                   />
                 ))}
@@ -88,9 +90,9 @@ export function StudioLibrary({ refreshKey }: { refreshKey: number }) {
               <div className="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-2.5">
                 {archived.map(entry => (
                   <GenerationCard
-                    key={entry.id}
                     archived
                     entry={entry}
+                    key={entry.id}
                     onDeleteForever={() => setPendingDelete(entry)}
                     onRestore={() => void restore(entry.id)}
                   />
@@ -107,7 +109,7 @@ export function StudioLibrary({ refreshKey }: { refreshKey: number }) {
         destructive
         onClose={() => setPendingDelete(null)}
         onConfirm={async () => {
-          if (pendingDelete) await deleteForever(pendingDelete.id)
+          if (pendingDelete) {await deleteForever(pendingDelete.id)}
         }}
         open={pendingDelete !== null}
         title="Delete permanently?"
@@ -199,9 +201,12 @@ function GenerationMedia({ dataUrl, kind }: { dataUrl: string; kind: StudioGener
 }
 
 function iconForKind(kind: StudioGenerationEntry['kind']): string {
-  if (kind === 'video') return 'device-camera-video'
-  if (kind === 'audio') return 'music'
-  if (kind === 'image') return 'file-media'
+  if (kind === 'video') {return 'device-camera-video'}
+
+  if (kind === 'audio') {return 'music'}
+
+  if (kind === 'image') {return 'file-media'}
+
   return 'file'
 }
 
@@ -213,8 +218,8 @@ function groupByFolder(entries: StudioGenerationEntry[]): [string, StudioGenerat
     const folder = entry.folder || 'other'
     const bucket = map.get(folder)
 
-    if (bucket) bucket.push(entry)
-    else map.set(folder, [entry])
+    if (bucket) {bucket.push(entry)}
+    else {map.set(folder, [entry])}
   }
 
   return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0]))
@@ -230,7 +235,7 @@ function useGenerationPreview(filePath: string | undefined): string {
     void (async () => {
       const url = await loadGenerationDataUrl(filePath)
 
-      if (!cancelled) setDataUrl(url)
+      if (!cancelled) {setDataUrl(url)}
     })()
 
     return () => {

@@ -1,13 +1,14 @@
 import { cleanup, fireEvent, render } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
+import type * as OnboardingStore from '@/store/onboarding'
 import type { ModelOptionProvider } from '@/types/hermes'
 
 import { ClaudeSubscriptionRow } from './model-settings'
 
 const startManualProviderOAuth = vi.hoisted(() => vi.fn())
 vi.mock('@/store/onboarding', async importOriginal => ({
-  ...(await importOriginal<typeof import('@/store/onboarding')>()),
+  ...(await importOriginal<typeof OnboardingStore>()),
   startManualProviderOAuth
 }))
 

@@ -56,6 +56,7 @@ export function ClaudeSubscriptionRow({ providers }: { providers: ModelOptionPro
   const c = t.settings.model.claudeSubscription
   const row = providers.find(p => p.slug === CLAUDE_CODE_SLUG)
   const connected = isProviderReady(row)
+
   return (
     <div className="flex items-center justify-between gap-3 rounded-[6px] border border-(--ui-stroke-tertiary) px-3 py-2.5">
       <div className="min-w-0">

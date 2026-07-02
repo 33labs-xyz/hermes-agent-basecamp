@@ -65,6 +65,7 @@ describe('CreateSkillDialog', () => {
   it('imports a markdown file: frontmatter fills fields, body fills instructions', async () => {
     render(<CreateSkillDialog onOpenChange={() => {}} open />)
     const input = document.querySelector('input[type="file"]') as HTMLInputElement
+
     const file = new File(
       ['---\nname: imported-skill\ndescription: Imported one.\n---\n\nDo the imported thing.'],
       'imported.md',

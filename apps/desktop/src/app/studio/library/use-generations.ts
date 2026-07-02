@@ -15,10 +15,12 @@ export function useGenerations(refreshKey = 0) {
     if (!gen) {
       setEntries([])
       setLoading(false)
+
       return
     }
 
     setLoading(true)
+
     try {
       setEntries(await gen.list())
     } finally {
@@ -73,7 +75,7 @@ export function useGenerations(refreshKey = 0) {
 // Load an on-disk generation as a data URL for inline preview. Returns '' when
 // unavailable (missing bridge or unreadable file).
 export async function loadGenerationDataUrl(filePath: string | undefined): Promise<string> {
-  if (!filePath) return ''
+  if (!filePath) {return ''}
 
   try {
     return (await window.hermesDesktop?.readFileDataUrl(filePath)) ?? ''

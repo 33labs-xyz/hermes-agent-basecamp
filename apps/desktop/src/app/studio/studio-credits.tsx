@@ -28,6 +28,7 @@ export function StudioCredits({ apiKey, refreshSignal }: StudioCreditsProps) {
   useEffect(() => {
     if (!apiKey) {
       setBalance(null)
+
       return
     }
 
@@ -35,12 +36,12 @@ export function StudioCredits({ apiKey, refreshSignal }: StudioCreditsProps) {
 
     void getUserBalance(apiKey)
       .then(result => {
-        if (cancelled) return
+        if (cancelled) {return}
         const value = result?.balance
         setBalance(typeof value === 'number' && Number.isFinite(value) ? value : null)
       })
       .catch(() => {
-        if (!cancelled) setBalance(null)
+        if (!cancelled) {setBalance(null)}
       })
 
     return () => {
@@ -48,7 +49,7 @@ export function StudioCredits({ apiKey, refreshSignal }: StudioCreditsProps) {
     }
   }, [apiKey, refreshSignal])
 
-  if (balance === null) return null
+  if (balance === null) {return null}
 
   return (
     <div

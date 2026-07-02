@@ -23,6 +23,7 @@ export function isValidSkillSlug(slug: string): boolean {
 export function buildSkillMarkdown(fields: { description: string; instructions: string; slug: string }): string {
   const description = fields.description.trim()
   const instructions = fields.instructions.trim()
+
   return `---\nname: ${fields.slug}\ndescription: ${description}\n---\n\n${instructions}`
 }
 
@@ -42,9 +43,11 @@ const FRONTMATTER_RE = /^---\n([\s\S]*?)\n---\n?/
 // Peel surrounding matching single or double quotes from a scalar value.
 function stripQuotes(value: string): string {
   const first = value[0]
+
   if (value.length >= 2 && (first === '"' || first === "'") && value[value.length - 1] === first) {
     return value.slice(1, -1)
   }
+
   return value
 }
 
@@ -52,10 +55,13 @@ function stripQuotes(value: string): string {
 // shallow: single-line scalars only, which is all a SKILL.md name/description is.
 function readFrontmatterValue(frontmatter: string, key: string): string | undefined {
   const line = new RegExp(`^${key}:[ \\t]*(.*)$`, 'm').exec(frontmatter)
+
   if (!line) {
     return undefined
   }
+
   const value = stripQuotes(line[1].trim())
+
   return value.length > 0 ? value : undefined
 }
 
@@ -92,6 +98,7 @@ export function friendlyCreateSkillError(err: unknown, fallback: string): string
 
   try {
     const parsed = JSON.parse(remainder) as { detail?: unknown }
+
     if (parsed && typeof parsed.detail === 'string' && parsed.detail.trim()) {
       return parsed.detail.trim()
     }

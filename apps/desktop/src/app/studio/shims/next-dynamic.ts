@@ -18,6 +18,7 @@ export default function dynamic(loader: Loader, options: DynamicOptions = {}) {
     // Support both `export default` modules and `.then(m => m.Named)` loaders
     // (which resolve directly to a component).
     const component = (mod as { default?: ComponentType<Record<string, unknown>> }).default ?? mod
+
     return { default: component as ComponentType<Record<string, unknown>> }
   })
 

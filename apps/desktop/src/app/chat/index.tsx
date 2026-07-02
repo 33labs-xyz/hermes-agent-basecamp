@@ -124,6 +124,7 @@ function ChatHeader({
     activeStoredSession?.id,
     activeStoredSession?._lineage_root_id
   ].filter((id): id is string => Boolean(id))
+
   const ownerProject =
     ownerCandidateIds.length > 0
       ? projects.find(group => group.session_ids.some(id => ownerCandidateIds.includes(id))) ?? null

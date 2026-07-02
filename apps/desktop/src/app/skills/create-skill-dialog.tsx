@@ -83,12 +83,15 @@ export function CreateSkillDialog({ open, onOpenChange }: CreateSkillDialogProps
   async function importFile(file: File) {
     try {
       const parsed = parseImportedSkill(await file.text())
+
       if (parsed.name) {
         setName(parsed.name)
       }
+
       if (parsed.description) {
         setDescription(parsed.description)
       }
+
       setInstructions(parsed.instructions)
       setError(null)
     } catch {
@@ -170,9 +173,11 @@ export function CreateSkillDialog({ open, onOpenChange }: CreateSkillDialogProps
               className="hidden"
               onChange={event => {
                 const file = event.target.files?.[0]
+
                 if (file) {
                   void importFile(file)
                 }
+
                 // Reset so re-selecting the same file still fires a change event.
                 event.target.value = ''
               }}

@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils'
 
 import { PAGE_INSET_X } from '../layout-constants'
 import type { SetStatusbarItemGroup } from '../shell/statusbar-controls'
+
 import { StudioLibrary } from './library'
 import { StudioCredits } from './studio-credits'
 import {
@@ -66,6 +67,7 @@ const STUDIO_TABS: readonly StudioTab[] = [
 function urlsFromGeneration(generation: StudioGeneration): string[] {
   const urls = Array.isArray(generation.urls) ? generation.urls : []
   const single = typeof generation.url === 'string' ? [generation.url] : []
+
   return [...urls, ...single].filter(Boolean)
 }
 
@@ -92,7 +94,7 @@ export function StudioView({ setStatusbarItemGroup }: StudioViewProps) {
     void (async () => {
       const stored = (await window.hermesDesktop?.studio?.getKey()) ?? ''
 
-      if (!cancelled) setApiKey(stored)
+      if (!cancelled) {setApiKey(stored)}
     })()
 
     return () => {
@@ -111,8 +113,7 @@ export function StudioView({ setStatusbarItemGroup }: StudioViewProps) {
     (generation: StudioGeneration) => {
       const gen = window.hermesDesktop?.studio?.gen
 
-      if (!gen) return
-
+      if (!gen) {return}
       void (async () => {
         for (const url of urlsFromGeneration(generation)) {
           try {
@@ -126,6 +127,7 @@ export function StudioView({ setStatusbarItemGroup }: StudioViewProps) {
             // ignore individual save failures
           }
         }
+
         setLibraryVersion(version => version + 1)
       })()
     },
@@ -185,7 +187,7 @@ function StudioKeyGate({ onSubmit }: { onSubmit: (key: string) => void }) {
   const submit = () => {
     const trimmed = draft.trim()
 
-    if (trimmed) onSubmit(trimmed)
+    if (trimmed) {onSubmit(trimmed)}
   }
 
   return (
@@ -203,7 +205,7 @@ function StudioKeyGate({ onSubmit }: { onSubmit: (key: string) => void }) {
           autoFocus
           onChange={event => setDraft(event.target.value)}
           onKeyDown={event => {
-            if (event.key === 'Enter') submit()
+            if (event.key === 'Enter') {submit()}
           }}
           placeholder="Muapi API key"
           type="password"

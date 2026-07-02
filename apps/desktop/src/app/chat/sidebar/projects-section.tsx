@@ -27,8 +27,8 @@ import { Tip } from '@/components/ui/tooltip'
 import type { ChatGroup, SessionInfo } from '@/hermes'
 import { useI18n } from '@/i18n'
 import { triggerHaptic } from '@/lib/haptics'
-import { cn } from '@/lib/utils'
 import { projectMemberTitle } from '@/lib/project-session-title'
+import { cn } from '@/lib/utils'
 import { notify, notifyError } from '@/store/notifications'
 import {
   $projects,
@@ -39,7 +39,7 @@ import {
 } from '@/store/projects'
 import { $cronSessions, $selectedStoredSessionId, $sessions } from '@/store/session'
 
-import { PROJECTS_ROUTE, projectRoute } from '../../routes'
+import { projectRoute, PROJECTS_ROUTE } from '../../routes'
 import { SidebarPanelLabel } from '../../shell/sidebar-label'
 
 import { ProjectSettingsDialog } from './project-dialog'
@@ -220,6 +220,7 @@ function ProjectRow({
   // Whole row is the drag handle (distance-constrained sensor keeps clicks working).
   // Vertical list: translate Y only so a dragged row never drifts sideways.
   const { attributes, isDragging, listeners, setNodeRef, transform, transition } = useSortable({ id: project.id })
+
   const sortableStyle = {
     transform: transform ? `translate3d(0px, ${transform.y}px, 0)` : undefined,
     transition: isDragging ? undefined : transition,
@@ -294,6 +295,7 @@ function ProjectRow({
           ) : (
             project.session_ids.map(sessionId => {
               const session = sessionById.get(sessionId)
+
               const title = projectMemberTitle(
                 session,
                 sessionMeta[sessionId],
