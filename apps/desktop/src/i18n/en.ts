@@ -678,7 +678,25 @@ export const en: Translations = {
     toolsetEnabled: 'Toolset enabled',
     toolsetDisabled: 'Toolset disabled',
     appliesToNewSessions: name => `${name} applies to new sessions.`,
-    failedToUpdate: name => `Failed to update ${name}`
+    failedToUpdate: name => `Failed to update ${name}`,
+    create: 'Create skill',
+    createTitle: 'Create a skill',
+    createDescription:
+      'Skills teach the assistant a repeatable task. Fill these in and Basecamp writes the SKILL.md for you.',
+    createNameLabel: "What's it called?",
+    createNamePlaceholder: 'e.g. Weekly report',
+    createSlugPrefix: 'Saved as',
+    createSlugInvalid: 'Use letters, numbers, dots, or hyphens, starting with a letter or number.',
+    createDescriptionLabel: 'One line: what it does and when to use it',
+    createDescriptionPlaceholder: 'Use when the user asks for a weekly report. Produces a markdown summary.',
+    createInstructionsLabel: 'What should the skill tell the assistant to do?',
+    createInstructionsPlaceholder: 'Step by step, describe the task the assistant should carry out.',
+    createPreviewLabel: 'Preview (SKILL.md)',
+    createSubmit: 'Create skill',
+    createSubmitting: 'Creating',
+    createDone: 'Created',
+    createSuccess: name => `Skill "${name}" created.`,
+    createFailed: 'Could not create the skill'
   },
 
   agents: {

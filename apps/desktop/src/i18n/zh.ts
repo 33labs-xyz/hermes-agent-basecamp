@@ -868,7 +868,24 @@ export const zh: Translations = {
     toolsetEnabled: '工具集已启用',
     toolsetDisabled: '工具集已禁用',
     appliesToNewSessions: name => `${name} 将应用于新会话。`,
-    failedToUpdate: name => `更新 ${name} 失败`
+    failedToUpdate: name => `更新 ${name} 失败`,
+    create: '创建技能',
+    createTitle: '创建技能',
+    createDescription: '技能教助手完成可重复的任务。填写下面内容，Basecamp 会为你写入 SKILL.md。',
+    createNameLabel: '叫什么名字？',
+    createNamePlaceholder: '例如 每周报告',
+    createSlugPrefix: '保存为',
+    createSlugInvalid: '仅可使用字母、数字、点或连字符，并以字母或数字开头。',
+    createDescriptionLabel: '一句话说明：它做什么，何时使用',
+    createDescriptionPlaceholder: '当用户需要每周报告时使用。生成 markdown 摘要。',
+    createInstructionsLabel: '这个技能应让助手做什么？',
+    createInstructionsPlaceholder: '逐步描述助手应执行的任务。',
+    createPreviewLabel: '预览 (SKILL.md)',
+    createSubmit: '创建技能',
+    createSubmitting: '创建中',
+    createDone: '已创建',
+    createSuccess: name => `已创建技能 "${name}"。`,
+    createFailed: '无法创建技能'
   },
 
   agents: {

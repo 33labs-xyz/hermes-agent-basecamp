@@ -557,6 +557,23 @@ export interface Translations {
     toolsetDisabled: string
     appliesToNewSessions: (name: string) => string
     failedToUpdate: (name: string) => string
+    create: string
+    createTitle: string
+    createDescription: string
+    createNameLabel: string
+    createNamePlaceholder: string
+    createSlugPrefix: string
+    createSlugInvalid: string
+    createDescriptionLabel: string
+    createDescriptionPlaceholder: string
+    createInstructionsLabel: string
+    createInstructionsPlaceholder: string
+    createPreviewLabel: string
+    createSubmit: string
+    createSubmitting: string
+    createDone: string
+    createSuccess: (name: string) => string
+    createFailed: string
   }
 
   agents: {
