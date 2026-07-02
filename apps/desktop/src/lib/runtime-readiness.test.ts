@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { interpretRuntimeReadiness } from './runtime-readiness'
+import { interpretRuntimeReadiness, SAVED_CREDENTIALS_UNUSABLE_REASON } from './runtime-readiness'
 
 describe('interpretRuntimeReadiness', () => {
   it('prefers runtime_check when both signals exist', () => {
@@ -23,15 +23,65 @@ describe('interpretRuntimeReadiness', () => {
     const result = interpretRuntimeReadiness({
       setup: { provider_configured: true },
       setupError: null,
-      runtime: { error: 'No provider can serve the selected model.', ok: false },
+      runtime: { error: 'Selected runtime is not available.', ok: false },
       runtimeError: null
     })
 
     expect(result.ready).toBe(false)
     expect(result.source).toBe('runtime_check')
     expect(result.checksDisagree).toBe(true)
-    expect(result.reason).toContain('No provider can serve the selected model.')
-    expect(result.reason).toContain('setup.status reports configured credentials')
+    expect(result.reason).toContain('Selected runtime is not available.')
+    expect(result.reason).toContain('Saved credentials were found')
+    // Internal RPC names must never leak into user-facing copy.
+    expect(result.reason).not.toContain('setup.status')
+  })
+
+  it('replaces backend provider-setup jargon with human copy on a credential mismatch', () => {
+    const result = interpretRuntimeReadiness({
+      setup: { provider_configured: true },
+      setupError: null,
+      runtime: {
+        error:
+          "No inference provider configured. Run 'hermes model' to choose a provider and model, or set an API key (OPENROUTER_API_KEY, OPENAI_API_KEY, etc.) in ~/.hermes/.env.",
+        ok: false
+      },
+      runtimeError: null
+    })
+
+    expect(result.ready).toBe(false)
+    expect(result.checksDisagree).toBe(true)
+    expect(result.reason).toBe(SAVED_CREDENTIALS_UNUSABLE_REASON)
+    expect(result.reason).not.toContain('hermes model')
+    expect(result.reason).not.toContain('~/.hermes')
+  })
+
+  it('falls back to the default reason when a provider-setup error carries no mismatch', () => {
+    const result = interpretRuntimeReadiness(
+      {
+        setup: { provider_configured: false },
+        setupError: null,
+        runtime: { error: 'No inference provider configured. Run `hermes model` to choose one.', ok: false },
+        runtimeError: null
+      },
+      { defaultReason: 'Connect a provider to start chatting.' }
+    )
+
+    expect(result.ready).toBe(false)
+    expect(result.checksDisagree).toBe(false)
+    expect(result.reason).toBe('Connect a provider to start chatting.')
+  })
+
+  it('uses the human mismatch copy when the runtime fails without any error text', () => {
+    const result = interpretRuntimeReadiness({
+      setup: { provider_configured: true },
+      setupError: null,
+      runtime: { ok: false },
+      runtimeError: null
+    })
+
+    expect(result.ready).toBe(false)
+    expect(result.checksDisagree).toBe(true)
+    expect(result.reason).toBe(SAVED_CREDENTIALS_UNUSABLE_REASON)
   })
 
   it('falls back to setup.status when runtime_check has no boolean result', () => {

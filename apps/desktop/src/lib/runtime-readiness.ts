@@ -1,3 +1,5 @@
+import { isProviderSetupErrorMessage } from './provider-setup-errors'
+
 export interface SetupStatusSnapshot {
   provider_configured?: boolean
 }
@@ -29,6 +31,26 @@ export interface RuntimeReadinessResult {
 export type RuntimeReadinessRequester = <T = unknown>(method: string, params?: Record<string, unknown>) => Promise<T>
 
 const DEFAULT_NOT_READY_REASON = 'Add a provider credential before sending your first message.'
+
+// Shown when setup.status counts stored credentials but the runtime can't
+// resolve any of them into a usable provider (dead keys, revoked tokens,
+// credentials auto-harvested from ambient env vars).
+export const SAVED_CREDENTIALS_UNUSABLE_REASON =
+  'Basecamp found saved credentials on this device, but none of them can run a model right now. Connect a provider to continue.'
+
+const SAVED_CREDENTIALS_MISMATCH_SUFFIX =
+  'Saved credentials were found, but none of them can run a model right now.'
+
+// Backend failure strings can be raw CLI guidance ("Run 'hermes model'...",
+// "set an API key ... in ~/.hermes/.env") that means nothing inside the
+// desktop app. Drop those so callers fall back to desktop-appropriate copy.
+function humanizeFailure(message: null | string): null | string {
+  if (message && isProviderSetupErrorMessage(message)) {
+    return null
+  }
+
+  return message
+}
 
 function toErrorMessage(error: unknown): null | string {
   if (error instanceof Error) {
@@ -90,8 +112,8 @@ export function interpretRuntimeReadiness(
     typeof signals.setup?.provider_configured === 'boolean' ? Boolean(signals.setup.provider_configured) : undefined
 
   const runtimeOk = typeof signals.runtime?.ok === 'boolean' ? Boolean(signals.runtime.ok) : undefined
-  const runtimeFailure = normalizeMessage(signals.runtime?.error) ?? normalizeMessage(signals.runtimeError)
-  const setupFailure = normalizeMessage(signals.setupError)
+  const runtimeFailure = humanizeFailure(normalizeMessage(signals.runtime?.error) ?? normalizeMessage(signals.runtimeError))
+  const setupFailure = humanizeFailure(normalizeMessage(signals.setupError))
 
   const checksDisagree =
     typeof setupConfigured === 'boolean' && typeof runtimeOk === 'boolean' && setupConfigured !== runtimeOk
@@ -109,7 +131,9 @@ export function interpretRuntimeReadiness(
     let reason = runtimeFailure ?? defaultReason
 
     if (checksDisagree && setupConfigured) {
-      reason = `${reason} setup.status reports configured credentials, but runtime resolution still failed.`
+      reason = runtimeFailure
+        ? `${runtimeFailure} ${SAVED_CREDENTIALS_MISMATCH_SUFFIX}`
+        : SAVED_CREDENTIALS_UNUSABLE_REASON
     }
 
     return {

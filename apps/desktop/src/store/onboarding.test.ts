@@ -94,8 +94,9 @@ describe('refreshOnboarding', () => {
     expect(ready).toBe(false)
     expect(api).toHaveBeenCalledTimes(1)
     expect($desktopOnboarding.get().providers?.map(p => p.id)).toEqual(['fresh'])
-    expect($desktopOnboarding.get().reason).toContain('Selected runtime is not available.')
-    expect($desktopOnboarding.get().reason).toContain('setup.status reports configured credentials')
+    // First launch keeps the explicitly requested reason instead of overwriting
+    // it with runtime-derived failure text.
+    expect($desktopOnboarding.get().reason).toBe('Need provider setup')
   })
 
   it('keeps cached providers when onboarding was not re-requested', async () => {
@@ -266,6 +267,34 @@ describe('refreshOnboarding first-launch gate', () => {
 
     expect(ready).toBe(true)
     expect($desktopOnboarding.get().configured).toBe(true)
+  })
+
+  it('keeps the first-run picker calm when harvested credentials fail runtime resolution', async () => {
+    installApiMock(oauthApi([provider('nous', 'Nous Portal')]))
+
+    // Ambient env vars (ANTHROPIC_API_KEY, gh token) get auto-harvested into the
+    // credential pool on launch, so setup.status says "configured" while the
+    // runtime resolves nothing. A true first launch must still show the clean
+    // picker, not a failure banner.
+    const ready = await refreshOnboarding(onboardingContext(runtimeMismatchGateway()))
+
+    expect(ready).toBe(false)
+    expect($desktopOnboarding.get().configured).toBe(false)
+    expect($desktopOnboarding.get().reason).toBeNull()
+  })
+
+  it('humanizes the credential mismatch reason for a returning onboarded install', async () => {
+    window.localStorage.setItem('hermes-desktop-onboarded-v1', '1')
+    installApiMock(oauthApi([provider('nous', 'Nous Portal')]))
+
+    const ready = await refreshOnboarding(onboardingContext(runtimeMismatchGateway()))
+
+    expect(ready).toBe(false)
+
+    const reason = $desktopOnboarding.get().reason
+    expect(reason).toContain('Selected runtime is not available.')
+    expect(reason).toContain('Saved credentials were found')
+    expect(reason).not.toContain('setup.status')
   })
 })
 

@@ -562,7 +562,8 @@ export async function refreshOnboarding(ctx: OnboardingContext) {
   // choose a provider later" button (dismissFirstRunOnboarding, which writes the
   // skip flag) is the escape; once skipped or actually onboarded this stops
   // firing.
-  const readyFirstLaunch = runtime.ready && readCachedConfigured() === null && !readCachedSkipped()
+  const firstLaunch = readCachedConfigured() === null && !readCachedSkipped()
+  const readyFirstLaunch = runtime.ready && firstLaunch
 
   if (runtime.ready && !readyFirstLaunch) {
     completeDesktopOnboarding()
@@ -572,9 +573,11 @@ export async function refreshOnboarding(ctx: OnboardingContext) {
   }
 
   const state = $desktopOnboarding.get()
-  // Ready-but-first-launch isn't a real "no provider configured" problem, so
-  // skip the alarm banner and just feature the OpenRouter screen.
-  const reason = readyFirstLaunch ? null : runtime.reason || state.reason || DEFAULT_ONBOARDING_REASON
+  // A first launch is never a real "provider broke" problem — whether the
+  // runtime resolved (leftover credential) or not (auto-harvested dead env
+  // credential), the user hasn't picked anything yet. Keep the picker calm and
+  // only carry a reason that was explicitly requested.
+  const reason = firstLaunch ? state.reason : runtime.reason || state.reason || DEFAULT_ONBOARDING_REASON
 
   writeCachedConfigured(false)
   patch(readyFirstLaunch ? { configured: false, mode: 'openrouter', reason } : { configured: false, reason })
