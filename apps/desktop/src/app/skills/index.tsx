@@ -1,3 +1,4 @@
+import { useStore } from '@nanostores/react'
 import type * as React from 'react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
@@ -9,7 +10,9 @@ import { Switch } from '@/components/ui/switch'
 import { TextTab, TextTabMeta } from '@/components/ui/text-tab'
 import { getSkills, getToolsets, toggleSkill, toggleToolset } from '@/hermes'
 import { useI18n } from '@/i18n'
+import { Plus } from '@/lib/icons'
 import { cn } from '@/lib/utils'
+import { $skillsRefreshSignal, setCreateSkillOpen } from '@/store/create-skill'
 import { notify, notifyError } from '@/store/notifications'
 import type { SkillInfo, ToolsetInfo } from '@/types/hermes'
 
@@ -85,6 +88,10 @@ export function SkillsView({ setStatusbarItemGroup: _setStatusbarItemGroup, ...p
   const [savingToolset, setSavingToolset] = useState<string | null>(null)
   const [expandedToolset, setExpandedToolset] = useState<string | null>(null)
 
+  // Bumped by the shared Create Skill overlay after a skill is written; refetch
+  // so the new skill shows up without a manual refresh.
+  const refreshSignal = useStore($skillsRefreshSignal)
+
   const refreshCapabilities = useCallback(async () => {
     setRefreshing(true)
 
@@ -109,7 +116,7 @@ export function SkillsView({ setStatusbarItemGroup: _setStatusbarItemGroup, ...p
 
   useEffect(() => {
     void refreshCapabilities()
-  }, [refreshCapabilities])
+  }, [refreshCapabilities, refreshSignal])
 
   const categories = useMemo(() => {
     if (!skills) {
@@ -213,18 +220,33 @@ export function SkillsView({ setStatusbarItemGroup: _setStatusbarItemGroup, ...p
       searchHidden={mode === 'skills' ? (skills?.length ?? 0) === 0 : (toolsets?.length ?? 0) === 0}
       searchPlaceholder={mode === 'skills' ? t.skills.searchSkills : t.skills.searchToolsets}
       searchTrailingAction={
-        <Button
-          aria-label={refreshing ? t.skills.refreshing : t.skills.refresh}
-          className="text-(--ui-text-tertiary) hover:bg-transparent hover:text-foreground"
-          disabled={refreshing}
-          onClick={() => void refreshCapabilities()}
-          size="icon-xs"
-          title={refreshing ? t.skills.refreshing : t.skills.refresh}
-          type="button"
-          variant="ghost"
-        >
-          <Codicon name="refresh" size="0.875rem" spinning={refreshing} />
-        </Button>
+        <>
+          {mode === 'skills' && (
+            <Button
+              aria-label={t.skills.create}
+              className="text-(--ui-text-tertiary) hover:bg-transparent hover:text-foreground"
+              onClick={() => setCreateSkillOpen(true)}
+              size="icon-xs"
+              title={t.skills.create}
+              type="button"
+              variant="ghost"
+            >
+              <Plus className="size-3.5" />
+            </Button>
+          )}
+          <Button
+            aria-label={refreshing ? t.skills.refreshing : t.skills.refresh}
+            className="text-(--ui-text-tertiary) hover:bg-transparent hover:text-foreground"
+            disabled={refreshing}
+            onClick={() => void refreshCapabilities()}
+            size="icon-xs"
+            title={refreshing ? t.skills.refreshing : t.skills.refresh}
+            type="button"
+            variant="ghost"
+          >
+            <Codicon name="refresh" size="0.875rem" spinning={refreshing} />
+          </Button>
+        </>
       }
       searchValue={query}
       tabs={
@@ -243,7 +265,18 @@ export function SkillsView({ setStatusbarItemGroup: _setStatusbarItemGroup, ...p
       ) : mode === 'skills' ? (
         <div className={cn('h-full overflow-y-auto py-3', PAGE_INSET_X)}>
           {visibleSkills.length === 0 ? (
-            <EmptyState description={t.skills.noSkillsDesc} title={t.skills.noSkillsTitle} />
+            <EmptyState
+              action={
+                totalSkills === 0 ? (
+                  <Button onClick={() => setCreateSkillOpen(true)} size="sm" type="button" variant="secondary">
+                    <Plus className="size-3.5" />
+                    {t.skills.create}
+                  </Button>
+                ) : undefined
+              }
+              description={t.skills.noSkillsDesc}
+              title={t.skills.noSkillsTitle}
+            />
           ) : (
             <div className="space-y-4">
               {skillGroups.map(([category, list]) => (
@@ -359,12 +392,21 @@ function StatusPill({ active, children }: { active: boolean; children: string })
   )
 }
 
-function EmptyState({ title, description }: { title: string; description: string }) {
+function EmptyState({
+  title,
+  description,
+  action
+}: {
+  title: string
+  description: string
+  action?: React.ReactNode
+}) {
   return (
     <div className="grid min-h-52 place-items-center text-center">
       <div>
         <div className="text-sm font-medium">{title}</div>
         <div className="mt-1 text-xs text-muted-foreground">{description}</div>
+        {action ? <div className="mt-3 flex justify-center">{action}</div> : null}
       </div>
     </div>
   )

@@ -1,6 +1,8 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
+import { $createSkillOpen, $skillsRefreshSignal, bumpSkillsRefresh } from '@/store/create-skill'
 
 const getSkills = vi.fn()
 const getToolsets = vi.fn()
@@ -40,14 +42,28 @@ function toolset(overrides: Record<string, unknown> = {}) {
   }
 }
 
-function renderSkills() {
+function skill(overrides: Record<string, unknown> = {}) {
+  return {
+    name: 'weekly-report',
+    description: 'Summarize the week',
+    category: 'general',
+    enabled: true,
+    ...overrides
+  }
+}
+
+function renderSkillsTab(tab: 'skills' | 'toolsets') {
   return import('./index').then(({ SkillsView }) =>
     render(
-      <MemoryRouter initialEntries={['/skills?tab=toolsets']}>
+      <MemoryRouter initialEntries={[`/skills?tab=${tab}`]}>
         <SkillsView />
       </MemoryRouter>
     )
   )
+}
+
+function renderSkills() {
+  return renderSkillsTab('toolsets')
 }
 
 beforeEach(() => {
@@ -99,5 +115,43 @@ describe('SkillsView toolset management', () => {
     fireEvent.click(configureBtn)
 
     await waitFor(() => expect(getToolsetConfig).toHaveBeenCalledWith('web'))
+  })
+})
+
+describe('SkillsView create skill', () => {
+  afterEach(() => {
+    $createSkillOpen.set(false)
+    $skillsRefreshSignal.set(0)
+  })
+
+  it('opens the create wizard from the trailing Create button', async () => {
+    getSkills.mockResolvedValue([skill()])
+    await renderSkillsTab('skills')
+
+    const btn = await screen.findByRole('button', { name: 'Create skill' })
+    fireEvent.click(btn)
+
+    expect($createSkillOpen.get()).toBe(true)
+  })
+
+  it('offers a Create button in the empty state when there are no skills', async () => {
+    getSkills.mockResolvedValue([])
+    await renderSkillsTab('skills')
+
+    const btn = await screen.findByRole('button', { name: 'Create skill' })
+    fireEvent.click(btn)
+
+    expect($createSkillOpen.get()).toBe(true)
+  })
+
+  it('refetches skills when the refresh signal bumps', async () => {
+    getSkills.mockResolvedValue([skill()])
+    await renderSkillsTab('skills')
+
+    await waitFor(() => expect(getSkills).toHaveBeenCalledTimes(1))
+
+    act(() => bumpSkillsRefresh())
+
+    await waitFor(() => expect(getSkills).toHaveBeenCalledTimes(2))
   })
 })
