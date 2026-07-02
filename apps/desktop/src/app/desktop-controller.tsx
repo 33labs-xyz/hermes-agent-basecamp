@@ -567,11 +567,12 @@ export function DesktopController() {
       gatewayState === 'open' ? (
         <ModelMenuPanel
           gateway={gatewayRef.current || undefined}
+          inferenceStatus={inferenceStatus}
           onSelectModel={selectModel}
           requestGateway={requestGateway}
         />
       ) : null,
-    [gatewayRef, gatewayState, requestGateway, selectModel]
+    [gatewayRef, gatewayState, inferenceStatus, requestGateway, selectModel]
   )
 
   useContextSuggestions({

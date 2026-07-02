@@ -18,7 +18,9 @@ import { Skeleton } from '@/components/ui/skeleton'
 import type { HermesGateway } from '@/hermes'
 import { getGlobalModelOptions } from '@/hermes'
 import { useI18n } from '@/i18n'
+import { AlertCircle } from '@/lib/icons'
 import { currentPickerSelection, displayModelName, modelDisplayParts, reasoningEffortLabel } from '@/lib/model-status-label'
+import type { RuntimeReadinessResult } from '@/lib/runtime-readiness'
 import { cn } from '@/lib/utils'
 import { $modelPresets, applyModelPreset, modelPresetKey } from '@/store/model-presets'
 import {
@@ -50,6 +52,7 @@ export const ModelMenuCloseContext = createContext<() => void>(() => {})
 
 interface ModelMenuPanelProps {
   gateway?: HermesGateway
+  inferenceStatus?: RuntimeReadinessResult | null
   onSelectModel: (selection: { model: string; provider: string }) => Promise<boolean> | void
   requestGateway: <T>(method: string, params?: Record<string, unknown>) => Promise<T>
 }
@@ -59,7 +62,7 @@ interface ProviderGroup {
   provider: ModelOptionProvider
 }
 
-export function ModelMenuPanel({ gateway, onSelectModel, requestGateway }: ModelMenuPanelProps) {
+export function ModelMenuPanel({ gateway, inferenceStatus, onSelectModel, requestGateway }: ModelMenuPanelProps) {
   const { t } = useI18n()
   const copy = t.shell.modelMenu
   const closeMenu = useContext(ModelMenuCloseContext)
@@ -156,6 +159,10 @@ export function ModelMenuPanel({ gateway, onSelectModel, requestGateway }: Model
       />
 
       <DropdownMenuSeparator className="mx-0" />
+
+      {!loading && !error && hasModels && inferenceStatus && !inferenceStatus.ready && inferenceStatus.reason ? (
+        <UnverifiedModelsWarning reason={inferenceStatus.reason} />
+      ) : null}
 
       {loading ? (
         <DropdownMenuGroup className="py-1">
@@ -328,6 +335,19 @@ export function EmptyModelActions({
         {copy.connectClaude}
       </DropdownMenuItem>
     </>
+  )
+}
+
+// Shown above the list when the backend's catalog includes providers with
+// only ambient/unverified credentials (env vars, `gh auth login`, etc.) — the
+// picker still shows every model the backend knows about (matches Settings
+// and onboarding), it just stops silently implying they're all ready to use.
+export function UnverifiedModelsWarning({ reason }: { reason: string }) {
+  return (
+    <DropdownMenuItem className={cn(dropdownMenuRow, 'items-start gap-1.5 text-(--ui-text-tertiary)')} disabled>
+      <AlertCircle className="mt-0.5 size-3.5 shrink-0 text-amber-600" />
+      <span className="min-w-0 flex-1 text-xs leading-snug text-wrap">{reason}</span>
+    </DropdownMenuItem>
   )
 }
 
