@@ -1599,8 +1599,7 @@ export const en: Translations = {
     },
     recommended: 'Recommended',
     connected: 'Connected',
-    featuredPitch: 'One subscription, 300+ frontier models — the recommended way to run Basecamp',
-    openRouterPitch: 'One key, hundreds of models — a solid default',
+    openRouterPitch: 'One key, hundreds of models - a solid default',
     apiKeyOptions: {
       openrouter: {
         short: 'one key, many models',

@@ -1604,8 +1604,7 @@ export const zhHant = defineLocale({
     },
     recommended: '建議',
     connected: '已連線',
-    featuredPitch: '一個訂閱，300+ 前沿模型 — 執行 Basecamp 的建議方式',
-    openRouterPitch: '一個金鑰，數百個模型 — 穩定的預設選擇',
+    openRouterPitch: '一個金鑰，數百個模型 - 穩定的預設選擇',
     apiKeyOptions: {
       openrouter: { short: '一個金鑰，多個模型', description: '用一個金鑰存取數百個模型。適合新安裝的預設選擇。' },
       openai: { short: 'GPT 等級模型', description: '直接存取 OpenAI 模型。' },

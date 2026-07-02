@@ -63,28 +63,38 @@ afterEach(() => {
 })
 
 describe('onboarding Picker', () => {
-  it('features Nous Portal and hides other providers behind a disclosure', () => {
+  it('features OpenRouter at the top and hides sign-in providers behind a disclosure', () => {
     setProviders([provider('anthropic', 'Anthropic Claude'), provider('nous', 'Nous Portal')])
     render(<Picker ctx={ctx} />)
 
-    expect(screen.getByText('Nous Portal')).toBeTruthy()
+    // OpenRouter leads with the Recommended badge; the OAuth providers stay
+    // hidden until the disclosure opens. Nous is no longer singled out.
+    expect(screen.getByText('OpenRouter')).toBeTruthy()
     expect(screen.getByText('Recommended')).toBeTruthy()
+    expect(screen.queryByText('Nous Portal')).toBeNull()
     expect(screen.queryByText('Anthropic API Key')).toBeNull()
 
     fireEvent.click(screen.getByRole('button', { name: 'Other providers' }))
 
+    // Expanded: every sign-in provider is a normal row, Nous included.
+    expect(screen.getByText('Nous Portal')).toBeTruthy()
     expect(screen.getByText('Anthropic API Key')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Collapse' })).toBeTruthy()
   })
 
-  it('shows every provider directly when Nous Portal is absent', () => {
+  it('opens the API-key form when the featured OpenRouter card is picked', () => {
     setProviders([provider('anthropic', 'Anthropic Claude'), provider('openai-codex', 'OpenAI Codex / ChatGPT')])
     render(<Picker ctx={ctx} />)
 
-    expect(screen.getByText('Anthropic API Key')).toBeTruthy()
-    expect(screen.getByText('OpenAI OAuth (ChatGPT)')).toBeTruthy()
-    expect(screen.queryByText('Other sign-in options')).toBeNull()
-    expect(screen.queryByText('Recommended')).toBeNull()
+    // OpenRouter is featured no matter which OAuth providers exist; the sign-in
+    // options collapse behind the disclosure.
+    expect(screen.getByText('OpenRouter')).toBeTruthy()
+    expect(screen.queryByText('Anthropic API Key')).toBeNull()
+    expect(screen.queryByText('OpenAI OAuth (ChatGPT)')).toBeNull()
+
+    fireEvent.click(screen.getByText('OpenRouter'))
+
+    expect($desktopOnboarding.get().mode).toBe('apikey')
   })
 
   it('offers "choose later" on first run and persists the skip', () => {

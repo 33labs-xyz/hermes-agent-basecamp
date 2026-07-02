@@ -180,8 +180,6 @@ const PROVIDER_DISPLAY: Record<string, { order: number; title: string }> = {
   anthropic: { order: 7, title: 'Anthropic API Key' }
 }
 
-const assetPath = (path: string) => `${import.meta.env.BASE_URL}${path.replace(/^\/+/, '')}`
-
 export const providerTitle = (p: OAuthProvider) => PROVIDER_DISPLAY[p.id]?.title ?? p.name
 const orderOf = (p: OAuthProvider) => PROVIDER_DISPLAY[p.id]?.order ?? 99
 
@@ -409,7 +407,6 @@ function Header() {
   )
 }
 
-export const FEATURED_ID = 'nous'
 const SHOW_ALL_KEY = 'hermes-onboarding-show-all-v1'
 
 const readShowAll = () => {
@@ -509,25 +506,16 @@ export function Picker({ ctx }: { ctx: OnboardingContext }) {
   }
 
   const select = (p: OAuthProvider) => void startProviderOAuth(p, ctx)
-  const featured = ordered.find(p => p.id === FEATURED_ID) ?? null
-  const rest = featured ? ordered.filter(p => p.id !== FEATURED_ID) : ordered
-  // Collapse the secondary providers behind a disclosure only when Nous
-  // Portal is present to anchor the choice — otherwise show the full list.
-  const collapsible = Boolean(featured) && rest.length > 0
+  // OpenRouter (an API key, not an OAuth provider) leads as the recommended
+  // choice; the sign-in providers collapse behind a disclosure below it.
+  const collapsible = ordered.length > 0
   const showRest = !collapsible || showAll
 
   return (
     <div className="grid gap-2">
       <div className="grid max-h-[60dvh] gap-2 overflow-y-auto p-1">
-        {featured ? <FeaturedProviderRow onSelect={select} provider={featured} /> : null}
-        {showRest ? (
-          <>
-            {rest.map(p => (
-              <ProviderRow key={p.id} onSelect={select} provider={p} />
-            ))}
-            <KeyProviderRow onClick={() => setOnboardingMode('apikey')} />
-          </>
-        ) : null}
+        <FeaturedOpenRouterRow onClick={() => setOnboardingMode('apikey')} />
+        {showRest ? ordered.map(p => <ProviderRow key={p.id} onSelect={select} provider={p} />) : null}
       </div>
       {collapsible ? (
         <Button
@@ -579,39 +567,27 @@ function ChooseLaterLink() {
   )
 }
 
-export function FeaturedProviderRow({
-  onSelect,
-  provider
-}: {
-  onSelect: (provider: OAuthProvider) => void
-  provider: OAuthProvider
-}) {
+// OpenRouter leads the picker as the recommended default: one key reaches
+// hundreds of models. It is an API-key provider (not OAuth), so it renders as a
+// standalone featured card whose click opens the API-key form.
+export function FeaturedOpenRouterRow({ onClick }: { onClick: () => void }) {
   const { t } = useI18n()
-  const loggedIn = provider.status?.logged_in
 
   return (
     <button
       className="group relative flex w-full items-center justify-between gap-4 rounded-[8px] bg-primary/[0.06] px-3 py-2.5 text-left transition-colors hover:bg-primary/10"
-      onClick={() => onSelect(provider)}
+      onClick={onClick}
       type="button"
     >
-      <span aria-hidden className="arc-border arc-reverse arc-nous" />
       <div className="min-w-0">
         <div className="flex items-center gap-2">
-          <img alt="" className="size-5 shrink-0 rounded" src={assetPath('apple-touch-icon.png')} />
-          <span className="text-[length:var(--conversation-text-font-size)] font-semibold">
-            {providerTitle(provider)}
+          <span className="text-[length:var(--conversation-text-font-size)] font-semibold">OpenRouter</span>
+          <span className="inline-flex items-center gap-1.5 bg-primary px-2 py-0.5 text-[0.64rem] font-semibold uppercase tracking-[0.16em] text-primary-foreground">
+            <span aria-hidden="true" className="dither inline-block size-2 shrink-0" />
+            {t.onboarding.recommended}
           </span>
-          {loggedIn ? (
-            <ConnectedTag />
-          ) : (
-            <span className="inline-flex items-center gap-1.5 bg-primary px-2 py-0.5 text-[0.64rem] font-semibold uppercase tracking-[0.16em] text-primary-foreground">
-              <span aria-hidden="true" className="dither inline-block size-2 shrink-0" />
-              {t.onboarding.recommended}
-            </span>
-          )}
         </div>
-        <p className="mt-1 text-xs leading-5 text-muted-foreground">{t.onboarding.featuredPitch}</p>
+        <p className="mt-1 text-xs leading-5 text-muted-foreground">{t.onboarding.openRouterPitch}</p>
       </div>
       <ChevronRight className="size-4 shrink-0 text-primary transition group-hover:translate-x-0.5" />
     </button>
@@ -631,20 +607,6 @@ function ConnectedTag() {
 
 const PROVIDER_ROW_CLASS =
   'group flex w-full items-center justify-between gap-3 rounded-[6px] px-3 py-2.5 text-left transition-colors hover:bg-(--ui-control-hover-background)'
-
-export function KeyProviderRow({ onClick }: { onClick: () => void }) {
-  const { t } = useI18n()
-
-  return (
-    <button className={PROVIDER_ROW_CLASS} onClick={onClick} type="button">
-      <div className="min-w-0">
-        <span className="text-[length:var(--conversation-text-font-size)] font-semibold">OpenRouter</span>
-        <p className="mt-1 text-xs leading-5 text-muted-foreground">{t.onboarding.openRouterPitch}</p>
-      </div>
-      <ChevronRight className="size-4 text-muted-foreground transition group-hover:text-foreground" />
-    </button>
-  )
-}
 
 export function ProviderRow({
   onSelect,

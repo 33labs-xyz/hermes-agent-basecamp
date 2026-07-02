@@ -1783,8 +1783,7 @@ export const zh: Translations = {
     },
     recommended: '推荐',
     connected: '已连接',
-    featuredPitch: '一个订阅，300+ 前沿模型 — 运行 Basecamp 的推荐方式',
-    openRouterPitch: '一个密钥，数百个模型 — 稳妥的默认选择',
+    openRouterPitch: '一个密钥，数百个模型 - 稳妥的默认选择',
     apiKeyOptions: {
       openrouter: { short: '一个密钥，多个模型', description: '用一个密钥访问数百个模型。适合新安装的默认选择。' },
       openai: { short: 'GPT 级模型', description: '直接访问 OpenAI 模型。' },

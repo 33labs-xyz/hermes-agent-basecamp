@@ -4,9 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { runInTerminal } from '@/app/right-sidebar/store'
 import {
-  FEATURED_ID,
-  FeaturedProviderRow,
-  KeyProviderRow,
+  FeaturedOpenRouterRow,
   ProviderRow,
   providerTitle,
   sortProviders
@@ -127,12 +125,12 @@ function OAuthPicker({
 
   const select = (p: OAuthProvider) => startManualProviderOAuth(p.id)
 
-  const featured = ordered.find(p => p.id === FEATURED_ID && !p.status?.logged_in) ?? null
-  const rest = featured ? ordered.filter(p => p.id !== FEATURED_ID) : ordered
-  // Keep connected accounts grouped and always visible; only the unconnected
-  // providers hide behind the disclosure, so the page leads with what's set up.
-  const connected = rest.filter(p => p.status?.logged_in)
-  const others = rest.filter(p => !p.status?.logged_in)
+  // OpenRouter (an API key, not an OAuth provider) leads as the recommended
+  // choice, mirroring first-run onboarding. Keep connected accounts grouped and
+  // always visible; only the unconnected providers hide behind the disclosure,
+  // so the page leads with what's set up.
+  const connected = ordered.filter(p => p.status?.logged_in)
+  const others = ordered.filter(p => !p.status?.logged_in)
   const collapsible = others.length > 0
   const showOthers = !collapsible || showAll
 
@@ -153,7 +151,7 @@ function OAuthPicker({
       <p className="-mt-2 mb-1 text-[length:var(--conversation-caption-font-size)] leading-(--conversation-caption-line-height) text-(--ui-text-tertiary)">
         {p.intro}
       </p>
-      {featured && <FeaturedProviderRow onSelect={select} provider={featured} />}
+      <FeaturedOpenRouterRow onClick={onWantApiKey} />
       {connected.length > 0 && (
         <>
           <GroupLabel>{p.connected}</GroupLabel>
@@ -169,13 +167,12 @@ function OAuthPicker({
           ))}
         </>
       )}
-      {showOthers && (
+      {showOthers && others.length > 0 && (
         <>
           {connected.length > 0 && <GroupLabel>{p.otherProviders}</GroupLabel>}
           {others.map(p => (
             <ProviderRow key={p.id} onSelect={select} provider={p} />
           ))}
-          <KeyProviderRow onClick={onWantApiKey} />
         </>
       )}
       {collapsible && (
