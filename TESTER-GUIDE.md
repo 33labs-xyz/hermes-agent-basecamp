@@ -13,22 +13,30 @@ steps are needed to get past macOS security. Takes about two minutes.
 ## Install
 
 1. Download **Basecamp-0.15.1-mac-arm64.dmg** from the link I sent you.
-2. Open the `.dmg` and drag **Basecamp** into your **Applications** folder.
-3. Open **Terminal** (Cmd+Space, type "Terminal", Enter) and paste this line,
+2. Double-click the `.dmg` to open it. A window appears showing **Basecamp**.
+   Leave that window open - **don't drag it anywhere yet.**
+3. Open **Terminal** (Cmd+Space, type "Terminal", Enter) and paste this one line,
    then press Enter:
    ```
-   xattr -dr com.apple.quarantine /Applications/Basecamp.app
+   ditto --noqtn "/Volumes/Install Basecamp/Basecamp.app" "/Applications/Basecamp.app" && open "/Applications/Basecamp.app"
    ```
-4. Now open **Basecamp** from Applications normally. Done.
+4. Basecamp copies into Applications and opens by itself. Eject the disk image.
+   Next time, just open Basecamp from Applications like any app. Done.
 
-If you double-click before doing step 3 and macOS says **"Basecamp is damaged and
-can't be opened"** - that is expected, it is NOT actually damaged. Click
-**Cancel** (do not move it to Trash), then do step 3 and open it. That "damaged"
-message is just macOS blocking an app that hasn't been notarized by Apple yet.
+Why a Terminal line: this build isn't notarized by Apple yet, so a plain
+double-click gives a false **"Basecamp is damaged and can't be opened"** message.
+The line above copies Basecamp in *without* the "downloaded from the internet"
+flag, so it opens normally - no password, no special permissions. (The older
+`xattr` trick fails on recent macOS, which is why this uses `ditto` instead.)
+
+Already dragged it to Applications and hit "damaged"? Click **Cancel** (do not
+move it to Trash), then run the same line while the disk-image window is still
+open. If it still complains, drag the old Basecamp from Applications to the Trash
+and run the line once more.
 
 That's the only security hurdle. Nothing here is sketchy - notarizing with Apple
-is a paid step I'll do before the real release, and the Terminal line just
-removes the "downloaded from the internet" quarantine flag.
+is a paid step I'll do before the real release, and the line just copies the app
+in without the "downloaded from the internet" quarantine flag.
 
 ## Install (Windows 10 / 11, 64-bit)
 
