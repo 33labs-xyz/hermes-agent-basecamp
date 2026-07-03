@@ -61,6 +61,34 @@ class TestEnsureHermesHome:
             ensure_hermes_home()
             assert soul_path.read_text(encoding="utf-8") == "custom soul"
 
+    def test_reseeds_unmodified_legacy_hermes_soul_md(self, tmp_path):
+        legacy = (
+            "# Hermes Agent Persona\n\n"
+            "<!--\n"
+            "This file defines the agent's personality and tone.\n"
+            "Edit this to customize how Hermes communicates with you.\n"
+            "-->\n"
+        )
+        with patch.dict(os.environ, {"HERMES_HOME": str(tmp_path)}):
+            soul_path = tmp_path / "SOUL.md"
+            soul_path.write_text(legacy, encoding="utf-8")
+            ensure_hermes_home()
+            from hermes_cli.default_soul import DEFAULT_SOUL_MD
+
+            assert soul_path.read_text(encoding="utf-8") == DEFAULT_SOUL_MD
+
+    def test_keeps_legacy_soul_md_with_user_customization(self, tmp_path):
+        customized = (
+            "# Hermes Agent Persona\n\n"
+            "<!-- template comment -->\n"
+            "You are a pirate. Speak like one.\n"
+        )
+        with patch.dict(os.environ, {"HERMES_HOME": str(tmp_path)}):
+            soul_path = tmp_path / "SOUL.md"
+            soul_path.write_text(customized, encoding="utf-8")
+            ensure_hermes_home()
+            assert soul_path.read_text(encoding="utf-8") == customized
+
 
 class TestLoadConfigDefaults:
     def test_returns_defaults_when_no_file(self, tmp_path):
