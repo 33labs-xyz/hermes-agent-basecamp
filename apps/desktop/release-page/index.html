@@ -75,11 +75,11 @@
   <main class="card">
     <div class="logo">B</div>
     <h1>Download Basecamp</h1>
-    <div class="ver" id="version">Loading latest version…</div>
+    <div class="ver" id="version">Latest: v0.15.11</div>
     <div class="btns" id="btns">
-      <a class="btn primary" id="dl-mac-arm" href="#" hidden>Download for Mac (Apple Silicon)</a>
+      <a class="btn primary" id="dl-mac-arm" href="https://github.com/33labs-xyz/hermes-agent-basecamp/releases/download/v0.15.11/Basecamp-0.15.11-mac-arm64.dmg">Download for Mac (Apple Silicon)</a>
       <a class="btn" id="dl-mac-intel" href="#" hidden>Download for Mac (Intel)</a>
-      <a class="btn primary" id="dl-win" href="#" hidden>Download for Windows</a>
+      <a class="btn primary" id="dl-win" href="https://github.com/33labs-xyz/hermes-agent-basecamp/releases/download/v0.15.11/Basecamp-0.15.11-win-x64.exe">Download for Windows</a>
     </div>
     <div class="err" id="err" hidden></div>
     <p class="sub">
@@ -89,9 +89,10 @@
   </main>
 
   <script>
-    // Pull the latest release from the public repo and wire each OS button to
-    // its actual asset. Keeps this page static while always linking the newest
-    // version (asset filenames embed the version, so they cannot be hardcoded).
+    // Buttons ship with hardcoded links to the version current at deploy time,
+    // so downloads work even when the GitHub API is unreachable or rate-limited.
+    // On load we ask the API for the latest release and re-point the buttons at
+    // it, so a newer release is picked up without redeploying this page.
     const REPO = '33labs-xyz/hermes-agent-basecamp'
     const API = 'https://api.github.com/repos/' + REPO + '/releases/latest'
 
@@ -128,10 +129,8 @@
         }
       })
       .catch(err => {
-        document.getElementById('version').textContent = ''
-        const e = document.getElementById('err')
-        e.textContent = 'Could not load downloads. Use the GitHub link below.'
-        e.hidden = false
+        // Version check failed; the hardcoded button links still download the
+        // deploy-time version, and the app self-updates after install.
         console.error(err)
       })
   </script>
