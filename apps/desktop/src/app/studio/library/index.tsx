@@ -131,6 +131,15 @@ interface GenerationCardProps {
 // delete. Preview is lazily read off disk as a data URL.
 function GenerationCard({ entry, archived, onArchive, onRestore, onDeleteForever }: GenerationCardProps) {
   const dataUrl = useGenerationPreview(entry.path)
+  const [promptCopied, setPromptCopied] = useState(false)
+
+  const copyPrompt = () => {
+    if (!entry.prompt) {return}
+    void navigator.clipboard.writeText(entry.prompt).then(() => {
+      setPromptCopied(true)
+      setTimeout(() => setPromptCopied(false), 1500)
+    })
+  }
 
   return (
     <div className="group relative overflow-hidden rounded-[4px] border border-border bg-(--ui-bg-tertiary)">
@@ -139,6 +148,16 @@ function GenerationCard({ entry, archived, onArchive, onRestore, onDeleteForever
       </div>
 
       <div className="pointer-events-none absolute inset-x-0 top-0 flex justify-end gap-1 p-1 opacity-0 transition-opacity group-hover:opacity-100">
+        {entry.prompt && (
+          <button
+            aria-label="Copy prompt"
+            className="pointer-events-auto rounded-[3px] bg-black/60 p-1 text-white hover:bg-black/80"
+            onClick={copyPrompt}
+            type="button"
+          >
+            <Codicon name={promptCopied ? 'check' : 'copy'} />
+          </button>
+        )}
         {archived ? (
           <>
             <button
