@@ -69,6 +69,28 @@
     .sub { color: var(--muted); font-size: 13px; margin-top: 22px; line-height: 1.5; }
     .sub a { color: var(--accent); }
     .err { color: #ff6b6b; font-size: 14px; margin-top: 16px; }
+    .mac-help { text-align: left; margin-top: 22px; }
+    .code {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px 14px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 12.5px;
+      overflow-x: auto;
+      white-space: pre;
+      margin: 8px 0;
+    }
+    .copy-btn {
+      font-size: 12px;
+      padding: 4px 10px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: #1d212a;
+      color: var(--muted);
+      cursor: pointer;
+    }
+    .copy-btn:hover { color: var(--fg); border-color: var(--accent); }
   </style>
 </head>
 <body>
@@ -82,13 +104,29 @@
       <a class="btn primary" id="dl-win" href="https://github.com/33labs-xyz/hermes-agent-basecamp/releases/download/v0.15.11/Basecamp-0.15.11-win-x64.exe">Download for Windows</a>
     </div>
     <div class="err" id="err" hidden></div>
+    <div class="mac-help">
+      <p class="sub" style="margin-top:0">
+        <b>Mac:</b> this build isn't notarized by Apple yet, so opening it normally may
+        say it's "damaged." Don't trash it — open <b>Terminal</b> (Cmd+Space, type
+        "Terminal", Enter), paste this, then press Enter:
+      </p>
+      <div class="code" id="mac-cmd">ditto --noqtn "/Volumes/Install Basecamp/Basecamp.app" "/Applications/Basecamp.app" && open "/Applications/Basecamp.app"</div>
+      <button class="copy-btn" id="copy-cmd" type="button">Copy command</button>
+    </div>
     <p class="sub">
-      Trouble installing? On Mac, right-click the app and choose <b>Open</b> the first time.<br />
       All builds: <a id="all" href="https://github.com/33labs-xyz/hermes-agent-basecamp/releases/latest" target="_blank" rel="noopener">view every download on GitHub</a>.
     </p>
   </main>
 
   <script>
+    document.getElementById('copy-cmd').addEventListener('click', () => {
+      const btn = document.getElementById('copy-cmd')
+      navigator.clipboard.writeText(document.getElementById('mac-cmd').textContent).then(() => {
+        btn.textContent = 'Copied!'
+        setTimeout(() => { btn.textContent = 'Copy command' }, 1500)
+      })
+    })
+
     // Buttons ship with hardcoded links to the version current at deploy time,
     // so downloads work even when the GitHub API is unreachable or rate-limited.
     // On load we ask the API for the latest release and re-point the buttons at
