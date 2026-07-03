@@ -293,8 +293,8 @@ export default function ClippingStudio({
   const handleVideoFileChange = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    if (file.size > 100 * 1024 * 1024) {
-      alert("Video exceeds 100MB limit.");
+    if (file.size > 500 * 1024 * 1024) {
+      alert("Video exceeds 500MB limit.");
       return;
     }
     setVideoUploading(true);
