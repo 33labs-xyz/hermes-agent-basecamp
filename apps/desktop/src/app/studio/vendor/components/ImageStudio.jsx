@@ -767,9 +767,16 @@ export default function ImageStudio({
 
   // ── UI state ────────────────────────────────────────────────────────────
   const [dropdownOpen, setDropdownOpen] = useState(null); // 'model' | 'ar' | 'quality' | null
-  const [generating, setGenerating] = useState(false);
-  const [generateError, setGenerateError] = useState(null);
+  // In-flight generations. Each job renders a pending card in the gallery and
+  // resolves independently, so Generate stays clickable while jobs run.
+  // [{id, prompt, model, aspect_ratio, status: 'running'|'error', error?}]
+  const [activeJobs, setActiveJobs] = useState([]);
+  const [uploadBusy, setUploadBusy] = useState(false);
   const [fullscreenUrl, setFullscreenUrl] = useState(null);
+
+  const MAX_CONCURRENT_JOBS = 4;
+  const runningJobCount = activeJobs.filter((j) => j.status === "running").length;
+  const atJobCap = runningJobCount >= MAX_CONCURRENT_JOBS;
 
   // ── Canvas / history state ──────────────────────────────────────────────
   const [currentImageUrl, setCurrentImageUrl] = useState(null);
@@ -875,7 +882,7 @@ export default function ImageStudio({
       return;
     }
 
-    setGenerating(true); // Show as generating/busy
+    setUploadBusy(true);
     try {
       const toUpload =
         maxImages === 1 ? files.slice(0, 1) : files.slice(0, maxImages);
@@ -898,7 +905,7 @@ export default function ImageStudio({
     } catch (err) {
       alert(`Image upload failed: ${err.message}`);
     } finally {
-      setGenerating(false);
+      setUploadBusy(false);
     }
   };
 
@@ -1027,8 +1034,68 @@ export default function ImageStudio({
   };
 
   // ── Generation ───────────────────────────────────────────────────────────
-  const handleGenerate = async () => {
-    if (generating) return;
+  const removeJob = (jobId) => {
+    setActiveJobs((prev) => prev.filter((j) => j.id !== jobId));
+  };
+
+  // Runs one generation to completion. Params are snapshotted at click time so
+  // edits made while a job is in flight don't leak into it.
+  const runGenerationJob = async (jobId, snap) => {
+    try {
+      let res;
+      if (snap.imageMode) {
+        const genParams = {
+          model: snap.model,
+          images_list: snap.imagesList,
+          image_url: snap.imagesList[0],
+          aspect_ratio: snap.aspect_ratio,
+        };
+        if (snap.swapUrl) genParams.swap_url = snap.swapUrl;
+        if (snap.prompt) genParams.prompt = snap.prompt;
+        if (snap.qualityField && snap.quality) {
+          genParams[snap.qualityField] = snap.quality;
+        }
+        if (snap.effect) genParams.name = snap.effect;
+        res = await generateI2I(apiKey, genParams);
+      } else {
+        const genParams = {
+          model: snap.model,
+          prompt: snap.prompt,
+          aspect_ratio: snap.aspect_ratio,
+        };
+        if (snap.qualityField && snap.quality) {
+          genParams[snap.qualityField] = snap.quality;
+        }
+        res = await generateImage(apiKey, genParams);
+      }
+      if (!res?.url) throw new Error("No image URL returned by API");
+
+      addToHistory({
+        id: res.id || Math.random().toString(36).substring(7),
+        url: res.url,
+        prompt: snap.prompt,
+        model: snap.model,
+        aspect_ratio: snap.aspect_ratio,
+        timestamp: new Date().toISOString(),
+      });
+      onGenerationComplete?.({
+        url: res.url,
+        model: snap.model,
+        prompt: snap.prompt,
+        type: "image",
+      });
+      removeJob(jobId);
+    } catch (e) {
+      console.error("[ImageStudio] Generation failed:", e);
+      const message = e.message?.slice(0, 120) || "Generation failed";
+      setActiveJobs((prev) =>
+        prev.map((j) => (j.id === jobId ? { ...j, status: "error", error: message } : j))
+      );
+    }
+  };
+
+  const handleGenerate = () => {
+    if (atJobCap) return;
 
     if (imageMode) {
       if (uploadedImageUrls.length === 0) {
@@ -1047,65 +1114,31 @@ export default function ImageStudio({
       }
     }
 
-    setGenerating(true);
-    setGenerateError(null);
+    const snapshot = {
+      imageMode,
+      prompt: prompt.trim(),
+      model: selectedModelId,
+      aspect_ratio: selectedAr,
+      quality: selectedQuality,
+      qualityField: currentQualityField,
+      effect: showEffectBtn ? selectedEffect : "",
+      imagesList: uploadedImageUrls,
+      swapUrl: swapImageUrl,
+    };
 
-    try {
-      const results = await Promise.all(
-        Array.from({ length: batchSize }).map(async () => {
-          if (imageMode) {
-            const genParams = {
-              model: selectedModelId,
-              images_list: uploadedImageUrls,
-              image_url: uploadedImageUrls[0],
-              aspect_ratio: selectedAr,
-            };
-            if (swapImageUrl) genParams.swap_url = swapImageUrl;
-            if (prompt.trim()) genParams.prompt = prompt.trim();
-            if (currentQualityField && selectedQuality) {
-              genParams[currentQualityField] = selectedQuality;
-            }
-            if (showEffectBtn && selectedEffect) genParams.name = selectedEffect;
-            return await generateI2I(apiKey, genParams);
-          } else {
-            const genParams = {
-              model: selectedModelId,
-              prompt: prompt.trim(),
-              aspect_ratio: selectedAr,
-            };
-            if (currentQualityField && selectedQuality) {
-              genParams[currentQualityField] = selectedQuality;
-            }
-            return await generateImage(apiKey, genParams);
-          }
-        })
-      );
-
-      results.forEach((res) => {
-        if (res && res.url) {
-          const entry = {
-            id: res.id || Math.random().toString(36).substring(7),
-            url: res.url,
-            prompt: prompt.trim(),
-            model: selectedModelId,
-            aspect_ratio: selectedAr,
-            timestamp: new Date().toISOString(),
-          };
-          addToHistory(entry);
-          onGenerationComplete?.({
-            url: res.url,
-            model: selectedModelId,
-            prompt: prompt.trim(),
-            type: "image",
-          });
-        }
-      });
-    } catch (e) {
-      console.error("[ImageStudio] Generation failed:", e);
-      setGenerateError(e.message.slice(0, 80));
-      setTimeout(() => setGenerateError(null), 4000);
-    } finally {
-      setGenerating(false);
+    for (let i = 0; i < batchSize; i++) {
+      const jobId = `job-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+      setActiveJobs((prev) => [
+        {
+          id: jobId,
+          prompt: snapshot.prompt,
+          model: snapshot.model,
+          aspect_ratio: snapshot.aspect_ratio,
+          status: "running",
+        },
+        ...prev,
+      ]);
+      runGenerationJob(jobId, snapshot);
     }
   };
 
@@ -1122,8 +1155,50 @@ export default function ImageStudio({
       
       {/* ── CENTRAL GALLERY AREA ── */}
       <div className="flex-1 w-full max-w-7xl mx-auto overflow-y-auto custom-scrollbar pb-40 lg:pb-32 px-2">
-        {history.length > 0 ? (
+        {activeJobs.length > 0 || history.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 w-full pt-4 animate-fade-in-up">
+            {activeJobs.map((job) => (
+              <div
+                key={job.id}
+                className="relative rounded-lg overflow-hidden border border-white/10 bg-[#0d0d28] shadow-xl flex flex-col"
+              >
+                <div className="w-full aspect-square bg-black/40 flex flex-col items-center justify-center gap-3">
+                  {job.status === "running" ? (
+                    <>
+                      <span className="animate-spin text-3xl text-[#8b80e8]">◌</span>
+                      <span className="text-white/40 text-xs font-medium tracking-wide">
+                        Generating...
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-2xl text-red-400">✕</span>
+                      <span className="text-red-400/80 text-xs font-medium px-4 text-center">
+                        {job.error}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => removeJob(job.id)}
+                        className="text-white/40 hover:text-white text-[10px] underline underline-offset-2"
+                      >
+                        Dismiss
+                      </button>
+                    </>
+                  )}
+                </div>
+                <div className="p-3 bg-black/80 backdrop-blur-sm border-t border-white/5 flex-1 flex flex-col justify-between gap-2">
+                  <p className="text-white/70 text-xs line-clamp-3 leading-relaxed" title={job.prompt}>
+                    {job.prompt || "No prompt provided"}
+                  </p>
+                  <div className="flex items-center justify-between mt-1">
+                    <span className="text-[10px] font-bold text-primary px-2 py-0.5 bg-primary/10 rounded border border-primary/20">
+                      {job.model?.replace("-", " ")}
+                    </span>
+                    <span className="text-[10px] text-white/40">{job.aspect_ratio}</span>
+                  </div>
+                </div>
+              </div>
+            ))}
             {history.map((entry, idx) => (
               <div
                 key={entry.id || idx}
@@ -1437,20 +1512,22 @@ export default function ImageStudio({
             <button
               type="button"
               onClick={handleGenerate}
-              disabled={generating}
+              disabled={atJobCap || uploadBusy}
+              title={atJobCap ? `Max ${MAX_CONCURRENT_JOBS} generations at once` : undefined}
               className="bg-[#8b80e8] text-black px-4 py-2 rounded-md font-medium text-sm hover:bg-[#b9a8ff] hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2 w-full sm:w-auto shadow-lg shadow-[#8b80e8]/10 disabled:opacity-50 disabled:cursor-not-allowed z-10"
             >
-              {generating ? (
+              {uploadBusy ? (
                 <>
                   <span className="animate-spin inline-block text-black">◌</span>
-                  Generating...
+                  Uploading...
                 </>
-              ) : generateError ? (
-                `Error: ${generateError}`
-              ) : (
+              ) : runningJobCount > 0 ? (
                 <>
-                  <span>Generate</span>
+                  <span className="animate-spin inline-block text-black">◌</span>
+                  {`Generate (${runningJobCount} running)`}
                 </>
+              ) : (
+                <span>Generate</span>
               )}
             </button>
           </div>
