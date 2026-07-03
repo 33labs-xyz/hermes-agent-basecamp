@@ -6,6 +6,7 @@ import {
   ExternalLink,
   fetchLinkTitle,
   hostPathLabel,
+  isLocalhostUrl,
   isTitleFetchable,
   LinkifiedText,
   PrettyLink,
@@ -50,6 +51,16 @@ describe('external link helpers', () => {
         'https://www.getyourguide.com/fajardo-l882/from-fajardo-icacos-island-full-day-catamaran-trip-t19891/'
       )
     ).toBe('From Fajardo Icacos Island Full Day Catamaran Trip')
+  })
+
+  it('detects loopback dev-server URLs', () => {
+    expect(isLocalhostUrl('http://localhost:5000/landing.html')).toBe(true)
+    expect(isLocalhostUrl('http://127.0.0.1:3000')).toBe(true)
+    expect(isLocalhostUrl('http://0.0.0.0:8080/app')).toBe(true)
+    expect(isLocalhostUrl('http://[::1]:8080')).toBe(true)
+    expect(isLocalhostUrl('https://example.com')).toBe(false)
+    expect(isLocalhostUrl('file:///tmp/index.html')).toBe(false)
+    expect(isLocalhostUrl('not a url')).toBe(false)
   })
 
   it('filters out local/non-http targets for title fetches', () => {

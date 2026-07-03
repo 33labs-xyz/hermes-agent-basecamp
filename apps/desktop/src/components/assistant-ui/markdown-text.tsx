@@ -22,8 +22,9 @@ import {
 import { PreviewAttachment } from '@/components/chat/preview-attachment'
 import { SyntaxHighlighter } from '@/components/chat/shiki-highlighter'
 import { ZoomableImage } from '@/components/chat/zoomable-image'
-import { normalizeExternalUrl, openExternalLink, PrettyLink } from '@/lib/external-link'
+import { isLocalhostUrl, normalizeExternalUrl, openExternalLink, PrettyLink } from '@/lib/external-link'
 import { createMemoizedMathPlugin } from '@/lib/katex-memo'
+import { localPreviewTarget } from '@/lib/local-preview'
 import { preprocessMarkdown } from '@/lib/markdown-preprocess'
 import {
   filePathFromMediaPath,
@@ -38,6 +39,7 @@ import {
 import { previewTargetFromMarkdownHref } from '@/lib/preview-targets'
 import { tailBoundedRemend } from '@/lib/remend-tail'
 import { cn } from '@/lib/utils'
+import { setCurrentSessionPreviewTarget } from '@/store/preview'
 
 // Math rendering plugin (KaTeX). Configured once at module scope — the
 // plugin is stateless beyond its internal cache so re-creating per-render
@@ -232,7 +234,7 @@ function childrenToText(children: unknown): string {
   return ''
 }
 
-function MarkdownLink({ children, className, href, ...props }: ComponentProps<'a'>) {
+export function MarkdownLink({ children, className, href, ...props }: ComponentProps<'a'>) {
   const mediaPath = mediaPathFromMarkdownHref(href)
 
   if (mediaPath) {
@@ -266,6 +268,32 @@ function MarkdownLink({ children, className, href, ...props }: ComponentProps<'a
 
   const text = childrenToText(children)
   const fallbackLabel = text && normalizeExternalUrl(text) !== target ? text : undefined
+
+  // Loopback links are the agent's own dev servers — open them in the in-app
+  // preview pane. Modifier-click keeps the system-browser escape hatch.
+  if (isLocalhostUrl(target)) {
+    return (
+      <PrettyLink
+        className={cn('wrap-anywhere', className)}
+        fallbackLabel={fallbackLabel}
+        href={target}
+        {...props}
+        onClick={event => {
+          if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+            return
+          }
+
+          event.preventDefault()
+
+          const preview = localPreviewTarget(target)
+
+          if (preview) {
+            setCurrentSessionPreviewTarget(preview, 'explicit-link', target)
+          }
+        }}
+      />
+    )
+  }
 
   return (
     <PrettyLink className={cn('wrap-anywhere', className)} fallbackLabel={fallbackLabel} href={target} {...props} />

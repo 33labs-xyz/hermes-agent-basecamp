@@ -111,6 +111,15 @@ export function urlSlugTitleLabel(value: string): string {
   return hostPathLabel(value)
 }
 
+// Loopback http(s) URLs are dev servers the desktop app can render itself —
+// callers use this to route them into the in-app preview pane instead of the
+// system browser.
+export function isLocalhostUrl(value: string): boolean {
+  const url = parseUrl(value)
+
+  return Boolean(url && /^https?:$/.test(url.protocol) && LOCAL_HOST_RE.test(url.host))
+}
+
 export function isTitleFetchable(value: string): boolean {
   if (!value || SKIP_PROTO_RE.test(value)) {
     return false
