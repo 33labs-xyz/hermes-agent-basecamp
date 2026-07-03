@@ -10,6 +10,8 @@ import { $studioKey, ensureStudioKeyLoaded, saveStudioKey } from '@/store/studio
 import { PAGE_INSET_X } from '../layout-constants'
 import type { SetStatusbarItemGroup } from '../shell/statusbar-controls'
 
+import { AgentsHost } from './agents-host'
+import { DesignHost } from './design-host'
 import { StudioLibrary } from './library'
 import { StudioCredits } from './studio-credits'
 import {
@@ -25,6 +27,7 @@ import {
   VibeMotionStudio,
   VideoStudio
 } from './vendor'
+import { WorkflowHost } from './workflow-host'
 
 interface StudioViewProps {
   setStatusbarItemGroup: SetStatusbarItemGroup
@@ -40,17 +43,26 @@ type StudioTabId =
   | 'marketing'
   | 'recast'
   | 'vibe'
+  | 'workflow'
+  | 'agents'
+  | 'design'
   | 'library'
 
 interface StudioTab {
   id: StudioTabId
   label: string
   Component?: ComponentType<StudioProps>
+  // Hard-gated tabs fetch account data on mount (they are browsable galleries,
+  // not prompt boxes), so without a key they render the connect prompt instead
+  // of the studio rather than waiting for the typing-triggered overlay.
+  requiresKey?: true
 }
 
 // Order mirrors the source studio's tab order. Each generation entry is a
 // self-contained vendored studio (react + muapi only, zero new npm deps).
-// Library is the local generation manager, not a Muapi studio.
+// Workflow/Agents/Design are the router-driven studios (hosted to bridge
+// their Next.js routing onto the memory-router shim). Library is the local
+// generation manager, not a Muapi studio.
 const STUDIO_TABS: readonly StudioTab[] = [
   { id: 'image', label: 'Image', Component: ImageStudio },
   { id: 'video', label: 'Video', Component: VideoStudio },
@@ -61,6 +73,9 @@ const STUDIO_TABS: readonly StudioTab[] = [
   { id: 'marketing', label: 'Marketing', Component: MarketingStudio },
   { id: 'recast', label: 'Body Swap', Component: RecastStudio },
   { id: 'vibe', label: 'Vibe Motion', Component: VibeMotionStudio },
+  { id: 'workflow', label: 'Workflows', Component: WorkflowHost, requiresKey: true },
+  { id: 'agents', label: 'Agents', Component: AgentsHost, requiresKey: true },
+  { id: 'design', label: 'Design', Component: DesignHost, requiresKey: true },
   { id: 'library', label: 'Library' }
 ]
 
@@ -174,8 +189,15 @@ export function StudioView({ setStatusbarItemGroup }: StudioViewProps) {
         </div>
         <StudioCredits apiKey={storedKey || null} refreshSignal={libraryVersion} />
       </div>
-      <div className="relative min-h-0 flex-1 overflow-auto" onInputCapture={handleStudioInput}>
-        {ActiveStudio ? (
+      {/* While the hard gate is showing there is no studio to protect, and the
+          typing-trigger would stack the overlay on top of the gate's own input. */}
+      <div
+        className="relative min-h-0 flex-1 overflow-auto"
+        onInputCapture={active.requiresKey && !hasKey ? undefined : handleStudioInput}
+      >
+        {active.requiresKey && !hasKey ? (
+          <StudioKeyGate onSubmit={handleConnect} />
+        ) : ActiveStudio ? (
           <ActiveStudio apiKey={storedKey ?? ''} onGenerationComplete={handleGenerationComplete} />
         ) : (
           <StudioLibrary refreshKey={libraryVersion} />

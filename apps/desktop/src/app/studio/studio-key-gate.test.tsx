@@ -6,15 +6,25 @@ import { StudioKeyGate } from './index'
 // The studio barrel drags in every vendored Muapi studio; the key gate needs
 // none of them.
 vi.mock('./vendor', () => ({
+  AgentProfile: () => null,
+  AgentStudio: () => null,
+  AiAgent: () => null,
   AudioStudio: () => null,
   CinemaStudio: () => null,
   ClippingStudio: () => null,
+  CreateAgentPage: () => null,
+  DesignAgentStudio: () => null,
+  EditAgentPage: () => null,
   ImageStudio: () => null,
   LipSyncStudio: () => null,
   MarketingStudio: () => null,
   RecastStudio: () => null,
   VibeMotionStudio: () => null,
-  VideoStudio: () => null
+  VideoStudio: () => null,
+  WorkflowStudio: () => null,
+  getAgentDetails: vi.fn(),
+  getConversationHistory: vi.fn(),
+  getUserBalance: vi.fn()
 }))
 vi.mock('./library', () => ({ StudioLibrary: () => null }))
 vi.mock('./studio-credits', () => ({ StudioCredits: () => null }))

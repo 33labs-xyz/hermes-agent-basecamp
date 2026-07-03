@@ -16,15 +16,25 @@ vi.mock('./vendor', () => {
   )
 
   return {
+    AgentProfile: StudioStub,
+    AgentStudio: StudioStub,
+    AiAgent: StudioStub,
     AudioStudio: StudioStub,
     CinemaStudio: StudioStub,
     ClippingStudio: StudioStub,
+    CreateAgentPage: StudioStub,
+    DesignAgentStudio: StudioStub,
+    EditAgentPage: StudioStub,
     ImageStudio: StudioStub,
     LipSyncStudio: StudioStub,
     MarketingStudio: StudioStub,
     RecastStudio: StudioStub,
     VibeMotionStudio: StudioStub,
-    VideoStudio: StudioStub
+    VideoStudio: StudioStub,
+    WorkflowStudio: StudioStub,
+    getAgentDetails: vi.fn(async () => ({})),
+    getConversationHistory: vi.fn(async () => null),
+    getUserBalance: vi.fn(async () => ({ balance: 0 }))
   }
 })
 vi.mock('./library', () => ({ StudioLibrary: () => null }))
@@ -101,5 +111,37 @@ describe('StudioView ungated', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Video' }))
     fireEvent.input(screen.getByLabelText('prompt'), { target: { value: 'b' } })
     expect(screen.getByTestId('studio-key-overlay')).toBeTruthy()
+  })
+})
+
+// Workflows/Agents/Design fetch account data on mount, so without a key they
+// render the connect pane in place of the studio (no typing-trigger overlay).
+describe('StudioView hard-gated tabs', () => {
+  it('renders the connect pane instead of the studio without a key', async () => {
+    renderStudio()
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Workflows' }))
+
+    expect(screen.getByText('Connect Studio')).toBeTruthy()
+    expect(screen.queryByLabelText('prompt')).toBeNull()
+
+    // Typing the key into the in-pane gate must not stack the overlay on top.
+    fireEvent.input(screen.getByPlaceholderText('Muapi API key'), { target: { value: 'sk' } })
+    expect(screen.queryByTestId('studio-key-overlay')).toBeNull()
+
+    // Connecting through the pane swaps in the studio.
+    fireEvent.change(screen.getByPlaceholderText('Muapi API key'), { target: { value: 'sk-flow' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Connect' }))
+    expect(screen.getByTestId('stub-api-key').textContent).toBe('sk-flow')
+  })
+
+  it('renders the studio directly when a key is stored', async () => {
+    $studioKey.set('sk-live')
+    renderStudio()
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Workflows' }))
+
+    expect(screen.queryByText('Connect Studio')).toBeNull()
+    expect(screen.getByTestId('stub-api-key').textContent).toBe('sk-live')
   })
 })
