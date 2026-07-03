@@ -265,6 +265,8 @@
       "perMachine": false,
       "shortcutName": "Basecamp",
       "uninstallDisplayName": "Basecamp",
+      "createDesktopShortcut": "always",
+      "createStartMenuShortcut": true,
       "warningsAsErrors": false
     }
   }
