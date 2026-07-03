@@ -24,9 +24,11 @@ import {
 import { PreviewPane } from './preview-pane'
 
 export const PREVIEW_RAIL_MIN_WIDTH = '18rem'
-export const PREVIEW_RAIL_MAX_WIDTH = '38rem'
+// 60rem (960px) lets a desktop-width page render without horizontal cramping;
+// the pane-width formula below still yields to the chat's minimum width.
+export const PREVIEW_RAIL_MAX_WIDTH = '60rem'
 
-const INTRINSIC = `clamp(${PREVIEW_RAIL_MIN_WIDTH}, 36vw, 32rem)`
+const INTRINSIC = `clamp(${PREVIEW_RAIL_MIN_WIDTH}, 44vw, 46rem)`
 
 // Track for <Pane id="preview">. Folds the intrinsic clamp with a min-floor
 // against --chat-min-width so the chat surface never gets squeezed below it.

@@ -1869,7 +1869,10 @@ export const zhHant = defineLocale({
       loadFailedConsole: (code, message) => `載入失敗${code ? ` (${code})` : ''}：${message}`,
       unreachableDescription: '無法連線至預覽頁面。',
       openTarget: url => `開啟 ${url}`,
-      fallbackTitle: '預覽'
+      fallbackTitle: '預覽',
+      deviceDesktop: '桌面',
+      deviceTablet: '平板',
+      deviceMobile: '手機'
     }
   },
 

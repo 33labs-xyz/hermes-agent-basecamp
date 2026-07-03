@@ -3,10 +3,11 @@ import type { PointerEvent as ReactPointerEvent } from 'react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import type { SetTitlebarToolGroup, TitlebarTool } from '@/app/shell/titlebar-controls'
+import { SegmentedControl, type SegmentedControlOption } from '@/components/ui/segmented-control'
 import { Tip } from '@/components/ui/tooltip'
 import { type Translations, useI18n } from '@/i18n'
 import { isDesktopFsRemoteMode } from '@/lib/desktop-fs'
-import { Bug } from '@/lib/icons'
+import { Bug, Monitor, Smartphone, Tablet } from '@/lib/icons'
 import { cn } from '@/lib/utils'
 import { notify, notifyError } from '@/store/notifications'
 import { $previewServerRestart, failPreviewServerRestart, type PreviewTarget } from '@/store/preview'
@@ -47,6 +48,26 @@ interface PreviewLoadErrorState {
 
 const FILE_RELOAD_DEBOUNCE_MS = 200
 const SERVER_RESTART_TIMEOUT_MS = 45_000
+
+export type PreviewDeviceMode = 'desktop' | 'tablet' | 'mobile'
+
+// Common viewport widths: iPad portrait and iPhone 14/15. Desktop means
+// "fill the pane", so it clears the override entirely.
+const PREVIEW_DEVICE_WIDTHS: Record<PreviewDeviceMode, string> = {
+  desktop: '',
+  tablet: '768px',
+  mobile: '390px'
+}
+
+// The webview is created imperatively (not JSX), so the device constraint is
+// applied as inline styles — they win over the element's w-full/flex-1 classes.
+function applyPreviewDeviceWidth(webview: HTMLElement, mode: PreviewDeviceMode) {
+  const width = PREVIEW_DEVICE_WIDTHS[mode]
+
+  webview.style.flex = width ? '0 0 auto' : ''
+  webview.style.maxWidth = width ? '100%' : ''
+  webview.style.width = width
+}
 
 function loadErrorTitle(error: PreviewLoadErrorState, copy: Translations['preview']['web']): string {
   const description = error.description.toLowerCase()
@@ -141,6 +162,8 @@ export function PreviewPane({
   const consoleHeight = useStore(consoleState.$height)
   const consoleOpen = useStore(consoleState.$open)
   const [currentUrl, setCurrentUrl] = useState(target.url)
+  const [deviceMode, setDeviceMode] = useState<PreviewDeviceMode>('desktop')
+  const deviceModeRef = useRef(deviceMode)
   const [devtoolsOpen, setDevtoolsOpen] = useState(false)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<PreviewLoadErrorState | null>(null)
@@ -154,6 +177,12 @@ export function PreviewPane({
   const restartingServer =
     previewServerRestart?.status === 'running' &&
     (previewServerRestart.url === target.url || previewServerRestart.url === currentUrl)
+
+  const deviceOptions: readonly SegmentedControlOption<PreviewDeviceMode>[] = [
+    { icon: Monitor, id: 'desktop', label: copy.deviceDesktop },
+    { icon: Tablet, id: 'tablet', label: copy.deviceTablet },
+    { icon: Smartphone, id: 'mobile', label: copy.deviceMobile }
+  ]
 
   const startConsoleResize = useCallback(
     (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -281,6 +310,16 @@ export function PreviewPane({
     webview.openDevTools()
     setDevtoolsOpen(true)
   }, [])
+
+  // Ref keeps the current device out of the webview-creation effect's deps —
+  // switching devices must resize the live webview, not recreate it.
+  useEffect(() => {
+    deviceModeRef.current = deviceMode
+
+    if (webviewRef.current) {
+      applyPreviewDeviceWidth(webviewRef.current, deviceMode)
+    }
+  }, [deviceMode])
 
   useEffect(() => {
     if (!setTitlebarToolGroup) {
@@ -518,6 +557,7 @@ export function PreviewPane({
     webview.setAttribute('partition', 'persist:hermes-preview')
     webview.setAttribute('src', target.url)
     webview.setAttribute('webpreferences', 'contextIsolation=yes,nodeIntegration=no,sandbox=yes')
+    applyPreviewDeviceWidth(webview, deviceModeRef.current)
 
     const onConsole = (event: Event) => {
       const detail = event as Event & {
@@ -622,13 +662,19 @@ export function PreviewPane({
           </div>
         )}
 
+        {isWebPreview && (
+          <div className="flex shrink-0 items-center justify-end border-b border-(--ui-stroke-tertiary) px-2 py-1">
+            <SegmentedControl onChange={setDeviceMode} options={deviceOptions} value={deviceMode} />
+          </div>
+        )}
+
         <div
           className="pointer-events-auto relative min-h-0 flex-1 overflow-hidden bg-transparent"
           ref={previewContentRef}
         >
           <div
             className={cn(
-              'absolute inset-0 flex bg-transparent',
+              'absolute inset-0 flex justify-center bg-transparent',
               (!isWebPreview || loadError) && 'pointer-events-none opacity-0'
             )}
             ref={hostRef}

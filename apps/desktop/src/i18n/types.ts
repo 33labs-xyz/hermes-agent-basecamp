@@ -1511,6 +1511,9 @@ export interface Translations {
       unreachableDescription: string
       openTarget: (url: string) => string
       fallbackTitle: string
+      deviceDesktop: string
+      deviceTablet: string
+      deviceMobile: string
     }
   }
 
