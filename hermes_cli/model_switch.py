@@ -1502,11 +1502,7 @@ def list_authenticated_providers(
                     has_creds = True
             except Exception as exc:
                 logger.debug("Credential pool check failed for %s: %s", hermes_slug, exc)
-        # Fallback: check the hermes-managed OAuth file directly. Only the
-        # login this app created counts — probing the user's Claude Code
-        # install (Keychain / ~/.claude/.credentials.json) made anthropic
-        # look "ready" for anyone who happens to use Claude Code, and those
-        # borrowed tokens don't actually work through this app.
+        # Fallback: check the hermes-managed OAuth login this app created.
         if not has_creds and hermes_slug == "anthropic":
             try:
                 from agent.anthropic_adapter import read_hermes_oauth_credentials
@@ -1514,7 +1510,30 @@ def list_authenticated_providers(
                 if hermes_creds and hermes_creds.get("accessToken"):
                     has_creds = True
             except Exception as exc:
-                logger.debug("Anthropic external creds check failed: %s", exc)
+                logger.debug("Anthropic hermes-oauth creds check failed: %s", exc)
+        # Fallback: honor the user's on-disk Claude Code subscription login
+        # (~/.claude/.credentials.json or macOS Keychain). Verified 2026-07-04:
+        # these OAuth tokens ARE accepted by Anthropic through this app's
+        # anthropic transport (Bearer + oauth-2025-04-20 beta + Claude Code
+        # user-agent + system prefix) — a live 1-token call returned HTTP 200.
+        # An earlier comment here claimed the opposite ("borrowed tokens don't
+        # actually work through this app"); that was wrong. Count them only when
+        # usable now OR refreshable (has a refreshToken), mirroring
+        # resolve_anthropic_token()'s auto-refresh path, so a dead unrefreshable
+        # token does not surface a broken row.
+        if not has_creds and hermes_slug == "anthropic":
+            try:
+                from agent.anthropic_adapter import (
+                    read_claude_code_credentials,
+                    is_claude_code_token_valid,
+                )
+                cc_creds = read_claude_code_credentials()
+                if cc_creds and cc_creds.get("accessToken") and (
+                    is_claude_code_token_valid(cc_creds) or cc_creds.get("refreshToken")
+                ):
+                    has_creds = True
+            except Exception as exc:
+                logger.debug("Anthropic Claude Code creds check failed: %s", exc)
         if not has_creds:
             continue
 
