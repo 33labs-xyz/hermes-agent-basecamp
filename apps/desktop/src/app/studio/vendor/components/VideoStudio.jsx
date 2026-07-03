@@ -290,8 +290,10 @@ export default function VideoStudio({
   const [uploadedVideoName, setUploadedVideoName] = useState(null);
 
   // ── generation / canvas ──
-  const [generating, setGenerating] = useState(false);
-  const [generateError, setGenerateError] = useState(null);
+  // In-flight generations. Each job renders a pending card in the gallery and
+  // resolves independently, so Generate stays clickable while jobs run.
+  // [{id, prompt, model, status: 'running'|'error', error?}]
+  const [activeJobs, setActiveJobs] = useState([]);
   const [fullscreenUrl, setFullscreenUrl] = useState(null);
   const [canvasUrl, setCanvasUrl] = useState(null);
   const [canvasModel, setCanvasModel] = useState(null);
@@ -604,17 +606,28 @@ export default function VideoStudio({
       });
       setUploadedVideoUrl(url);
       setUploadedVideoName(file.name);
-      if (imageMode) {
-        setUploadedImageUrl(null);
-        setImageMode(false);
+      if (isMotionControlSelection(selectedModel, v2vMode)) {
+        // Already in motion-control mode — keep model and image, allow prompt
+        setPromptDisabled(false);
+      } else {
+        if (imageMode) {
+          setUploadedImageUrl(null);
+          setImageMode(false);
+        }
+        setV2vMode(true);
+        // Keep the currently selected v2v tool; only default to the first one
+        // when coming from a non-v2v model.
+        const target = v2vModels.find((m) => m.id === selectedModel) || v2vModels[0];
+        setSelectedModel(target.id);
+        setSelectedModelName(target.name);
+        applyControlsForModel(target.id, false, true);
+        if (target.imageField) {
+          setPromptDisabled(false);
+        } else {
+          setPrompt("");
+          setPromptDisabled(true);
+        }
       }
-      setV2vMode(true);
-      const firstV2V = v2vModels[0];
-      setSelectedModel(firstV2V.id);
-      setSelectedModelName(firstV2V.name);
-      applyControlsForModel(firstV2V.id, false, true);
-      setPrompt("");
-      setPromptDisabled(true);
     } catch (err) {
       alert(`Video upload failed: ${err.message}`);
     } finally {
@@ -807,18 +820,23 @@ export default function VideoStudio({
         // Already in motion-control mode — keep model and image, allow prompt
         setPromptDisabled(false);
       } else {
-        // Default v2v flow (e.g. watermark remover) — auto-pick the first v2v model
         if (imageMode) {
           setUploadedImageUrl(null);
           setImageMode(false);
         }
         setV2vMode(true);
-        const firstV2V = v2vModels[0];
-        setSelectedModel(firstV2V.id);
-        setSelectedModelName(firstV2V.name);
-        applyControlsForModel(firstV2V.id, false, true);
-        setPrompt("");
-        setPromptDisabled(true);
+        // Keep the currently selected v2v tool; only default to the first one
+        // when coming from a non-v2v model.
+        const target = v2vModels.find((m) => m.id === selectedModel) || v2vModels[0];
+        setSelectedModel(target.id);
+        setSelectedModelName(target.name);
+        applyControlsForModel(target.id, false, true);
+        if (target.imageField) {
+          setPromptDisabled(false);
+        } else {
+          setPrompt("");
+          setPromptDisabled(true);
+        }
       }
     } catch (err) {
       console.error("[VideoStudio] Video upload failed:", err);
@@ -864,9 +882,9 @@ export default function VideoStudio({
         }
       } else {
         if (v2vMode) {
+          // Keep the uploaded video (chip stays visible with click-to-clear)
+          // so switching back to a v2v tool doesn't force a re-upload.
           setV2vMode(false);
-          setUploadedVideoUrl(null);
-          setUploadedVideoName(null);
           setPromptDisabled(false);
         }
         setSelectedModel(m.id);
@@ -891,7 +909,66 @@ export default function VideoStudio({
   }, []);
 
   // ── generate ──────────────────────────────────────────────────────────────
-  const handleGenerate = useCallback(async () => {
+  const MAX_CONCURRENT_JOBS = 4;
+  const runningJobCount = activeJobs.filter((j) => j.status === "running").length;
+  const atJobCap = runningJobCount >= MAX_CONCURRENT_JOBS;
+
+  const removeJob = (jobId) => {
+    setActiveJobs((prev) => prev.filter((j) => j.id !== jobId));
+  };
+
+  // Runs one generation to completion. Params are snapshotted at click time so
+  // edits made while a job is in flight don't leak into it.
+  const runGenerationJob = async (jobId, snap) => {
+    try {
+      let res;
+      if (snap.kind === "v2v") {
+        res = await processV2V(apiKey, snap.params);
+      } else if (snap.kind === "i2v") {
+        res = await generateI2V(apiKey, snap.params);
+      } else {
+        res = await generateVideo(apiKey, snap.params);
+      }
+      if (!res?.url) throw new Error("No video URL returned by API");
+
+      const genId = res.id || Date.now().toString();
+      if (snap.tracksExtendId) {
+        setLastGenerationId(genId);
+        setLastGenerationModel(snap.model);
+      } else {
+        setLastGenerationId(null);
+        setLastGenerationModel(null);
+      }
+      const entry = {
+        id: genId,
+        url: res.url,
+        prompt: snap.historyPrompt,
+        model: snap.model,
+        timestamp: new Date().toISOString(),
+        ...(snap.extraEntry || {}),
+      };
+      addToLocalHistory(entry);
+      showVideoInCanvas(res.url, snap.model);
+      if (onGenerationComplete)
+        onGenerationComplete({
+          url: res.url,
+          model: snap.model,
+          prompt: snap.historyPrompt,
+          type: "video",
+        });
+      removeJob(jobId);
+    } catch (e) {
+      console.error("[VideoStudio]", e);
+      const message = e.message?.slice(0, 120) || "Generation failed";
+      setActiveJobs((prev) =>
+        prev.map((j) => (j.id === jobId ? { ...j, status: "error", error: message } : j)),
+      );
+    }
+  };
+
+  const handleGenerate = () => {
+    if (atJobCap) return;
+
     const currentModel = getCurrentModel();
     const isExtendMode = currentModel?.requiresRequestId;
     const trimmedPrompt = prompt.trim();
@@ -936,181 +1013,92 @@ export default function VideoStudio({
       }
     }
 
-    setGenerating(true);
-    setGenerateError(null);
-
-    let hadError = false;
-
-    try {
-      let res;
-
-      if (v2vMode) {
-        // V2V: dedicated processV2V handles single-input tools (e.g. watermark
-        // remover) and motion-control models (which take video + image + prompt)
-        const v2vParams = {
-          model: selectedModel,
-          video_url: uploadedVideoUrl,
-        };
-        if (currentModel?.imageField && uploadedImageUrl) {
-          v2vParams.image_url = uploadedImageUrl;
-        }
-        if (currentModel?.hasPrompt && trimmedPrompt) {
-          v2vParams.prompt = trimmedPrompt;
-        }
-        res = await processV2V(apiKey, v2vParams);
-        if (!res?.url) throw new Error("No video URL returned by API");
-
-        const genId = res.id || Date.now().toString();
-        setLastGenerationId(null);
-        setLastGenerationModel(null);
-        const entry = {
-          id: genId,
-          url: res.url,
-          prompt: currentModel?.hasPrompt ? trimmedPrompt : "",
-          model: selectedModel,
-          timestamp: new Date().toISOString(),
-        };
-        addToLocalHistory(entry);
-        showVideoInCanvas(res.url, selectedModel);
-        if (onGenerationComplete)
-          onGenerationComplete({
-            url: res.url,
-            model: selectedModel,
-            prompt: currentModel?.hasPrompt ? trimmedPrompt : "",
-            type: "video",
-          });
-      } else if (imageMode) {
-        const maxImgs = getMaxImagesForI2VModel(selectedModel);
-        const i2vParams = { model: selectedModel };
-        if (maxImgs > 2) {
-          i2vParams.images_list = uploadedImageUrls;
-        } else {
-          i2vParams.image_url = uploadedImageUrl;
-        }
-        if (trimmedPrompt) i2vParams.prompt = trimmedPrompt;
-        i2vParams.aspect_ratio = selectedAr;
-        const i2vModel = i2vModels.find((m) => m.id === selectedModel);
-        if (uploadedEndImageUrl && i2vModel?.lastImageField) {
-          i2vParams.last_image = uploadedEndImageUrl;
-        }
-        const durations = getDurationsForI2VModel(selectedModel);
-        if (durations.length > 0) i2vParams.duration = selectedDuration;
-        const resolutions = getResolutionsForI2VModel(selectedModel);
-        if (resolutions.length > 0) i2vParams.resolution = selectedResolution;
-        if (selectedQuality) i2vParams.quality = selectedQuality;
-        if (selectedMode) i2vParams.mode = selectedMode;
-        if (showEffect && selectedEffect) i2vParams.name = selectedEffect;
-
-        res = await generateI2V(apiKey, i2vParams);
-        if (!res?.url) throw new Error("No video URL returned by API");
-
-        const genId = res.id || Date.now().toString();
-        if (selectedModel === "seedance-v2.0-i2v") {
-          setLastGenerationId(genId);
-          setLastGenerationModel(selectedModel);
-        } else {
-          setLastGenerationId(null);
-          setLastGenerationModel(null);
-        }
-        const entry = {
-          id: genId,
-          url: res.url,
-          prompt: trimmedPrompt,
-          model: selectedModel,
-          aspect_ratio: selectedAr,
-          duration: selectedDuration,
-          timestamp: new Date().toISOString(),
-        };
-        addToLocalHistory(entry);
-        showVideoInCanvas(res.url, selectedModel);
-        if (onGenerationComplete)
-          onGenerationComplete({
-            url: res.url,
-            model: selectedModel,
-            prompt: trimmedPrompt,
-            type: "video",
-          });
-      } else {
-        // T2V (including extend mode)
-        const params = { model: selectedModel };
-        if (trimmedPrompt) params.prompt = trimmedPrompt;
-
-        if (isExtendMode) {
-          params.request_id = lastGenerationId;
-        } else {
-          params.aspect_ratio = selectedAr;
-        }
-
-        const durations = getDurationsForModel(selectedModel);
-        if (durations.length > 0) params.duration = selectedDuration;
-        const resolutions = getResolutionsForVideoModel(selectedModel);
-        if (resolutions.length > 0) params.resolution = selectedResolution;
-        if (selectedQuality) params.quality = selectedQuality;
-        if (selectedMode) params.mode = selectedMode;
-
-        res = await generateVideo(apiKey, params);
-        if (!res?.url) throw new Error("No video URL returned by API");
-
-        const genId = res.id || Date.now().toString();
-        if (
-          selectedModel === "seedance-v2.0-t2v" ||
-          selectedModel === "seedance-v2.0-i2v"
-        ) {
-          setLastGenerationId(genId);
-          setLastGenerationModel(selectedModel);
-        } else {
-          setLastGenerationId(null);
-          setLastGenerationModel(null);
-        }
-        const entry = {
-          id: genId,
-          url: res.url,
-          prompt: trimmedPrompt,
-          model: selectedModel,
-          aspect_ratio: selectedAr,
-          duration: selectedDuration,
-          timestamp: new Date().toISOString(),
-        };
-        addToLocalHistory(entry);
-        showVideoInCanvas(res.url, selectedModel);
-        if (onGenerationComplete)
-          onGenerationComplete({
-            url: res.url,
-            model: selectedModel,
-            prompt: trimmedPrompt,
-            type: "video",
-          });
+    let snap;
+    if (v2vMode) {
+      // V2V: dedicated processV2V handles single-input tools (e.g. watermark
+      // remover) and motion-control models (which take video + image + prompt)
+      const v2vParams = {
+        model: selectedModel,
+        video_url: uploadedVideoUrl,
+      };
+      if (currentModel?.imageField && uploadedImageUrl) {
+        v2vParams.image_url = uploadedImageUrl;
       }
-    } catch (e) {
-      hadError = true;
-      console.error("[VideoStudio]", e);
-      setGenerateError(e.message?.slice(0, 80) || "Generation failed");
-      setTimeout(() => setGenerateError(null), 4000);
-    } finally {
-      setGenerating(false);
+      if (currentModel?.hasPrompt && trimmedPrompt) {
+        v2vParams.prompt = trimmedPrompt;
+      }
+      snap = {
+        kind: "v2v",
+        model: selectedModel,
+        params: v2vParams,
+        historyPrompt: currentModel?.hasPrompt ? trimmedPrompt : "",
+        tracksExtendId: false,
+      };
+    } else if (imageMode) {
+      const maxImgs = getMaxImagesForI2VModel(selectedModel);
+      const i2vParams = { model: selectedModel };
+      if (maxImgs > 2) {
+        i2vParams.images_list = uploadedImageUrls;
+      } else {
+        i2vParams.image_url = uploadedImageUrl;
+      }
+      if (trimmedPrompt) i2vParams.prompt = trimmedPrompt;
+      i2vParams.aspect_ratio = selectedAr;
+      const i2vModel = i2vModels.find((m) => m.id === selectedModel);
+      if (uploadedEndImageUrl && i2vModel?.lastImageField) {
+        i2vParams.last_image = uploadedEndImageUrl;
+      }
+      const durations = getDurationsForI2VModel(selectedModel);
+      if (durations.length > 0) i2vParams.duration = selectedDuration;
+      const resolutions = getResolutionsForI2VModel(selectedModel);
+      if (resolutions.length > 0) i2vParams.resolution = selectedResolution;
+      if (selectedQuality) i2vParams.quality = selectedQuality;
+      if (selectedMode) i2vParams.mode = selectedMode;
+      if (showEffect && selectedEffect) i2vParams.name = selectedEffect;
+      snap = {
+        kind: "i2v",
+        model: selectedModel,
+        params: i2vParams,
+        historyPrompt: trimmedPrompt,
+        tracksExtendId: selectedModel === "seedance-v2.0-i2v",
+        extraEntry: { aspect_ratio: selectedAr, duration: selectedDuration },
+      };
+    } else {
+      // T2V (including extend mode)
+      const params = { model: selectedModel };
+      if (trimmedPrompt) params.prompt = trimmedPrompt;
+
+      if (isExtendMode) {
+        params.request_id = lastGenerationId;
+      } else {
+        params.aspect_ratio = selectedAr;
+      }
+
+      const durations = getDurationsForModel(selectedModel);
+      if (durations.length > 0) params.duration = selectedDuration;
+      const resolutions = getResolutionsForVideoModel(selectedModel);
+      if (resolutions.length > 0) params.resolution = selectedResolution;
+      if (selectedQuality) params.quality = selectedQuality;
+      if (selectedMode) params.mode = selectedMode;
+      snap = {
+        kind: "t2v",
+        model: selectedModel,
+        params,
+        historyPrompt: trimmedPrompt,
+        tracksExtendId:
+          selectedModel === "seedance-v2.0-t2v" ||
+          selectedModel === "seedance-v2.0-i2v",
+        extraEntry: { aspect_ratio: selectedAr, duration: selectedDuration },
+      };
     }
-  }, [
-    apiKey,
-    prompt,
-    v2vMode,
-    imageMode,
-    selectedModel,
-    selectedAr,
-    selectedDuration,
-    selectedResolution,
-    selectedQuality,
-    selectedMode,
-    selectedEffect,
-    showEffect,
-    uploadedImageUrl,
-    uploadedImageUrls,
-    uploadedVideoUrl,
-    lastGenerationId,
-    getCurrentModel,
-    addToLocalHistory,
-    showVideoInCanvas,
-    onGenerationComplete,
-  ]);
+
+    const jobId = `job-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+    setActiveJobs((prev) => [
+      { id: jobId, prompt: snap.historyPrompt, model: snap.model, status: "running" },
+      ...prev,
+    ]);
+    runGenerationJob(jobId, snap);
+  };
 
   // ── reset to prompt bar ───────────────────────────────────────────────────
   const resetToPromptBar = useCallback(() => {
@@ -1179,8 +1167,49 @@ export default function VideoStudio({
     >
       {/* ── CENTRAL GALLERY AREA ── */}
       <div className="flex-1 w-full max-w-7xl mx-auto overflow-y-auto custom-scrollbar pb-40 lg:pb-32 px-2">
-        {history.length > 0 ? (
+        {activeJobs.length > 0 || history.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 w-full pt-4 animate-fade-in-up">
+            {activeJobs.map((job) => (
+              <div
+                key={job.id}
+                className="relative rounded-lg overflow-hidden border border-white/10 bg-[#0d0d28] shadow-xl flex flex-col"
+              >
+                <div className="w-full aspect-video bg-black/40 flex flex-col items-center justify-center gap-3">
+                  {job.status === "running" ? (
+                    <>
+                      <span className="animate-spin text-3xl text-[#8b80e8]">◌</span>
+                      <span className="text-white/40 text-xs font-medium tracking-wide">
+                        Generating...
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-2xl text-red-400">✕</span>
+                      <span className="text-red-400/80 text-xs font-medium px-4 text-center">
+                        {job.error}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => removeJob(job.id)}
+                        className="text-white/40 hover:text-white text-[10px] underline underline-offset-2"
+                      >
+                        Dismiss
+                      </button>
+                    </>
+                  )}
+                </div>
+                <div className="p-3 bg-black/80 backdrop-blur-sm border-t border-white/5 flex-1 flex flex-col justify-between gap-2">
+                  <p className="text-white/70 text-xs line-clamp-3 leading-relaxed" title={job.prompt}>
+                    {job.prompt || "No prompt provided"}
+                  </p>
+                  <div className="flex items-center justify-between mt-1 flex-wrap gap-1">
+                    <span className="text-[10px] font-bold text-primary px-2 py-0.5 bg-primary/10 rounded border border-primary/20 whitespace-nowrap">
+                      {job.model?.replace("-", " ")}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            ))}
             {history.map((entry, idx) => {
               const isSeedance2 = entry.model === "seedance-v2.0-t2v" || entry.model === "seedance-v2.0-i2v";
               return (
@@ -1887,22 +1916,19 @@ export default function VideoStudio({
             <button
               type="button"
               onClick={handleGenerate}
-              disabled={generating}
+              disabled={atJobCap}
+              title={atJobCap ? `Max ${MAX_CONCURRENT_JOBS} generations at once` : undefined}
               className="bg-[#8b80e8] text-black px-4 py-2 rounded-md font-medium text-sm hover:bg-[#b9a8ff] hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2 w-full sm:w-auto shadow-lg shadow-[#8b80e8]/10 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {generating ? (
+              {runningJobCount > 0 ? (
                 <>
                   <span className="animate-spin inline-block text-black">
                     ◌
                   </span>{" "}
-                  Generating...
+                  {`Generate (${runningJobCount} running)`}
                 </>
-              ) : generateError ? (
-                `Error: ${generateError}`
               ) : (
-                <>
-                  <span>Generate</span>
-                </>
+                <span>Generate</span>
               )}
             </button>
           </div>
