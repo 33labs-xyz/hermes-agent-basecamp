@@ -168,10 +168,18 @@ function useApiKeyCatalog(): ApiKeyOption[] {
   }, [rows])
 }
 
+// The Claude subscription's OAuth connect flow is broken, so it is hidden from
+// onboarding and the settings connect list (already-connected accounts stay
+// visible for disconnect). The model picker still offers it, demoted to the
+// bottom of the list.
+export const CLAUDE_CODE_PROVIDER_ID = 'claude-code'
+
+export const isConnectableProvider = (p: OAuthProvider) => p.id !== CLAUDE_CODE_PROVIDER_ID
+
 const PROVIDER_DISPLAY: Record<string, { order: number; title: string }> = {
   nous: { order: 0, title: 'Nous Portal' },
-  // The Claude subscription sits near the top: it is a first-class connect
-  // path (reuses the existing external claude-code login), not a last resort.
+  // Kept for the connected-account title in settings even though the connect
+  // path is hidden (see CLAUDE_CODE_PROVIDER_ID above).
   'claude-code': { order: 2, title: 'Claude subscription' },
   'openai-codex': { order: 3, title: 'OpenAI OAuth (ChatGPT)' },
   'minimax-oauth': { order: 4, title: 'MiniMax' },
@@ -432,7 +440,7 @@ export function Picker({ ctx }: { ctx: OnboardingContext }) {
   const { initialApiKeyEnv, localEndpoint, manual, mode, providers } = useStore($desktopOnboarding)
   const [showAll, setShowAll] = useState(readShowAll)
   const [pickedOpenRouter, setPickedOpenRouter] = useState(false)
-  const ordered = useMemo(() => (providers ? sortProviders(providers) : []), [providers])
+  const ordered = useMemo(() => (providers ? sortProviders(providers.filter(isConnectableProvider)) : []), [providers])
   const hasOauth = ordered.length > 0
   const apiKeyOptions = useApiKeyCatalog()
 

@@ -97,6 +97,16 @@ describe('onboarding Picker', () => {
     expect($desktopOnboarding.get().mode).toBe('apikey')
   })
 
+  it('never lists the Claude subscription (its OAuth flow is broken)', () => {
+    setProviders([provider('claude-code', 'Claude Code'), provider('nous', 'Nous Portal')])
+    render(<Picker ctx={ctx} />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Other providers' }))
+
+    expect(screen.getByText('Nous Portal')).toBeTruthy()
+    expect(screen.queryByText('Claude subscription')).toBeNull()
+  })
+
   it('offers "choose later" on first run and persists the skip', () => {
     setProviders([provider('nous', 'Nous Portal')])
     render(<Picker ctx={ctx} />)

@@ -668,13 +668,6 @@ export const ja = defineLocale({
       model: 'モデル',
       applying: '適用中...',
       auxiliaryTitle: '補助モデル',
-      claudeSubscription: {
-        connect: 'Connect',
-        connected: 'Connected',
-        connectedHint: 'Basecamp is using your Claude login on this computer.',
-        disconnectedHint: 'Use your existing Claude login instead of an API key.',
-        title: 'Claude subscription'
-      },
       resetAllToMain: 'すべてメインにリセット',
       auxiliaryDesc:
         'ヘルパータスクはデフォルトでメインモデルで実行されます。タスクに専用モデルを割り当てることでオーバーライドできます。',

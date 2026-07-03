@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { runInTerminal } from '@/app/right-sidebar/store'
 import {
   FeaturedOpenRouterRow,
+  isConnectableProvider,
   ProviderRow,
   providerTitle,
   sortProviders
@@ -130,7 +131,9 @@ function OAuthPicker({
   // always visible; only the unconnected providers hide behind the disclosure,
   // so the page leads with what's set up.
   const connected = ordered.filter(p => p.status?.logged_in)
-  const others = ordered.filter(p => !p.status?.logged_in)
+  // Hidden connect paths (broken Claude subscription) drop out here, but a
+  // connected account above stays visible so it can still be removed.
+  const others = ordered.filter(p => !p.status?.logged_in && isConnectableProvider(p))
   const collapsible = others.length > 0
   const showOthers = !collapsible || showAll
 

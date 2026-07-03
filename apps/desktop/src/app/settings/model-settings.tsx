@@ -16,7 +16,7 @@ import {
 } from '@/hermes'
 import type { AuxiliaryModelsResponse, ModelOptionProvider, StaleAuxAssignment } from '@/hermes'
 import { useI18n } from '@/i18n'
-import { AlertTriangle, Check, Cpu, Loader2 } from '@/lib/icons'
+import { AlertTriangle, Cpu, Loader2 } from '@/lib/icons'
 import { cn } from '@/lib/utils'
 import { notifyError } from '@/store/notifications'
 import { startManualLocalEndpoint, startManualProviderOAuth } from '@/store/onboarding'
@@ -44,37 +44,6 @@ const effortLabelKey = (v: string) => (v === 'xhigh' ? 'max' : v) as 'high' | 'l
 // and an empty `models` list — those need a setup step before a model exists.
 function isProviderReady(p?: ModelOptionProvider): boolean {
   return !!p && (p.authenticated !== false || (p.models?.length ?? 0) > 0)
-}
-
-const CLAUDE_CODE_SLUG = 'claude-code'
-
-// Surfaces the existing `claude-code` OAuth provider as a one-click connect row
-// at the model picker, so people can reuse their Claude login instead of an API
-// key. Connect reuses the CLI OAuth flow via `startManualProviderOAuth`.
-export function ClaudeSubscriptionRow({ providers }: { providers: ModelOptionProvider[] }) {
-  const { t } = useI18n()
-  const c = t.settings.model.claudeSubscription
-  const row = providers.find(p => p.slug === CLAUDE_CODE_SLUG)
-  const connected = isProviderReady(row)
-
-  return (
-    <div className="flex items-center justify-between gap-3 rounded-[6px] border border-(--ui-stroke-tertiary) px-3 py-2.5">
-      <div className="min-w-0">
-        <p className="text-sm font-medium">{c.title}</p>
-        <p className="mt-0.5 text-xs text-muted-foreground">{connected ? c.connectedHint : c.disconnectedHint}</p>
-      </div>
-      {connected ? (
-        <span className="inline-flex shrink-0 items-center gap-1 bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
-          <Check className="size-3" />
-          {c.connected}
-        </span>
-      ) : (
-        <Button onClick={() => startManualProviderOAuth(CLAUDE_CODE_SLUG)} size="sm" variant="textStrong">
-          {c.connect}
-        </Button>
-      )}
-    </div>
-  )
 }
 
 // Mirrors `_AUX_TASK_SLOTS` in hermes_cli/web_server.py. Friendly labels and
@@ -571,10 +540,6 @@ export function ModelSettings({ onMainModelChanged }: ModelSettingsProps) {
             />
           </div>
         )}
-      </section>
-
-      <section>
-        <ClaudeSubscriptionRow providers={providers} />
       </section>
 
       <section>

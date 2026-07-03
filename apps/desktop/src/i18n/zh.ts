@@ -739,13 +739,6 @@ export const zh: Translations = {
       reasoningOff: '关闭',
       defaultsFailed: '保存模型默认值失败',
       auxiliaryTitle: '辅助模型',
-      claudeSubscription: {
-        connect: 'Connect',
-        connected: 'Connected',
-        connectedHint: 'Basecamp is using your Claude login on this computer.',
-        disconnectedHint: 'Use your existing Claude login instead of an API key.',
-        title: 'Claude subscription'
-      },
       resetAllToMain: '全部重置为主模型',
       auxiliaryDesc: '辅助任务默认使用主模型。你可以为任意任务指定专用模型。',
       setToMain: '设为主模型',

@@ -380,7 +380,8 @@ export function UnverifiedModelsWarning({ reason }: { reason: string }) {
 // spans every available model so anything is reachable past the cut.
 const PER_PROVIDER_SEARCH = 12
 
-function groupModels(
+// Exported for tests.
+export function groupModels(
   providers: ModelOptionProvider[],
   search: string,
   current: { model: string; provider: string },
@@ -438,7 +439,11 @@ function groupModels(
 
   // Stable, logical group order: alphabetical by provider name. (The backend
   // floats the current provider first, which would reshuffle on every switch.)
-  groups.sort((a, b) => a.provider.name.localeCompare(b.provider.name))
+  // The Claude subscription sinks to the bottom: its OAuth connect flow is
+  // unreliable, so it stays reachable without leading the list.
+  const sinkRank = (group: ProviderGroup) => (group.provider.slug === 'claude-code' ? 1 : 0)
+
+  groups.sort((a, b) => sinkRank(a) - sinkRank(b) || a.provider.name.localeCompare(b.provider.name))
 
   return groups
 }

@@ -78,6 +78,29 @@ describe('ProvidersSettings', () => {
     expect(disconnectOAuthProvider).not.toHaveBeenCalled()
   })
 
+  it('hides the unconnected Claude subscription but keeps it removable when connected', async () => {
+    listOAuthProviders.mockResolvedValue({
+      providers: [provider('nous', true), provider('claude-code', false, { name: 'Claude Code' }), provider('minimax-oauth', false)]
+    })
+
+    await renderProvidersSettings()
+
+    await screen.findByText('Nous Portal')
+    fireEvent.click(screen.getByRole('button', { name: 'Connect another provider' }))
+
+    expect(screen.getByText('MiniMax')).toBeTruthy()
+    expect(screen.queryByText('Claude subscription')).toBeNull()
+
+    // Already-connected accounts stay visible so they can still be removed.
+    listOAuthProviders.mockResolvedValue({
+      providers: [provider('claude-code', true, { name: 'Claude Code' })]
+    })
+    cleanup()
+    await renderProvidersSettings()
+
+    expect(await screen.findByText('Claude subscription')).toBeTruthy()
+  })
+
   it('does not offer removal for externally managed providers', async () => {
     listOAuthProviders.mockResolvedValue({
       providers: [

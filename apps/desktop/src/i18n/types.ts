@@ -436,13 +436,6 @@ export interface Translations {
       reasoningOff: string
       defaultsFailed: string
       auxiliaryTitle: string
-      claudeSubscription: {
-        connect: string
-        connected: string
-        connectedHint: string
-        disconnectedHint: string
-        title: string
-      }
       resetAllToMain: string
       auxiliaryDesc: string
       setToMain: string
