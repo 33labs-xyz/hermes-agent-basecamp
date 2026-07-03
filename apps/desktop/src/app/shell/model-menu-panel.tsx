@@ -391,6 +391,14 @@ export function groupModels(
   const groups: ProviderGroup[] = []
 
   for (const provider of providers) {
+    // Only providers the user actually connected are pickable. Rows the
+    // backend lists but couldn't verify (`authenticated === false`) belong in
+    // Settings → Model, where connecting them lives — here they'd just be
+    // models that 401 on first use.
+    if (provider.authenticated === false) {
+      continue
+    }
+
     const allFamilies = collapseModelFamilies(provider.models ?? [])
 
     if (allFamilies.length === 0) {

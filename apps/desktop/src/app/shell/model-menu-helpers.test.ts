@@ -31,4 +31,13 @@ describe('hasAuthenticatedModels', () => {
 
     expect(hasAuthenticatedModels(providers)).toBe(true)
   })
+
+  it('is false when the only models belong to unconnected providers', () => {
+    // A not-connected provider can still carry a model catalog (ambient
+    // credentials the backend refused to verify). Those models are not
+    // usable, so the composer must fall back to the Connect CTA.
+    const providers = [prov('anthropic', ['claude-4-opus'], { authenticated: false })]
+
+    expect(hasAuthenticatedModels(providers)).toBe(false)
+  })
 })
