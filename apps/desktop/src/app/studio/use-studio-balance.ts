@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 
-import { getUserBalance } from './vendor'
+// Direct module import (not the ./vendor barrel) so titlebar consumers don't
+// pull every vendored studio JSX file into their bundle.
+import { getUserBalance } from './vendor/muapi.js'
 
 // Remaining Muapi credit balance for a key, or null while loading / on any
 // failure (missing key, expired key, network). Bump `refreshSignal` to force

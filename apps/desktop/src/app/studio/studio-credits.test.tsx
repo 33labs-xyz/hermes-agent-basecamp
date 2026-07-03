@@ -2,10 +2,11 @@ import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { StudioCredits } from './studio-credits'
-import { getUserBalance } from './vendor'
+import { getUserBalance } from './vendor/muapi.js'
 
-// The barrel re-exports the untyped muapi client; mock just the balance call.
-vi.mock('./vendor', () => ({ getUserBalance: vi.fn() }))
+// The balance hook imports the muapi transport module directly (not the
+// barrel) so shell consumers don't drag studio JSX in; mock the same path.
+vi.mock('./vendor/muapi.js', () => ({ getUserBalance: vi.fn() }))
 
 const mockGetUserBalance = vi.mocked(getUserBalance)
 
