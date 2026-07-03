@@ -58,8 +58,8 @@ function modeRemovesUserData(mode) {
  * Resolve the on-disk app bundle/dir to remove for the running desktop app,
  * given the path to the running executable (`process.execPath`) and platform.
  *
- *   macOS:   …/Hermes.app/Contents/MacOS/Hermes  → …/Hermes.app
- *   Windows: …\Hermes\Hermes.exe                 → …\Hermes  (install dir)
+ *   macOS:   …/Basecamp.app/Contents/MacOS/Basecamp  → …/Basecamp.app
+ *   Windows: …\Basecamp\Basecamp.exe                 → …\Basecamp  (install dir)
  *   Linux:   AppImage → the APPIMAGE env path; unpacked → the *-unpacked dir
  *
  * Returns null when we can't confidently identify a removable bundle (e.g.
@@ -84,9 +84,10 @@ function resolveRemovableAppPath(execPath, platform, env = {}) {
   }
 
   if (platform === 'win32') {
-    // NSIS per-user installs Hermes.exe directly in the install dir.
+    // NSIS per-user installs Basecamp.exe directly in the install dir.
+    // Hermes names cover installs from before the Basecamp rename.
     const dir = p.dirname(exe)
-    if (/[\\/]Hermes$/i.test(dir) || /[\\/]hermes-desktop$/i.test(dir)) return dir
+    if (/[\\/](Basecamp|Hermes)$/i.test(dir) || /[\\/](basecamp|hermes)-desktop$/i.test(dir)) return dir
     return null
   }
 

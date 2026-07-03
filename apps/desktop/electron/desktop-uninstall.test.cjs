@@ -89,6 +89,13 @@ test('resolveRemovableAppPath finds the install dir on Windows', () => {
   )
 })
 
+test('resolveRemovableAppPath finds the renamed Basecamp install dir on Windows', () => {
+  assert.equal(
+    resolveRemovableAppPath('C:\\Users\\x\\AppData\\Local\\Programs\\Basecamp\\Basecamp.exe', 'win32'),
+    'C:\\Users\\x\\AppData\\Local\\Programs\\Basecamp'
+  )
+})
+
 test('resolveRemovableAppPath returns null for an unrecognized Windows dir', () => {
   assert.equal(resolveRemovableAppPath('C:\\Temp\\foo\\Hermes.exe', 'win32'), null)
 })
