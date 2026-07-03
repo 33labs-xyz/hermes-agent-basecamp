@@ -455,6 +455,36 @@ export async function getUserConversations(apiKey) {
     return Array.isArray(data) ? data : [];
 };
 
+// GET agent details by slug, falling back to a raw-id lookup for long ids.
+// Mirrors the upstream Next server component that hydrated the chat page;
+// AiAgent itself does not self-fetch, so the agents host calls this.
+export async function getAgentDetails(apiKey, agentIdOrSlug) {
+    const headers = { 'Content-Type': 'application/json', 'x-api-key': apiKey };
+    let response = await fetch(`${BASE_URL}/agents/by-slug/${agentIdOrSlug}`, { headers });
+    if (!response.ok && String(agentIdOrSlug).length > 20) {
+        response = await fetch(`${BASE_URL}/agents/${agentIdOrSlug}`, { headers });
+    }
+    if (!response.ok) {
+        const errText = await response.text();
+        notifyAuthRequired(response.status, errText);
+        throw new Error(`Failed to fetch agent: ${response.status} - ${errText.slice(0, 100)}`);
+    }
+    return response.json();
+};
+
+// GET one conversation's message history for an agent.
+export async function getConversationHistory(apiKey, agentIdOrSlug, conversationId) {
+    const response = await fetch(`${BASE_URL}/agents/by-slug/${agentIdOrSlug}/${conversationId}`, {
+        headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey }
+    });
+    if (!response.ok) {
+        const errText = await response.text();
+        notifyAuthRequired(response.status, errText);
+        throw new Error(`Failed to fetch conversation: ${response.status} - ${errText.slice(0, 100)}`);
+    }
+    return response.json();
+};
+
 export async function createWorkflow(apiKey, payload) {
     const response = await fetch(`${BASE_URL}/workflow/create`, {
         method: 'POST',

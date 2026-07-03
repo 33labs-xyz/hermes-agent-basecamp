@@ -38,9 +38,25 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
       '@hermes/shared': path.resolve(__dirname, '../shared/src'),
       // Shims so the vendored generative-AI studio (authored for Next.js) runs
-      // unmodified under Vite. Only the two Next modules it touches are mapped.
+      // unmodified under Vite: the Next modules it touches plus axios, which is
+      // rewritten onto the Electron IPC bridge instead of hitting the network
+      // from the renderer.
       'next/navigation': path.resolve(__dirname, './src/app/studio/shims/next-navigation.ts'),
       'next/dynamic': path.resolve(__dirname, './src/app/studio/shims/next-dynamic.ts'),
+      'next/image': path.resolve(__dirname, './src/app/studio/shims/next-image.tsx'),
+      'next/link': path.resolve(__dirname, './src/app/studio/shims/next-link.tsx'),
+      'next-themes': path.resolve(__dirname, './src/app/studio/shims/next-themes.tsx'),
+      axios: path.resolve(__dirname, './src/app/studio/shims/axios.ts'),
+      // Vendored studio sub-packages, resolved by their package names so the
+      // wrapper components' imports work without source edits.
+      'workflow-builder': path.resolve(
+        __dirname,
+        './src/app/studio/vendor/packages/workflow-builder/src/index.js'
+      ),
+      'design-agent': path.resolve(
+        __dirname,
+        './src/app/studio/vendor/packages/design-agent/src/index.js'
+      ),
       react: path.resolve(__dirname, '../../node_modules/react'),
       'react-dom': path.resolve(__dirname, '../../node_modules/react-dom'),
       'react/jsx-dev-runtime': path.resolve(__dirname, '../../node_modules/react/jsx-dev-runtime.js'),
