@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useCallback, useEffect, useRef, useMemo, useLayoutEffect } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import ReactFlow, {
   addEdge,
   Background,
@@ -222,6 +222,7 @@ const processWorkflowData = (workflowData, nodeSchemas, id) => {
 const NodeFlow = ({ initialNodeSchemas, initialWorkflowData }) => {
   const params = useParams();
   const { id } = params;
+  const router = useRouter();
 
   // Pre-calculate initial state if data is provided
   const initialState = useMemo(() => {
@@ -1325,7 +1326,16 @@ const NodeFlow = ({ initialNodeSchemas, initialWorkflowData }) => {
     try {
       const response = await axios.post("/api/workflow/create", workflowPayload);
       console.log("Workflow created:", response.data);
-      window.location.href = `/workflow/${response.data.workflow_id}`;
+      // No web server behind this app, so a hard window.location redirect to
+      // /workflow/<id> blanks the screen. Adopt the fresh copy in place: the
+      // canvas already shows the duplicated content, so just take ownership
+      // and move the in-memory route to the new id.
+      setWorkflowIds(response.data.workflow_id, runId);
+      setWorkflowId(response.data.workflow_id);
+      setInteractionMode(true);
+      setIsRunning(0);
+      toast.success("Workflow duplicated. Now editing your copy.");
+      router.push(`/workflow/${response.data.workflow_id}/builder`);
     } catch (error) {
       console.log(error);
       setIsRunning(0);
