@@ -1,9 +1,12 @@
 import { type ComponentType, useCallback, useEffect, useState } from 'react'
 
+import { useStore } from '@nanostores/react'
+
 import { Button } from '@/components/ui/button'
 import { Codicon } from '@/components/ui/codicon'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
+import { $studioKey, ensureStudioKeyLoaded, saveStudioKey } from '@/store/studio-key'
 
 import { PAGE_INSET_X } from '../layout-constants'
 import type { SetStatusbarItemGroup } from '../shell/statusbar-controls'
@@ -72,8 +75,10 @@ function urlsFromGeneration(generation: StudioGeneration): string[] {
 }
 
 // The ported generative-AI studio (Muapi BYOK) as a local Basecamp function.
-// Results auto-save to the on-disk library (and surface in Artifacts). Transport
-// runs through the main-process proxy so the http renderer bypasses CORS.
+// Browsable without a key: every tab renders immediately, and the connect
+// prompt only appears once the user starts typing into a studio. Results
+// auto-save to the on-disk library (and surface in Artifacts). Transport runs
+// through the main-process proxy so the http renderer bypasses CORS.
 export function StudioView({ setStatusbarItemGroup }: StudioViewProps) {
   useEffect(() => {
     setStatusbarItemGroup('studio', [])
@@ -81,30 +86,40 @@ export function StudioView({ setStatusbarItemGroup }: StudioViewProps) {
     return () => setStatusbarItemGroup('studio', [])
   }, [setStatusbarItemGroup])
 
-  // The Muapi key is loaded once from OS-encrypted storage. `null` = still
-  // loading; '' = none stored (show the gate); non-empty = ready.
-  const [apiKey, setApiKey] = useState<string | null>(null)
+  // `null` = still loading; '' = none stored; non-empty = ready.
+  const storedKey = useStore($studioKey)
+  const hasKey = Boolean(storedKey)
   const [activeTab, setActiveTab] = useState<StudioTabId>('image')
   // Bumped after each save so the Library refreshes when the user switches to it.
   const [libraryVersion, setLibraryVersion] = useState(0)
+  const [keyGateOpen, setKeyGateOpen] = useState(false)
+  // Closing the gate without connecting stops it re-opening on every keystroke;
+  // switching tabs re-arms it.
+  const [keyGateDismissed, setKeyGateDismissed] = useState(false)
 
   useEffect(() => {
-    let cancelled = false
-
-    void (async () => {
-      const stored = (await window.hermesDesktop?.studio?.getKey()) ?? ''
-
-      if (!cancelled) {setApiKey(stored)}
-    })()
-
-    return () => {
-      cancelled = true
-    }
+    ensureStudioKeyLoaded()
   }, [])
 
-  const connect = useCallback((key: string) => {
-    void window.hermesDesktop?.studio?.setKey(key)
-    setApiKey(key)
+  const openTab = useCallback((id: StudioTabId) => {
+    setActiveTab(id)
+    setKeyGateDismissed(false)
+  }, [])
+
+  // Typing anywhere inside a studio (prompt boxes included) without a stored
+  // key surfaces the connect prompt.
+  const handleStudioInput = useCallback(() => {
+    if (!hasKey && !keyGateOpen && !keyGateDismissed) {setKeyGateOpen(true)}
+  }, [hasKey, keyGateOpen, keyGateDismissed])
+
+  const handleConnect = useCallback((key: string) => {
+    saveStudioKey(key)
+    setKeyGateOpen(false)
+  }, [])
+
+  const dismissKeyGate = useCallback(() => {
+    setKeyGateOpen(false)
+    setKeyGateDismissed(true)
   }, [])
 
   // Auto-save: as soon as a job resolves, persist every result to the local
@@ -134,14 +149,6 @@ export function StudioView({ setStatusbarItemGroup }: StudioViewProps) {
     [activeTab]
   )
 
-  if (apiKey === null) {
-    return <div className="flex h-full min-h-0 flex-1 items-center justify-center" />
-  }
-
-  if (!apiKey) {
-    return <StudioKeyGate onSubmit={connect} />
-  }
-
   const active = STUDIO_TABS.find(tab => tab.id === activeTab) ?? STUDIO_TABS[0]
   const ActiveStudio = active.Component
 
@@ -159,28 +166,53 @@ export function StudioView({ setStatusbarItemGroup }: StudioViewProps) {
                   : 'text-muted-foreground hover:text-foreground'
               )}
               key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => openTab(tab.id)}
               type="button"
             >
               {tab.label}
             </button>
           ))}
         </div>
-        <StudioCredits apiKey={apiKey} refreshSignal={libraryVersion} />
+        <StudioCredits apiKey={storedKey || null} refreshSignal={libraryVersion} />
       </div>
-      <div className="min-h-0 flex-1 overflow-auto">
+      <div className="relative min-h-0 flex-1 overflow-auto" onInputCapture={handleStudioInput}>
         {ActiveStudio ? (
-          <ActiveStudio apiKey={apiKey} onGenerationComplete={handleGenerationComplete} />
+          <ActiveStudio apiKey={storedKey ?? ''} onGenerationComplete={handleGenerationComplete} />
         ) : (
           <StudioLibrary refreshKey={libraryVersion} />
         )}
+        {keyGateOpen ? (
+          <div
+            className="absolute inset-0 z-20 flex items-center justify-center bg-black/50"
+            data-testid="studio-key-overlay"
+            onClick={dismissKeyGate}
+            onKeyDown={event => {
+              if (event.key === 'Escape') {dismissKeyGate()}
+            }}
+          >
+            <div
+              className="relative mx-4 w-full max-w-md rounded-lg border border-border bg-background p-6 shadow-lg"
+              onClick={event => event.stopPropagation()}
+            >
+              <button
+                aria-label="Close"
+                className="absolute right-3 top-3 text-muted-foreground transition-colors hover:text-foreground"
+                onClick={dismissKeyGate}
+                type="button"
+              >
+                <Codicon name="close" size={14} />
+              </button>
+              <StudioKeyGate onSubmit={handleConnect} />
+            </div>
+          </div>
+        ) : null}
       </div>
     </div>
   )
 }
 
-// One-time gate: Studio needs a Muapi key before any studio can mount. The user
-// pastes their own key; it is persisted OS-encrypted via safeStorage.
+// Connect prompt: pastes a Muapi key, persisted OS-encrypted via safeStorage.
+// Rendered inside the typing-triggered overlay (and reusable standalone).
 // Exported for tests.
 export function StudioKeyGate({ onSubmit }: { onSubmit: (key: string) => void }) {
   const [draft, setDraft] = useState('')

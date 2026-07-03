@@ -1,15 +1,7 @@
-import { useEffect, useState } from 'react'
-
 import { Codicon } from '@/components/ui/codicon'
 import { cn } from '@/lib/utils'
 
-import { getUserBalance } from './vendor'
-
-// Muapi credit balances can carry decimals; group thousands and cap at two
-// places so 42.5 stays "42.5" and 1234 reads "1,234".
-function formatCredits(balance: number): string {
-  return balance.toLocaleString('en-US', { maximumFractionDigits: 2 })
-}
+import { formatCredits, useStudioBalance } from './use-studio-balance'
 
 interface StudioCreditsProps {
   // Null before a provider key is connected; nothing renders until we have one.
@@ -19,35 +11,10 @@ interface StudioCreditsProps {
 }
 
 // Subtle top-right pill showing the remaining Muapi credit balance for the
-// connected key. The lookup routes through the same main-process proxy as the
-// studios, so there are no CORS concerns. Any failure (missing/expired key,
-// network) hides the pill rather than surfacing an error in the header.
+// connected key. Any failure (missing/expired key, network) hides the pill
+// rather than surfacing an error in the header.
 export function StudioCredits({ apiKey, refreshSignal }: StudioCreditsProps) {
-  const [balance, setBalance] = useState<number | null>(null)
-
-  useEffect(() => {
-    if (!apiKey) {
-      setBalance(null)
-
-      return
-    }
-
-    let cancelled = false
-
-    void getUserBalance(apiKey)
-      .then(result => {
-        if (cancelled) {return}
-        const value = result?.balance
-        setBalance(typeof value === 'number' && Number.isFinite(value) ? value : null)
-      })
-      .catch(() => {
-        if (!cancelled) {setBalance(null)}
-      })
-
-    return () => {
-      cancelled = true
-    }
-  }, [apiKey, refreshSignal])
+  const balance = useStudioBalance(apiKey, refreshSignal)
 
   if (balance === null) {return null}
 
