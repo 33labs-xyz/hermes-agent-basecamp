@@ -166,6 +166,7 @@ contextBridge.exposeInMainWorld('hermesDesktop', {
     setKey: key => ipcRenderer.invoke('studio:key:set', key),
     request: req => ipcRenderer.invoke('studio:muapi:request', req),
     upload: req => ipcRenderer.invoke('studio:muapi:upload', req),
+    uploadSigned: req => ipcRenderer.invoke('studio:muapi:uploadSigned', req),
     gen: {
       save: payload => ipcRenderer.invoke('studio:gen:save', payload),
       list: () => ipcRenderer.invoke('studio:gen:list'),

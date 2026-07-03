@@ -71,6 +71,25 @@ function assertMuapiUrl(rawUrl) {
   return url
 }
 
+// Hosts a presigned upload may target: MuAPI's own domains plus the S3
+// endpoint shapes its get_upload_url API hands back (virtual-hosted and
+// path-style, with or without a region, including the legacy dashed form).
+const S3_UPLOAD_HOST = /^(?:[a-z0-9][a-z0-9.-]*\.)?s3(?:[.-][a-z0-9-]+)?\.amazonaws\.com$/
+
+// Allowlist, not blocklist: anything that isn't a recognized upload host is
+// refused, which inherently blocks IP literals, localhost, and private ranges.
+function assertSignedUploadUrl(rawUrl) {
+  const url = new URL(rawUrl)
+  if (url.protocol !== 'https:') {
+    throw new Error(`Refusing non-https upload URL: ${rawUrl}`)
+  }
+  const host = url.hostname.toLowerCase()
+  if (host === 'muapi.ai' || host.endsWith('.muapi.ai') || S3_UPLOAD_HOST.test(host)) {
+    return url
+  }
+  throw new Error(`Refusing upload to unrecognized host: ${host}`)
+}
+
 function registerStudioIpc({ ipcMain, app, safeStorage }) {
   const root = path.join(app.getPath('userData'), 'studio')
   const keyPath = path.join(root, 'muapi-key.json')
@@ -145,6 +164,37 @@ function registerStudioIpc({ ipcMain, app, safeStorage }) {
       headers: { 'x-api-key': String(req?.apiKey || '') },
       body: form
     })
+    const body = await response.text()
+    return { ok: response.ok, status: response.status, statusText: response.statusText, body }
+  })
+
+  // Multipart POST to a presigned upload URL (S3 or a MuAPI upload host).
+  // The signature in the URL is the auth, so no api key is ever attached.
+  // Used by the vendored workflow/agents/design sub-packages via the axios
+  // shim, which flattens the renderer's FormData into ordered parts.
+  ipcMain.handle('studio:muapi:uploadSigned', async (_event, req) => {
+    const url = assertSignedUploadUrl(req?.url)
+    const parts = Array.isArray(req?.parts) ? req.parts : []
+    if (!parts.some(part => part?.kind === 'file')) {
+      throw new Error('Signed upload has no file part')
+    }
+
+    const form = new FormData()
+    // S3 presigned POST ignores fields after the file, so append every field
+    // first and the file(s) last regardless of caller order.
+    for (const part of parts) {
+      if (part?.kind === 'field') form.append(String(part.name), String(part.value ?? ''))
+    }
+    for (const part of parts) {
+      if (part?.kind !== 'file') continue
+      if (!part.bytes) throw new Error(`File part "${part.name}" missing bytes`)
+      const blob = new Blob([Buffer.from(part.bytes)], {
+        type: part.type || 'application/octet-stream'
+      })
+      form.append(String(part.name), blob, part.filename || 'file')
+    }
+
+    const response = await fetch(url, { method: 'POST', body: form })
     const body = await response.text()
     return { ok: response.ok, status: response.status, statusText: response.statusText, body }
   })
@@ -274,4 +324,4 @@ function registerStudioIpc({ ipcMain, app, safeStorage }) {
   })
 }
 
-module.exports = { registerStudioIpc }
+module.exports = { assertSignedUploadUrl, registerStudioIpc }
