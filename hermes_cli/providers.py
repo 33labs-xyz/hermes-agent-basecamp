@@ -96,7 +96,10 @@ HERMES_OVERLAYS: Dict[str, HermesOverlay] = {
     ),
     "github-copilot": HermesOverlay(
         transport="openai_chat",
-        extra_env_vars=("COPILOT_GITHUB_TOKEN", "GH_TOKEN"),
+        # COPILOT_GITHUB_TOKEN only: GH_TOKEN is an ambient git token (gh CLI,
+        # CI shells) that is not a Copilot chat token — treating it as
+        # credentials surfaced a "ready" Copilot provider that then 401'd.
+        extra_env_vars=("COPILOT_GITHUB_TOKEN",),
     ),
     "anthropic": HermesOverlay(
         transport="anthropic_messages",

@@ -1502,23 +1502,16 @@ def list_authenticated_providers(
                     has_creds = True
             except Exception as exc:
                 logger.debug("Credential pool check failed for %s: %s", hermes_slug, exc)
-        # Fallback: check external credential files directly.
-        # The credential pool gates anthropic behind
-        # is_provider_explicitly_configured() to prevent auxiliary tasks
-        # from silently consuming Claude Code tokens (PR #4210).
-        # But the /model picker is discovery-oriented — we WANT to show
-        # providers the user can switch to, even if they aren't currently
-        # configured.
+        # Fallback: check the hermes-managed OAuth file directly. Only the
+        # login this app created counts — probing the user's Claude Code
+        # install (Keychain / ~/.claude/.credentials.json) made anthropic
+        # look "ready" for anyone who happens to use Claude Code, and those
+        # borrowed tokens don't actually work through this app.
         if not has_creds and hermes_slug == "anthropic":
             try:
-                from agent.anthropic_adapter import (
-                    read_claude_code_credentials,
-                    read_hermes_oauth_credentials,
-                )
+                from agent.anthropic_adapter import read_hermes_oauth_credentials
                 hermes_creds = read_hermes_oauth_credentials()
-                cc_creds = read_claude_code_credentials()
-                if (hermes_creds and hermes_creds.get("accessToken")) or \
-                   (cc_creds and cc_creds.get("accessToken")):
+                if hermes_creds and hermes_creds.get("accessToken"):
                     has_creds = True
             except Exception as exc:
                 logger.debug("Anthropic external creds check failed: %s", exc)
