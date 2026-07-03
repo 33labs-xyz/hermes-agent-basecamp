@@ -181,7 +181,8 @@ export function StudioView({ setStatusbarItemGroup }: StudioViewProps) {
 
 // One-time gate: Studio needs a Muapi key before any studio can mount. The user
 // pastes their own key; it is persisted OS-encrypted via safeStorage.
-function StudioKeyGate({ onSubmit }: { onSubmit: (key: string) => void }) {
+// Exported for tests.
+export function StudioKeyGate({ onSubmit }: { onSubmit: (key: string) => void }) {
   const [draft, setDraft] = useState('')
 
   const submit = () => {
@@ -215,6 +216,14 @@ function StudioKeyGate({ onSubmit }: { onSubmit: (key: string) => void }) {
           Connect
         </Button>
       </div>
+      <a
+        className="text-xs text-(--ui-text-tertiary) underline-offset-4 transition-colors hover:text-foreground hover:underline"
+        href="https://muapi.ai/access-keys"
+        rel="noreferrer"
+        target="_blank"
+      >
+        Get a Muapi API key
+      </a>
     </div>
   )
 }
