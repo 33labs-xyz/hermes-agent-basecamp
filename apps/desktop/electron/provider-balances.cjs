@@ -65,4 +65,18 @@ async function fetchProviderBalance(slug, { revealKey, fetchImpl }) {
   }
 }
 
-module.exports = { ADAPTERS, fetchProviderBalance, parseOpenRouterKeyRemaining }
+// Bridge fetchProviderBalance to the main process's profile-aware secret
+// reveal. `requestJsonForProfile(null, ...)` targets the active profile; the
+// revealed key is used transiently for one fetch and never returned to the
+// renderer or logged. `fetchImpl` is injected so tests stay hermetic.
+function createProviderBalanceResolver({ requestJsonForProfile, fetchImpl }) {
+  const revealKey = async envKey => {
+    const res = await requestJsonForProfile(null, '/api/env/reveal', 'POST', { key: envKey })
+
+    return res && typeof res.value === 'string' ? res.value : null
+  }
+
+  return slug => fetchProviderBalance(slug, { revealKey, fetchImpl })
+}
+
+module.exports = { ADAPTERS, fetchProviderBalance, parseOpenRouterKeyRemaining, createProviderBalanceResolver }

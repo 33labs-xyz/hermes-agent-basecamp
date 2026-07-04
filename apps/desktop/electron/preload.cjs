@@ -161,6 +161,9 @@ contextBridge.exposeInMainWorld('hermesDesktop', {
     fetchMarketplace: id => ipcRenderer.invoke('hermes:vscode-theme:fetch', id),
     searchMarketplace: query => ipcRenderer.invoke('hermes:vscode-theme:search', query)
   },
+  // Titlebar credit chip: fetch one configured provider's balance in the main
+  // process. Returns a number plus a status; the provider key never crosses here.
+  providerBalance: slug => ipcRenderer.invoke('provider:balance', slug),
   // Generative-AI Studio: Muapi key + CORS-bypass proxy + local library.
   studio: {
     getKey: () => ipcRenderer.invoke('studio:key:get'),

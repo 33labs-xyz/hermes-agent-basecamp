@@ -1,7 +1,7 @@
 const test = require('node:test')
 const assert = require('node:assert/strict')
 
-const { fetchProviderBalance, ADAPTERS, parseOpenRouterKeyRemaining } = require('./provider-balances.cjs')
+const { fetchProviderBalance, ADAPTERS, parseOpenRouterKeyRemaining, createProviderBalanceResolver } = require('./provider-balances.cjs')
 
 const SECRET = 'sk-or-v1-secrettoken'
 
@@ -88,4 +88,52 @@ test('parseOpenRouterKeyRemaining returns null on non-finite or missing', () => 
 test('ADAPTERS exposes the openrouter entry with the inference-key endpoint', () => {
   assert.equal(ADAPTERS.openrouter.envKey, 'OPENROUTER_API_KEY')
   assert.equal(ADAPTERS.openrouter.endpoint, 'https://openrouter.ai/api/v1/key')
+})
+
+// --- createProviderBalanceResolver (Task 3 IPC seam) ---
+
+const resolverOkJson = body => ({ ok: true, status: 200, json: async () => body })
+
+test('createProviderBalanceResolver reveals the env key and returns the balance', async () => {
+  let revealPath = null
+  let revealBody = null
+  const resolve = createProviderBalanceResolver({
+    requestJsonForProfile: async (_profile, path, _method, body) => {
+      revealPath = path
+      revealBody = body
+
+      return { value: 'sk-secret' }
+    },
+    fetchImpl: async () => resolverOkJson({ data: { limit_remaining: 12 } })
+  })
+
+  const result = await resolve('openrouter')
+
+  assert.strictEqual(revealPath, '/api/env/reveal')
+  assert.deepStrictEqual(revealBody, { key: 'OPENROUTER_API_KEY' })
+  assert.deepStrictEqual(result, { balance: 12, status: 'ok' })
+})
+
+test('createProviderBalanceResolver returns unavailable when no key is revealed', async () => {
+  const resolve = createProviderBalanceResolver({
+    requestJsonForProfile: async () => ({}),
+    fetchImpl: async () => resolverOkJson({ data: { limit_remaining: 12 } })
+  })
+
+  assert.deepStrictEqual(await resolve('openrouter'), { balance: null, status: 'unavailable' })
+})
+
+test('createProviderBalanceResolver returns unsupported for an unknown slug without revealing', async () => {
+  let revealed = false
+  const resolve = createProviderBalanceResolver({
+    requestJsonForProfile: async () => {
+      revealed = true
+
+      return { value: 'sk-secret' }
+    },
+    fetchImpl: async () => resolverOkJson({})
+  })
+
+  assert.deepStrictEqual(await resolve('nope'), { balance: null, status: 'unsupported' })
+  assert.strictEqual(revealed, false)
 })

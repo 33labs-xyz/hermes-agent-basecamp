@@ -56,6 +56,7 @@ const {
 const { isPackagedInstallPath: isPackagedInstallPathUnderRoots } = require('./workspace-cwd.cjs')
 const { registerStudioIpc } = require('./studio.cjs')
 const { registerTerminalSessionsIpc } = require('./terminal-sessions.cjs')
+const { createProviderBalanceResolver } = require('./provider-balances.cjs')
 const {
   authModeFromStatus,
   buildGatewayWsUrl,
@@ -5748,6 +5749,16 @@ ipcMain.handle('hermes:writeClipboard', (_event, text) => {
 
 // Studio (generative-AI) backend: Muapi key/proxy + local generation library.
 registerStudioIpc({ ipcMain, app, safeStorage })
+
+  // Titlebar credit chip: resolve one configured provider's balance in the main
+  // process so the provider key never crosses into the renderer. `fetch` is the
+  // global available in the Electron main process.
+  const resolveProviderBalance = createProviderBalanceResolver({
+    requestJsonForProfile,
+    fetchImpl: (url, init) => fetch(url, init)
+  })
+
+  ipcMain.handle('provider:balance', (_event, slug) => resolveProviderBalance(String(slug || '')))
 
 const terminalSessionsIpc = registerTerminalSessionsIpc({ ipcMain, app })
 
