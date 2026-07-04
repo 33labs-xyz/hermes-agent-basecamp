@@ -86,7 +86,7 @@ function jobPrompt(job: CronJob): string {
 }
 
 function jobScheduleDisplay(job: CronJob): string {
-  return asText(job.schedule_display) || asText(job.schedule?.display) || asText(job.schedule?.expr) || '—'
+  return asText(job.schedule_display) || asText(job.schedule?.display) || asText(job.schedule?.expr) || '-'
 }
 
 function jobScheduleExpr(job: CronJob): string {
@@ -214,7 +214,7 @@ function scheduleSummary(option: ScheduleOption, expr: string, c: Translations['
 
 function formatTime(iso?: null | string): string {
   if (!iso) {
-    return '—'
+    return '-'
   }
 
   const date = new Date(iso)
@@ -248,7 +248,7 @@ export function CronView({ onClose, onOpenSession, setStatusbarItemGroup: _setSt
   const { t } = useI18n()
   const c = t.cron
   // Source of truth is the shared atom (also fed by the controller poll), so the
-  // sidebar and this overlay never drift — a delete here clears the sidebar row
+  // sidebar and this overlay never drift - a delete here clears the sidebar row
   // immediately. `loading` only gates the first paint before the atom is filled.
   const jobs = useStore($cronJobs)
   const [loading, setLoading] = useState(jobs.length === 0)
@@ -616,12 +616,12 @@ function CronJobDetail({
 
 function formatRunTime(seconds?: null | number): string {
   if (!seconds) {
-    return '—'
+    return '-'
   }
 
   const date = new Date(seconds * 1000)
 
-  return Number.isNaN(date.valueOf()) ? '—' : date.toLocaleString()
+  return Number.isNaN(date.valueOf()) ? '-' : date.toLocaleString()
 }
 
 // Runs are produced by the background scheduler tick (no UI signal), so poll

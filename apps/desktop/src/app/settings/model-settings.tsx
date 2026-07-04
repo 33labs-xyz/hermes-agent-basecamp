@@ -41,7 +41,7 @@ const effortLabelKey = (v: string) => (v === 'xhigh' ? 'max' : v) as 'high' | 'l
 // A provider row is "ready" to pick a model from when it reports models. The
 // backend now surfaces the full `hermes model` universe (every canonical
 // provider), so unconfigured providers come back with `authenticated:false`
-// and an empty `models` list — those need a setup step before a model exists.
+// and an empty `models` list - those need a setup step before a model exists.
 function isProviderReady(p?: ModelOptionProvider): boolean {
   return !!p && (p.authenticated !== false || (p.models?.length ?? 0) > 0)
 }
@@ -64,7 +64,7 @@ const AUX_TASKS: readonly AuxTaskMeta[] = [
   { key: 'curator' }
 ]
 
-const NO_PROVIDERS: readonly ModelOptionProvider[] = [{ name: '—', slug: '', models: [] }]
+const NO_PROVIDERS: readonly ModelOptionProvider[] = [{ name: '-', slug: '', models: [] }]
 
 interface StaleAuxWarningProps {
   applying: boolean
@@ -125,7 +125,7 @@ export function ModelSettings({ onMainModelChanged }: ModelSettingsProps) {
   // switch (provider differs from the new main). Cleared on next switch/reset.
   const [switchStaleAux, setSwitchStaleAux] = useState<StaleAuxAssignment[]>([])
   // Inline API-key entry for picking an unconfigured `api_key` provider in
-  // place — mirrors the onboarding ApiKeyForm but scoped to the model picker.
+  // place - mirrors the onboarding ApiKeyForm but scoped to the model picker.
   const [apiKeyDraft, setApiKeyDraft] = useState('')
   const [activating, setActivating] = useState(false)
 
@@ -204,7 +204,7 @@ export function ModelSettings({ onMainModelChanged }: ModelSettingsProps) {
       .map(entry => ({ task: entry.task, provider: entry.provider, model: entry.model }))
   }, [auxiliary, mainModel])
 
-  // Capabilities of the APPLIED main model — gates the profile-default
+  // Capabilities of the APPLIED main model - gates the profile-default
   // reasoning/speed controls the same way the composer picker gates per-model
   // edits (reasoning defaults on, fast defaults off when unreported).
   const mainCaps = useMemo(() => {
@@ -219,7 +219,7 @@ export function ModelSettings({ onMainModelChanged }: ModelSettingsProps) {
   const fastOn = isFastTier(getNested(config ?? {}, 'agent.service_tier'))
 
   // Persist a single agent.* default by round-tripping the whole config record
-  // (PUT /api/config replaces it) — optimistic, with rollback on failure.
+  // (PUT /api/config replaces it) - optimistic, with rollback on failure.
   const writeAgentDefault = useCallback(
     async (key: string, value: string) => {
       if (!config) {
@@ -259,7 +259,7 @@ export function ModelSettings({ onMainModelChanged }: ModelSettingsProps) {
       setApiKeyDraft('')
 
       // Pick a sensible default for the freshly-activated provider (mirrors
-      // `hermes model` curation). Best-effort — fall through to the refreshed
+      // `hermes model` curation). Best-effort - fall through to the refreshed
       // model list if it fails.
       let nextModel = ''
 
@@ -282,7 +282,7 @@ export function ModelSettings({ onMainModelChanged }: ModelSettingsProps) {
     }
   }, [apiKeyDraft, selectedProviderRow])
 
-  // OAuth / external providers can't be activated with a pasted key — hand off
+  // OAuth / external providers can't be activated with a pasted key - hand off
   // to the shared onboarding flow scoped to this provider's real sign-in. The
   // custom / local endpoint is NOT an OAuth provider, so it gets the dedicated
   // local-endpoint form (URL + optional API key) instead of being dead-ended
@@ -493,8 +493,8 @@ export function ModelSettings({ onMainModelChanged }: ModelSettingsProps) {
         {needsSetup && !setupIsApiKey && (
           <p className="mt-2 text-xs text-muted-foreground">
             {selectedProviderRow?.auth_type === 'api_key'
-              ? `${selectedProviderRow?.name} needs an API key — set it up to choose a model.`
-              : `${selectedProviderRow?.name} signs in through your browser — Basecamp runs the flow for you.`}
+              ? `${selectedProviderRow?.name} needs an API key - set it up to choose a model.`
+              : `${selectedProviderRow?.name} signs in through your browser - Basecamp runs the flow for you.`}
           </p>
         )}
         {config && mainModel && (reasoningSupported || fastSupported) && (

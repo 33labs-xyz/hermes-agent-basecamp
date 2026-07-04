@@ -1,6 +1,6 @@
 /**
  * Built-in desktop themes. Names match the CLI skins / dashboard presets.
- * Add new themes here — no code changes needed elsewhere.
+ * Add new themes here - no code changes needed elsewhere.
  */
 
 import type { DesktopTheme, DesktopThemeTypography } from './types'
@@ -29,7 +29,7 @@ const nousTint = (pct: number) => `color-mix(in srgb, ${NOUS_BLUE} ${pct}%, #FFF
 const nousTintTransparent = (pct: number) => `color-mix(in srgb, ${NOUS_BLUE} ${pct}%, transparent)`
 
 /**
- * Nous — canonical Hermes desktop identity. The palette keeps the current
+ * Nous - canonical Hermes desktop identity. The palette keeps the current
  * glass geometry neutral, then lets the old bb/gui blue and psyche cream
  * return as accent seeds.
  */
@@ -135,11 +135,11 @@ export const midnightTheme: DesktopTheme = {
   }
 }
 
-/** Warm crimson and bronze — forge vibes. Matches the CLI ares skin. */
+/** Warm crimson and bronze - forge vibes. Matches the CLI ares skin. */
 export const emberTheme: DesktopTheme = {
   name: 'ember',
   label: 'Ember',
-  description: 'Warm crimson and bronze — forge vibes',
+  description: 'Warm crimson and bronze - forge vibes',
   colors: {
     background: '#160800',
     foreground: '#ffd8b0',
@@ -176,7 +176,7 @@ export const emberTheme: DesktopTheme = {
 export const monoTheme: DesktopTheme = {
   name: 'mono',
   label: 'Mono',
-  description: 'Clean grayscale — minimal and focused',
+  description: 'Clean grayscale - minimal and focused',
   colors: {
     background: '#0e0e0e',
     foreground: '#eaeaea',
@@ -209,7 +209,7 @@ export const monoTheme: DesktopTheme = {
 export const cyberpunkTheme: DesktopTheme = {
   name: 'cyberpunk',
   label: 'Cyberpunk',
-  description: 'Neon green on black — matrix terminal',
+  description: 'Neon green on black - matrix terminal',
   colors: {
     background: '#000a00',
     foreground: '#00ff41',
@@ -246,7 +246,7 @@ export const cyberpunkTheme: DesktopTheme = {
 export const slateTheme: DesktopTheme = {
   name: 'slate',
   label: 'Slate',
-  description: 'Cool slate blue — focused developer theme',
+  description: 'Cool slate blue - focused developer theme',
   colors: {
     background: '#0d1117',
     foreground: '#c9d1d9',
@@ -286,7 +286,7 @@ const campTint = (pct: number) => `color-mix(in srgb, ${CAMP_GREEN} ${pct}%, #FF
 const campTintTransparent = (pct: number) => `color-mix(in srgb, ${CAMP_GREEN} ${pct}%, transparent)`
 
 /**
- * Basecamp — the default identity for this app. Warm cream surfaces with forest
+ * Basecamp - the default identity for this app. Warm cream surfaces with forest
  * green accents drawn from the mountain mark; deep evergreen in dark mode.
  */
 export const basecampTheme: DesktopTheme = {

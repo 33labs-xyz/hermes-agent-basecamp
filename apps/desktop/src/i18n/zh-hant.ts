@@ -263,7 +263,7 @@ export const zhHant = defineLocale({
       technicalDesc: '包含原始工具參數、結果與底層細節。',
       themeTitle: '主題',
       themeDesc: '僅限桌面端的調色盤。所選模式會套用在其上。',
-      themeProfileNote: profile => `已為「${profile}」設定檔儲存——每個設定檔保留各自的主題。`,
+      themeProfileNote: profile => `已為「${profile}」設定檔儲存--每個設定檔保留各自的主題。`,
       installTitle: '從 VS Code 安裝',
       installDesc: '貼上 Marketplace 擴充功能 ID（例如 dracula-theme.theme-dracula），將其配色主題轉換為桌面調色盤。',
       installPlaceholder: 'publisher.extension',
@@ -1045,7 +1045,7 @@ export const zhHant = defineLocale({
     soulPlaceholderEmpty: '空的',
     unsavedChanges: '有未儲存的變更',
     loadingSoul: '正在載入 SOUL.md…',
-    emptySoul: '空的 SOUL.md — 開始撰寫角色設定…',
+    emptySoul: '空的 SOUL.md - 開始撰寫角色設定…',
     saving: '儲存中…',
     saveSoul: '儲存 SOUL.md',
     deleteTitle: '刪除設定檔？',
@@ -1534,7 +1534,7 @@ export const zhHant = defineLocale({
       restarting: '後端正在重新啟動以載入更新…',
       notAvailable: '此後端無法更新。',
       failed: '後端更新失敗。',
-      noReturn: '後端未恢復連線。更新可能未完成——請檢查後端主機。'
+      noReturn: '後端未恢復連線。更新可能未完成--請檢查後端主機。'
     }
   },
 
@@ -1616,8 +1616,8 @@ export const zhHant = defineLocale({
     update: '更新',
     flowSubtitles: {
       pkce: '開啟瀏覽器登入，然後回到這裡繼續',
-      device_code: '在瀏覽器中開啟驗證頁面 — Basecamp 會自動連線',
-      loopback: '開啟瀏覽器登入 — Basecamp 會自動連線',
+      device_code: '在瀏覽器中開啟驗證頁面 - Basecamp 會自動連線',
+      loopback: '開啟瀏覽器登入 - Basecamp 會自動連線',
       external: '先在終端機登入一次，然後回來繼續聊天'
     },
     startingSignIn: provider => `正在為 ${provider} 啟動登入...`,
@@ -1753,8 +1753,8 @@ export const zhHant = defineLocale({
       contextUsage: '上下文使用量',
       session: '工作階段',
       runtimeSessionElapsed: '執行時工作階段已用時間',
-      yoloOn: 'YOLO 已開啟 — 自動核准危險指令。點擊關閉。Shift+點擊可全域切換。',
-      yoloOff: 'YOLO 已關閉 — 點擊自動核准危險指令。Shift+點擊可全域切換。',
+      yoloOn: 'YOLO 已開啟 - 自動核准危險指令。點擊關閉。Shift+點擊可全域切換。',
+      yoloOff: 'YOLO 已關閉 - 點擊自動核准危險指令。Shift+點擊可全域切換。',
       modelNone: '無',
       noModel: '無模型',
       switchModel: '切換模型',
@@ -1774,7 +1774,7 @@ export const zhHant = defineLocale({
     remotePickerTitle: '選擇遠端資料夾',
     remotePickerDescription: '瀏覽已連線後端上的資料夾。',
     remotePickerSelect: '選擇資料夾',
-    folderTip: cwd => `${cwd} — 點擊以變更資料夾`,
+    folderTip: cwd => `${cwd} - 點擊以變更資料夾`,
     openFolder: '開啟資料夾',
     refreshTree: '重新整理檔案樹',
     collapseAll: '收合所有資料夾',
@@ -1896,7 +1896,7 @@ export const zhHant = defineLocale({
       stop: '停止',
       restorePrevious: '還原至上一個檢查點',
       restoreCheckpoint: '還原檢查點',
-      restoreFromHere: '還原檢查點 — 從此提示重新執行',
+      restoreFromHere: '還原檢查點 - 從此提示重新執行',
       restoreTitle: '還原至此檢查點？',
       restoreBody: '此提示之後的所有訊息將從對話中移除，並從此處重新執行該提示。',
       restoreConfirm: '還原並重新執行',
@@ -2031,7 +2031,7 @@ export const zhHant = defineLocale({
     handoff: {
       pickPlatform: '選擇目標平台',
       success: platform => `已移交到 ${platform}。隨時可在此處恢復。`,
-      systemNote: platform => `↻ 已移交到 ${platform} — 隨時可在此處恢復。`,
+      systemNote: platform => `↻ 已移交到 ${platform} - 隨時可在此處恢復。`,
       failed: error => `移交失敗：${error}`,
       timedOut: '等待閘道逾時。`hermes gateway` 是否正在執行？'
     }

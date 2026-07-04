@@ -85,7 +85,7 @@ export const PROVIDER_GROUPS: ProviderPrefix[] = [
   {
     prefix: 'DASHSCOPE_',
     name: 'DashScope (Qwen)',
-    description: 'Alibaba Cloud DashScope — Qwen and multi-vendor models',
+    description: 'Alibaba Cloud DashScope - Qwen and multi-vendor models',
     docsUrl: 'https://modelstudio.console.alibabacloud.com/',
     priority: 6
   },
@@ -130,7 +130,7 @@ export const PROVIDER_GROUPS: ProviderPrefix[] = [
   {
     prefix: 'HF_',
     name: 'Hugging Face',
-    description: 'Inference Providers — 20+ open models via router.huggingface.co',
+    description: 'Inference Providers - 20+ open models via router.huggingface.co',
     docsUrl: 'https://huggingface.co/settings/tokens',
     priority: 12
   },
@@ -240,17 +240,17 @@ export const ENUM_OPTIONS: Record<string, string[]> = {
   'context.engine': ['compressor', 'default', 'custom'],
   'delegation.reasoning_effort': ['', 'minimal', 'low', 'medium', 'high', 'xhigh'],
   'memory.provider': ['', 'builtin', 'honcho'],
-  // Terminal execution backends — kept in sync with the dispatch ladder in
+  // Terminal execution backends - kept in sync with the dispatch ladder in
   // tools/terminal_tool.py::_create_environment (local/docker/singularity/
   // modal/daytona/ssh). Remote backends need extra env (image, tokens, host).
   'terminal.backend': ['local', 'docker', 'singularity', 'modal', 'daytona', 'ssh'],
   'stt.elevenlabs.model_id': ['scribe_v2', 'scribe_v1'],
   'stt.local.model': ['tiny', 'base', 'small', 'medium', 'large-v3'],
-  // Speech-to-text backends — kept in sync with the stt block in
+  // Speech-to-text backends - kept in sync with the stt block in
   // hermes_cli/config.py (local/groq/openai/mistral/elevenlabs).
   'stt.provider': ['local', 'groq', 'openai', 'mistral', 'xai', 'elevenlabs'],
   'tts.openai.voice': ['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer'],
-  // Text-to-speech backends — kept in sync with the built-in source of truth
+  // Text-to-speech backends - kept in sync with the built-in source of truth
   // (agent/tts_registry.py::_BUILTIN_NAMES / tools/tts_tool.py::
   // BUILTIN_TTS_PROVIDERS). 'xai' is Grok TTS.
   'tts.provider': [

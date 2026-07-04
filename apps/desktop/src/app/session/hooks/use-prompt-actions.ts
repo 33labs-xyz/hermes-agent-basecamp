@@ -134,7 +134,7 @@ function isSessionBusyError(error: unknown): boolean {
 const sleep = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms))
 
 // Retry a gateway call across transient "session busy" so it never reaches the
-// user — the turn settles within the deadline and the call lands.
+// user - the turn settles within the deadline and the call lands.
 async function withSessionBusyRetry<T>(call: () => Promise<T>): Promise<T> {
   const deadline = Date.now() + SESSION_BUSY_RETRY_TIMEOUT_MS
 
@@ -218,7 +218,7 @@ type GatewayRequest = <T>(method: string, params?: Record<string, unknown>) => P
  * remote mode (so vision works) and pass the path locally; non-image files
  * upload bytes remotely and pass the path locally. Throws on failure so callers
  * can surface an error. Shared by submit-time sync, the eager drop-time upload,
- * and the message-edit composer drop — keep them in lockstep.
+ * and the message-edit composer drop - keep them in lockstep.
  */
 export async function uploadComposerAttachment(
   attachment: ComposerAttachment,
@@ -448,7 +448,7 @@ export function usePromptActions({
         let attachment = original
 
         // Join a drop-time eager upload still in flight for this attachment
-        // before deciding anything — otherwise submit and the eager task both
+        // before deciding anything - otherwise submit and the eager task both
         // call file.attach and stage duplicate files. After it settles, take the
         // store's updated copy (its gateway ref, or its failure) over the stale
         // pre-upload snapshot.
@@ -461,7 +461,7 @@ export function usePromptActions({
 
         // Already-synced or pathless refs (terminal, url, etc.) pass through.
         // A drop-time eager upload may already have staged this one (matching
-        // attachedSessionId) — don't re-upload it.
+        // attachedSessionId) - don't re-upload it.
         if (!attachment.path || attachment.attachedSessionId === sessionId) {
           synced.push(attachment)
 
@@ -496,7 +496,7 @@ export function usePromptActions({
   //
   // Images are intentionally NOT eager-uploaded: attachImagePath adds the chip
   // and then fills in `previewUrl` (the base64 thumbnail) on a second tick, so
-  // an eager upload would race that write — clobbering the thumbnail and
+  // an eager upload would race that write - clobbering the thumbnail and
   // swapping `path` to a gateway path the local preview can't read. Images are
   // small and still byte-upload at submit via image.attach_bytes.
   const eagerlyUploadAttachment = useCallback(
@@ -507,7 +507,7 @@ export function usePromptActions({
 
       try {
         // Update-only: if the user removed the chip while this was uploading,
-        // don't resurrect it — just drop the staged result on the floor.
+        // don't resurrect it - just drop the staged result on the floor.
         updateComposerAttachment(await uploadComposerAttachment(attachment, { remote, requestGateway, sessionId }))
       } catch (err) {
         // Leave the chip in place so submit-time sync can retry (or the user can
@@ -560,7 +560,7 @@ export function usePromptActions({
       // workspace-relative paths the remote gateway can resolve). Seed the
       // optimistic message with the pre-sync refs, then rewrite once synced.
       // Images use their base64 preview so the thumbnail renders inline without
-      // a (remote-mode 403-prone) /api/media fetch — see optimisticAttachmentRef.
+      // a (remote-mode 403-prone) /api/media fetch - see optimisticAttachmentRef.
       let attachmentRefs = attachments.map(optimisticAttachmentRef).filter((r): r is string => Boolean(r))
 
       const buildContextText = (atts: ComposerAttachment[]): string => {
@@ -576,7 +576,7 @@ export function usePromptActions({
       }
 
       // Queue drains fire on the busy→false settle edge, where busyRef (synced
-      // from $busy by a separate effect) may still read true — honoring it would
+      // from $busy by a separate effect) may still read true - honoring it would
       // bounce the drained send. The drain lock serializes them; the user path
       // keeps the guard so a stray Enter mid-turn can't double-submit.
       const hasSendable = Boolean(visibleText || terminalContextBlocks || attachments.length || hasImage)
@@ -600,7 +600,7 @@ export function usePromptActions({
         setAwaitingResponse(false)
       }
 
-      // Idempotent optimistic insert — re-running with the resolved sessionId
+      // Idempotent optimistic insert - re-running with the resolved sessionId
       // after createBackendSessionForSend just overwrites with the same id.
       const seedOptimistic = (sid: string) =>
         updateSessionState(
@@ -614,7 +614,7 @@ export function usePromptActions({
             awaitingResponse: true,
             pendingBranchGroup: null,
             sawAssistantPayload: false,
-            // Fresh submit = new turn — clear any leftover interrupt flag, else
+            // Fresh submit = new turn - clear any leftover interrupt flag, else
             // mutateStream/completeAssistantMessage drop every delta of this turn
             // (what made drained-after-interrupt sends go silent).
             interrupted: false
@@ -696,7 +696,7 @@ export function usePromptActions({
 
         // Rewrite the optimistic message + prompt text with the synced refs so
         // the gateway receives @file: paths that resolve in its workspace.
-        // (Images keep their inline base64 preview — see optimisticAttachmentRef.)
+        // (Images keep their inline base64 preview - see optimisticAttachmentRef.)
         attachmentRefs = syncedAttachments.map(optimisticAttachmentRef).filter((r): r is string => Boolean(r))
         rewriteOptimistic(sessionId)
         const text = buildContextText(syncedAttachments)
@@ -741,7 +741,7 @@ export function usePromptActions({
         releaseBusy()
 
         // A queued drain that raced a not-yet-settled turn gets a transient
-        // "session busy" (4009). Don't surface an error bubble/toast — the entry
+        // "session busy" (4009). Don't surface an error bubble/toast - the entry
         // stays queued and the composer's bounded auto-drain retries when idle.
         if (options?.fromQueue && isSessionBusyError(err)) {
           return false
@@ -967,7 +967,7 @@ export function usePromptActions({
           }
 
           if (busyRef.current) {
-            renderSlashOutput('session busy — /interrupt the current turn before sending this command')
+            renderSlashOutput('session busy - /interrupt the current turn before sending this command')
 
             return
           }
@@ -979,7 +979,7 @@ export function usePromptActions({
       }
 
       // One handler per `action` command. Adding a desktop-native command is a
-      // registry row in desktop-slash-commands.ts plus an entry here — never a
+      // registry row in desktop-slash-commands.ts plus an entry here - never a
       // new branch in a dispatch ladder.
       const actionHandlers: Record<DesktopActionId, (ctx: SlashActionCtx) => Promise<void>> = {
         new: async () => {
@@ -994,7 +994,7 @@ export function usePromptActions({
         'create-skill': async () => {
           setCreateSkillOpen(true)
         },
-        // /yolo maps to the status-bar YOLO control — a per-session approval
+        // /yolo maps to the status-bar YOLO control - a per-session approval
         // bypass, same scope as the TUI's Shift+Tab. With no session yet we arm
         // it locally; the session-create path applies it on the first message.
         yolo: async ({ sessionHint }) => {
@@ -1042,7 +1042,7 @@ export function usePromptActions({
             appendSessionTextMessage(sid, 'system', recordInput ? slashStatusText(command, result.error) : result.error)
           }
         },
-        // /profile selects which profile new chats open in — no app relaunch.
+        // /profile selects which profile new chats open in - no app relaunch.
         // A profile is per-session now, so an existing thread can't change its
         // profile mid-stream; `/profile <name>` points the next new chat (and
         // the current empty draft) at that profile's backend.
@@ -1083,7 +1083,7 @@ export function usePromptActions({
           const sid = sessionHint || activeSessionIdRef.current
           const message = handleSkinCommand(arg)
 
-          // No session to print into yet — surface it as a toast instead of
+          // No session to print into yet - surface it as a toast instead of
           // spinning up a backend session just to change the theme.
           if (!sid) {
             notify({ kind: 'success', message })
@@ -1093,7 +1093,7 @@ export function usePromptActions({
 
           appendSessionTextMessage(sid, 'system', recordInput ? slashStatusText(command, message) : message)
         },
-        // /title <name> renames via the gateway's session.title RPC — the same
+        // /title <name> renames via the gateway's session.title RPC - the same
         // path the TUI uses, NOT REST renameSession (which 404s on runtime ids)
         // nor the slash worker (whose DB write can silently fail). Bare /title
         // shows the current title, which the worker owns, so delegate to exec.
@@ -1152,7 +1152,7 @@ export function usePromptActions({
         },
         // /browser connect|disconnect|status manages the live CDP connection on
         // the gateway host, mirroring the TUI's browser.manage RPC. It mutates
-        // BROWSER_CDP_URL (and may launch Chrome) in the gateway process — only
+        // BROWSER_CDP_URL (and may launch Chrome) in the gateway process - only
         // meaningful when that process runs on this machine, so it's gated to
         // local connections. A remote gateway would act on the wrong host.
         browser: async ctx => {
@@ -1166,7 +1166,7 @@ export function usePromptActions({
 
           if ($connection.get()?.mode === 'remote') {
             renderSlashOutput(
-              '/browser manages a Chromium-family browser on the gateway host — only available when connected to a local gateway.'
+              '/browser manages a Chromium-family browser on the gateway host - only available when connected to a local gateway.'
             )
 
             return
@@ -1197,7 +1197,7 @@ export function usePromptActions({
             })
 
             // Without a streamed session subscription, the gateway bundles its
-            // progress lines into `messages` — flush them inline.
+            // progress lines into `messages` - flush them inline.
             result?.messages?.forEach(message => renderSlashOutput(message))
 
             if (cmdAction === 'status') {
@@ -1237,13 +1237,13 @@ export function usePromptActions({
             return
           }
 
-          // Power users can still type `/model <name>` — run it on the backend.
+          // Power users can still type `/model <name>` - run it on the backend.
           await runExec(ctx)
 
           return
         }
 
-        // session picker — /resume, /sessions, /switch
+        // session picker - /resume, /sessions, /switch
         const query = ctx.arg.trim()
 
         if (!query) {
@@ -1276,7 +1276,7 @@ export function usePromptActions({
       }
 
       // The whole dispatcher: resolve the command's desktop surface, then act on
-      // its kind. No per-command ladder — behavior lives in the registry.
+      // its kind. No per-command ladder - behavior lives in the registry.
       async function runSlash(commandText: string, sessionHint?: string, recordInput = true): Promise<void> {
         const command = commandText.trim()
         const { name, arg } = parseSlashCommand(command)
@@ -1475,7 +1475,7 @@ export function usePromptActions({
           return true
         }
       } catch {
-        // Swallow — caller queues the text so nothing is lost.
+        // Swallow - caller queues the text so nothing is lost.
       }
 
       return false
@@ -1561,12 +1561,12 @@ export function usePromptActions({
 
   // Cursor-style "restore checkpoint": rewind the conversation to a past user
   // prompt and run it again from there. Reuses the edit composer's rewind
-  // mechanism — `prompt.submit` with `truncate_before_user_ordinal` drops that
+  // mechanism - `prompt.submit` with `truncate_before_user_ordinal` drops that
   // user turn and everything after it from the session history, then the same
   // text is submitted as a fresh turn. Callers confirm before invoking; errors
   // are rethrown so the confirmation dialog can surface them inline.
   // Submit a rewind (truncate-before-ordinal + resubmit). Because edit/restore
-  // can fire while a turn is streaming, interrupt the live turn first — the
+  // can fire while a turn is streaming, interrupt the live turn first - the
   // cooperative interrupt takes a beat, so the shared busy-retry rides it out.
   const submitRewindPrompt = useCallback(
     async (sessionId: string, text: string, truncateOrdinal: number | undefined, wasRunning: boolean) => {
@@ -1574,7 +1574,7 @@ export function usePromptActions({
         try {
           await requestGateway('session.interrupt', { session_id: sessionId })
         } catch {
-          // Best-effort — the busy-retry below still gates the submit.
+          // Best-effort - the busy-retry below still gates the submit.
         }
       }
 
@@ -1666,7 +1666,7 @@ export function usePromptActions({
       }
 
       // Sending an edit is a revert: rewind to this prompt and re-run with the
-      // new text. It can fire mid-turn, so capture the live state — the submit
+      // new text. It can fire mid-turn, so capture the live state - the submit
       // helper interrupts first when a turn is running.
       const wasRunning = $busy.get()
 
@@ -1676,7 +1676,7 @@ export function usePromptActions({
       const isFailedTurn = nextMessage?.role === 'assistant' && Boolean(nextMessage.error)
       const editedMessage: ChatMessage = { ...source, parts: [textPart(text)] }
 
-      // Editing rewinds the conversation to this prompt — same as restore — so
+      // Editing rewinds the conversation to this prompt - same as restore - so
       // drop the abandoned timeline's todos/background rows (and kill the live
       // processes) before the re-run repopulates them.
       clearSessionTodos(sessionId)
@@ -1706,7 +1706,7 @@ export function usePromptActions({
 
         if (!isFailedTurn && isStaleTargetError(err)) {
           try {
-            // Already interrupted on the first attempt — submit as a plain resend.
+            // Already interrupted on the first attempt - submit as a plain resend.
             await submitRewindPrompt(sessionId, text, undefined, false)
 
             return

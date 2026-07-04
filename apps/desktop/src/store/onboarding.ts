@@ -33,7 +33,7 @@ export type OnboardingFlow =
   | { copied: boolean; provider: OAuthProvider; start: DeviceStart; status: 'polling' }
   // Loopback PKCE (xAI Grok): browser opens, the local backend's 127.0.0.1
   // listener catches the redirect, and we poll until the worker finishes.
-  // No code to paste and no user_code to show — just a waiting state.
+  // No code to paste and no user_code to show - just a waiting state.
   | { provider: OAuthProvider; start: LoopbackStart; status: 'awaiting_browser' }
   | { provider: OAuthProvider; start: OAuthStartResponse; status: 'submitting' }
   | { copied: boolean; provider: OAuthProvider; status: 'external_pending' }
@@ -45,7 +45,7 @@ export type OnboardingFlow =
       // just-authenticated provider (used to persist the chosen model
       // via /api/model/set). The change-model UI uses the existing
       // ModelPickerDialog, which fetches its own model list from
-      // /api/model/options — no need to cache the list here.
+      // /api/model/options - no need to cache the list here.
       currentModel: string
       label: string
       providerSlug: string
@@ -66,7 +66,7 @@ export interface DesktopOnboardingState {
   requested: boolean
   /** True when the user explicitly chose "I'll choose a provider later" on the
    *  first-run picker. Persisted to localStorage so the blocking overlay never
-   *  re-nags on subsequent launches — the user can connect a provider any time
+   *  re-nags on subsequent launches - the user can connect a provider any time
    *  from Settings → Providers (or the model picker's "Add provider"). Distinct
    *  from `configured`: the app still has no usable provider, so chat won't work
    *  until one is connected; we just stop forcing the choice up front. */
@@ -126,7 +126,7 @@ function writeCachedConfigured(value: boolean) {
       window.localStorage.removeItem(CONFIGURED_CACHE_KEY)
     }
   } catch {
-    // localStorage unavailable — degrade silently.
+    // localStorage unavailable - degrade silently.
   }
 }
 
@@ -154,7 +154,7 @@ function writeCachedSkipped(value: boolean) {
       window.localStorage.removeItem(SKIP_CACHE_KEY)
     }
   } catch {
-    // localStorage unavailable — degrade silently.
+    // localStorage unavailable - degrade silently.
   }
 }
 
@@ -216,7 +216,7 @@ const GATEWAY_TOOL_LABELS: Record<string, string> = {
 }
 
 // When switching to Nous auto-routes unconfigured tools through the Tool
-// Gateway, tell the user which ones — same information the CLI prints. Silent
+// Gateway, tell the user which ones - same information the CLI prints. Silent
 // when nothing changed (subscriber already configured, has own keys, etc.).
 function notifyGatewayTools(tools: string[] | undefined) {
   if (!tools || tools.length === 0) {
@@ -229,7 +229,7 @@ function notifyGatewayTools(tools: string[] | undefined) {
   notify({
     durationMs: 8000,
     kind: 'info',
-    message: `${list} now run through your Nous subscription — no separate API keys needed.`,
+    message: `${list} now run through your Nous subscription - no separate API keys needed.`,
     title: 'Tool Gateway enabled'
   })
 }
@@ -240,7 +240,7 @@ function notifyGatewayTools(tools: string[] | undefined) {
 // transition to the model-confirmation step. If anything goes wrong
 // fetching options (no providers returned, network error), the caller
 // falls through to completing onboarding without showing the confirm
-// card — the user gets the undefined-model auto-selection behaviour
+// card - the user gets the undefined-model auto-selection behaviour
 // we had before, which works but is surprising. The confirm step is
 // opportunistic polish, not a hard requirement for onboarding.
 async function fetchProviderDefaultModel(
@@ -274,7 +274,7 @@ async function fetchProviderDefaultModel(
     return null
   }
 
-  // Prefer the backend's recommended default — it mirrors the curation
+  // Prefer the backend's recommended default - it mirrors the curation
   // `hermes model` does (for Nous it honors the user's free/paid tier, so a
   // free user gets a free model rather than a paid default like opus). Fall
   // back to the first curated model if the endpoint can't resolve one.
@@ -291,7 +291,7 @@ async function fetchProviderDefaultModel(
       defaultModel = recommended.model
     }
   } catch {
-    // Endpoint unavailable — keep models[0]. Non-fatal: the confirm card still
+    // Endpoint unavailable - keep models[0]. Non-fatal: the confirm card still
     // shows and the user can change it.
   }
 
@@ -306,14 +306,14 @@ async function fetchProviderDefaultModel(
 // completion if we can't determine a default.
 //
 // onFail receives the runtime-readiness `reason` from checkRuntime so
-// the caller can fold it into a user-facing error — same contract as
+// the caller can fold it into a user-facing error - same contract as
 // reloadAndConnect used to have (which this replaces).
 async function completeWithModelConfirm(
   ctx: OnboardingContext,
   providerLabel: string,
   preferredSlugs: string[],
   onFail: (reason: null | string) => void,
-  // When true, a failing runtime check no longer blocks progression — the
+  // When true, a failing runtime check no longer blocks progression - the
   // user is allowed through onboarding regardless. Used by the API-key path,
   // where we intentionally don't validate the key (it blocked too many users).
   ignoreRuntimeGate = false
@@ -330,7 +330,7 @@ async function completeWithModelConfirm(
   const defaults = await fetchProviderDefaultModel(preferredSlugs)
 
   if (!defaults) {
-    // Couldn't get a sensible default — proceed without confirm step.
+    // Couldn't get a sensible default - proceed without confirm step.
     notifyReady(providerLabel)
     completeDesktopOnboarding()
     ctx.onCompleted?.()
@@ -340,7 +340,7 @@ async function completeWithModelConfirm(
 
   // Persist the default model BEFORE showing the confirm card so that:
   // (1) "current default: X" shown in the UI is what's actually written
-  //     to config — no lying.
+  //     to config - no lying.
   // (2) If the user clicks "Start chatting" without changing anything,
   //     no extra write is needed.
   // (3) If they bail out (e.g., refresh the page), they still end up
@@ -354,7 +354,7 @@ async function completeWithModelConfirm(
 
     notifyGatewayTools(res.gateway_tools)
   } catch {
-    // Persistence failed — still show the confirm card so the user can
+    // Persistence failed - still show the confirm card so the user can
     // pick something explicitly. The backend will pick its own default
     // at chat time if we end up never persisting.
   }
@@ -407,7 +407,7 @@ export function requestDesktopOnboarding(reason = DEFAULT_ONBOARDING_REASON) {
 }
 
 // Open the onboarding provider selector on demand from an already-configured
-// app — e.g. the model picker's "Add provider" button. Reuses the entire
+// app - e.g. the model picker's "Add provider" button. Reuses the entire
 // onboarding flow (OAuth rows, API-key form, model-confirm) instead of
 // duplicating provider UI. Sets manual=true so the overlay shows the picker
 // even though configured===true, and refreshes the provider list.
@@ -451,7 +451,7 @@ export function startManualApiKey(initialEnvKey: string, reason: null | string =
 // Model's "Set up custom endpoint" so it lands on a form that can actually
 // configure the endpoint instead of dead-ending on the OAuth provider list
 // (`custom` is not an OAuth provider, so the generic manual flow would just
-// re-show the picker — the original "booted back to the first screen" loop).
+// re-show the picker - the original "booted back to the first screen" loop).
 export function startManualLocalEndpoint(reason: null | string = null) {
   pendingProviderOAuthId = null
   patch({
@@ -491,7 +491,7 @@ export function clearPendingProviderOAuth() {
 }
 
 // Dismiss a manually-opened provider selector without touching the existing
-// (working) configuration. Only valid in the manual path — the unconfigured
+// (working) configuration. Only valid in the manual path - the unconfigured
 // first-run flow has no close affordance because the app can't run yet.
 export function closeManualOnboarding() {
   pendingProviderOAuthId = null
@@ -503,7 +503,7 @@ export function completeDesktopOnboarding() {
   clearPoll()
   writeCachedConfigured(true)
   // A real provider is now connected, so any earlier "choose later" skip is
-  // moot — clear it so the flag never lingers in a configured install.
+  // moot - clear it so the flag never lingers in a configured install.
   writeCachedSkipped(false)
   $desktopOnboarding.set({
     configured: true,
@@ -522,7 +522,7 @@ export function completeDesktopOnboarding() {
 // "I'll choose a provider later" on the first-run picker. Persists the skip so
 // the blocking overlay never re-nags on future launches, and dismisses it now
 // so the user lands in the app. Chat won't work until a provider is connected
-// (from Settings → Providers or the model picker's "Add provider") — this only
+// (from Settings → Providers or the model picker's "Add provider") - this only
 // stops forcing the choice up front. Distinct from completeDesktopOnboarding,
 // which marks the app actually configured.
 export function dismissFirstRunOnboarding() {
@@ -544,7 +544,7 @@ export function setOnboardingMode(mode: OnboardingMode) {
 
 export async function refreshOnboarding(ctx: OnboardingContext) {
   // Manual mode (user opened the selector from a working app): never
-  // auto-dismiss on runtime-ready — the whole point is to let them add /
+  // auto-dismiss on runtime-ready - the whole point is to let them add /
   // switch a provider while already configured. Just ensure the provider
   // list is loaded and show the picker.
   if ($desktopOnboarding.get().manual) {
@@ -557,7 +557,7 @@ export async function refreshOnboarding(ctx: OnboardingContext) {
 
   // First-ever launch: proactively surface the OpenRouter setup screen even when
   // a credential already resolves the runtime. A persistent ~/.basecamp/.env or
-  // auth.json (survives reinstalls) — or an ambient provider env var — would
+  // auth.json (survives reinstalls) - or an ambient provider env var - would
   // otherwise auto-complete onboarding and hide the screen entirely. The "I'll
   // choose a provider later" button (dismissFirstRunOnboarding, which writes the
   // skip flag) is the escape; once skipped or actually onboarded this stops
@@ -573,7 +573,7 @@ export async function refreshOnboarding(ctx: OnboardingContext) {
   }
 
   const state = $desktopOnboarding.get()
-  // A first launch is never a real "provider broke" problem — whether the
+  // A first launch is never a real "provider broke" problem - whether the
   // runtime resolved (leftover credential) or not (auto-harvested dead env
   // credential), the user hasn't picked anything yet. Keep the picker calm and
   // only carry a reason that was explicitly requested.
@@ -794,7 +794,7 @@ export async function saveOnboardingApiKey(
   value: string,
   label: string,
   ctx: OnboardingContext,
-  // Optional endpoint key — only meaningful for the "Local / custom endpoint"
+  // Optional endpoint key - only meaningful for the "Local / custom endpoint"
   // option, whose primary `value` is the base URL. Ignored for plain API-key
   // providers (their key IS `value`).
   endpointApiKey?: string
@@ -807,7 +807,7 @@ export async function saveOnboardingApiKey(
 
   // The "Local / custom endpoint" option carries a base URL (in `value`) plus
   // an optional API key. It must be wired into config (provider=custom +
-  // base_url + model + api_key), not dropped into .env — runtime resolution
+  // base_url + model + api_key), not dropped into .env - runtime resolution
   // ignores OPENAI_BASE_URL.
   if (envKey === 'OPENAI_BASE_URL') {
     return saveOnboardingLocalEndpoint(trimmed, endpointApiKey?.trim() ?? '', ctx)
@@ -822,7 +822,7 @@ export async function saveOnboardingApiKey(
     await setEnvVar(envKey, trimmed)
     // For API-key flows we don't have a definitive provider id (the
     // user picked which API key they're entering, but the corresponding
-    // backend slug — e.g. OPENROUTER_API_KEY → "openrouter" — is the
+    // backend slug - e.g. OPENROUTER_API_KEY → "openrouter" - is the
     // env-key prefix stripped). Pass a couple of likely candidates;
     // fetchProviderDefaultModel falls back to the first authenticated
     // provider returned by /api/model/options if none match.
@@ -949,7 +949,7 @@ export async function setOnboardingModel(model: string) {
 }
 
 // User clicked "Start chatting" on the confirm card. Finalizes onboarding
-// — the model was already persisted by completeWithModelConfirm (or by
+// - the model was already persisted by completeWithModelConfirm (or by
 // setOnboardingModel if they changed it), so all that's left is to mark
 // onboarding done and unblock the rest of the app.
 export function confirmOnboardingModel(ctx: OnboardingContext) {

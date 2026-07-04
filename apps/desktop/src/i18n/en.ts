@@ -283,7 +283,7 @@ export const en: Translations = {
     notifications: {
       title: 'Notifications',
       intro:
-        'Native desktop notifications, separate from in-app toasts. These are device-local — each computer keeps its own settings.',
+        'Native desktop notifications, separate from in-app toasts. These are device-local - each computer keeps its own settings.',
       enableAll: 'Enable notifications',
       enableAllDesc: 'Master switch. Turn this off to silence every notification below.',
       focusedHint: 'Completion alerts only fire while Basecamp is in the background.',
@@ -357,7 +357,7 @@ export const en: Translations = {
       technicalDesc: 'Include raw tool args/results and low-level details.',
       themeTitle: 'Theme',
       themeDesc: 'Desktop palettes only. The selected mode is applied on top.',
-      themeProfileNote: profile => `Saved for the ${profile} profile — each profile keeps its own theme.`,
+      themeProfileNote: profile => `Saved for the ${profile} profile - each profile keeps its own theme.`,
       installTitle: 'Install from VS Code',
       installDesc:
         'Paste a Marketplace extension id (e.g. dracula-theme.theme-dracula) to convert its color theme into a desktop palette.',
@@ -457,7 +457,7 @@ export const en: Translations = {
       remoteUrlTitle: 'Remote URL',
       remoteUrlDesc: 'Base URL for the remote dashboard backend. Path prefixes are supported, for example /hermes.',
       probing: 'Checking how this gateway authenticates…',
-      probeError: 'Could not reach this gateway yet. Check the URL — the auth method will appear once it responds.',
+      probeError: 'Could not reach this gateway yet. Check the URL - the auth method will appear once it responds.',
       signedIn: 'Signed in',
       signIn: 'Sign in',
       signOut: 'Sign out',
@@ -477,7 +477,7 @@ export const en: Translations = {
       saveForRestart: 'Save for next restart',
       saveAndReconnect: 'Save and reconnect',
       diagnostics: 'Diagnostics',
-      diagnosticsDesc: 'Reveal desktop.log in your file manager — useful when the gateway fails to start.',
+      diagnosticsDesc: 'Reveal desktop.log in your file manager - useful when the gateway fails to start.',
       openLogs: 'Open logs',
       incompleteTitle: 'Remote gateway incomplete',
       incompleteSignIn: 'Enter a remote URL and sign in before switching to remote.',
@@ -565,7 +565,7 @@ export const en: Translations = {
       connectAccount: 'Connect an account',
       haveApiKey: 'Have an API key instead?',
       intro:
-        'Sign in with a subscription — no API key to copy. Basecamp runs the browser sign-in for you, right here in the app.',
+        'Sign in with a subscription - no API key to copy. Basecamp runs the browser sign-in for you, right here in the app.',
       connected: 'Connected',
       collapse: 'Collapse',
       connectAnother: 'Connect another provider',
@@ -573,7 +573,7 @@ export const en: Translations = {
       disconnect: 'Disconnect',
       disconnectInTerminal: 'Disconnect (runs the removal command in the terminal)',
       removeConfirm: provider => `Remove ${provider}?`,
-      removeExternalGeneric: provider => `${provider} is managed by its own CLI — remove it there.`,
+      removeExternalGeneric: provider => `${provider} is managed by its own CLI - remove it there.`,
       removeKeyManaged: provider => `${provider} is configured from an API key. Remove it from API Keys.`,
       removeTerminalConfirm: (provider, command) =>
         `Disconnect ${provider}? This runs "${command}" in the terminal to clear the credential.`,
@@ -599,7 +599,7 @@ export const en: Translations = {
       defaultDirTitle: 'Default project directory',
       defaultDirDesc:
         'New sessions start in this folder unless you pick another. Leave it unset to use your home directory.',
-      defaultDirUpdated: 'Default project directory updated — start a new chat (Ctrl/⌘+N) for it to take effect',
+      defaultDirUpdated: 'Default project directory updated - start a new chat (Ctrl/⌘+N) for it to take effect',
       defaultsTo: label => `Defaults to ${label}.`,
       change: 'Change',
       choose: 'Choose',
@@ -627,13 +627,13 @@ export const en: Translations = {
       selectedMessage: provider => `${provider} is now active.`,
       failedSelect: provider => `Failed to select ${provider}`,
       failedLoad: 'Tool configuration failed to load',
-      noProviderOptions: 'This toolset has no provider options — enable it and it works with your current setup.',
+      noProviderOptions: 'This toolset has no provider options - enable it and it works with your current setup.',
       noProviders: 'No providers are available for this toolset right now.',
       ready: 'Ready',
-      nousIncluded: 'Included with a Nous subscription — sign in to Nous Portal to activate.',
+      nousIncluded: 'Included with a Nous subscription - sign in to Nous Portal to activate.',
       noApiKeyRequired: 'No API key required.',
       postSetupHint: step =>
-        `This backend needs a one-time install (${step}). Runs on this machine — may take a few minutes.`,
+        `This backend needs a one-time install (${step}). Runs on this machine - may take a few minutes.`,
       postSetupRun: 'Run setup',
       postSetupRunning: 'Installing…',
       postSetupStarting: 'Starting…',
@@ -981,7 +981,7 @@ export const en: Translations = {
     soulPlaceholderEmpty: 'empty',
     unsavedChanges: 'Unsaved changes',
     loadingSoul: 'Loading SOUL.md...',
-    emptySoul: 'Empty SOUL.md — start writing the persona...',
+    emptySoul: 'Empty SOUL.md - start writing the persona...',
     saving: 'Saving...',
     saveSoul: 'Save SOUL.md',
     deleteTitle: 'Delete profile?',
@@ -1425,7 +1425,7 @@ export const en: Translations = {
     queueSend: 'Send',
     queueDelete: 'Delete',
     queueStuckTitle: 'Queued message not sent',
-    queueStuckBody: 'A queued turn kept failing to send. It is still in the queue — try sending it again.',
+    queueStuckBody: 'A queued turn kept failing to send. It is still in the queue - try sending it again.',
     previewUnavailable: 'Preview unavailable',
     previewLabel: label => `Preview ${label}`,
     couldNotPreview: label => `Could not preview ${label}`,
@@ -1520,7 +1520,7 @@ export const en: Translations = {
       'The remote backend is applying the update and will restart. Basecamp reconnects automatically when it’s back.',
     applyingClose: 'Basecamp will close to apply the update.',
     errorTitle: 'Update didn’t finish',
-    errorBody: 'No worries — nothing was lost. You can try again now.',
+    errorBody: 'No worries - nothing was lost. You can try again now.',
     notNow: 'Not now',
     applyStatus: {
       preparing: 'Updating backend…',
@@ -1528,7 +1528,7 @@ export const en: Translations = {
       restarting: 'Backend restarting to load the update…',
       notAvailable: 'Update not available for this backend.',
       failed: 'Backend update failed.',
-      noReturn: 'Backend didn’t come back online. The update may not have completed — check the backend host.'
+      noReturn: 'Backend didn’t come back online. The update may not have completed - check the backend host.'
     }
   },
 
@@ -1609,14 +1609,14 @@ export const en: Translations = {
     getKey: 'Get a key',
     replaceCurrent: 'Replace current value',
     pasteApiKey: 'Paste API key',
-    localApiKeyPlaceholder: 'API key (optional — only if your endpoint requires one)',
+    localApiKeyPlaceholder: 'API key (optional - only if your endpoint requires one)',
     couldNotSave: 'Could not save credential.',
     connecting: 'Connecting',
     update: 'Update',
     flowSubtitles: {
       pkce: 'Opens your browser to sign in, then continues here',
-      device_code: 'Opens a verification page in your browser — Basecamp connects automatically',
-      loopback: 'Opens your browser to sign in — Basecamp connects automatically',
+      device_code: 'Opens a verification page in your browser - Basecamp connects automatically',
+      loopback: 'Opens your browser to sign in - Basecamp connects automatically',
       external: 'Sign in once in your terminal, then come back to chat'
     },
     startingSignIn: provider => `Starting sign-in for ${provider}...`,
@@ -1632,7 +1632,7 @@ export const en: Translations = {
     pasteAuthCode: 'Paste authorization code',
     reopenAuthPage: 'Re-open authorization page',
     autoBrowser: provider =>
-      `We opened ${provider} in your browser. Authorize Basecamp there and you'll be connected automatically — nothing to copy or paste.`,
+      `We opened ${provider} in your browser. Authorize Basecamp there and you'll be connected automatically - nothing to copy or paste.`,
     reopenSignInPage: 'Re-open sign-in page',
     waitingAuthorize: 'Waiting for you to authorize...',
     externalPending: provider =>
@@ -1754,8 +1754,8 @@ export const en: Translations = {
       contextUsage: 'Context usage',
       session: 'Session',
       runtimeSessionElapsed: 'Runtime session elapsed',
-      yoloOn: 'YOLO on — auto-approving dangerous commands. Click to turn off. Shift+click toggles it globally.',
-      yoloOff: 'YOLO off — click to auto-approve dangerous commands. Shift+click toggles it globally.',
+      yoloOn: 'YOLO on - auto-approving dangerous commands. Click to turn off. Shift+click toggles it globally.',
+      yoloOff: 'YOLO off - click to auto-approve dangerous commands. Shift+click toggles it globally.',
       modelNone: 'none',
       noModel: 'no model',
       switchModel: 'Switch model',
@@ -1775,7 +1775,7 @@ export const en: Translations = {
     remotePickerTitle: 'Choose remote folder',
     remotePickerDescription: 'Browse folders on the connected backend.',
     remotePickerSelect: 'Select folder',
-    folderTip: cwd => `${cwd} — click to change folder`,
+    folderTip: cwd => `${cwd} - click to change folder`,
     openFolder: 'Open folder',
     refreshTree: 'Refresh tree',
     collapseAll: 'Collapse all folders',
@@ -1899,7 +1899,7 @@ export const en: Translations = {
       stop: 'Stop',
       restorePrevious: 'Restore previous checkpoint',
       restoreCheckpoint: 'Restore checkpoint',
-      restoreFromHere: 'Restore checkpoint — rerun from this prompt',
+      restoreFromHere: 'Restore checkpoint - rerun from this prompt',
       restoreTitle: 'Restore to this checkpoint?',
       restoreBody: 'Everything after this prompt is removed from the conversation, and the prompt runs again from here.',
       restoreConfirm: 'Restore & rerun',
@@ -1920,7 +1920,7 @@ export const en: Translations = {
       reject: 'Reject',
       alwaysTitle: 'Always allow this command?',
       alwaysDescription: pattern =>
-        `This adds the “${pattern}” pattern to your permanent allowlist (~/.basecamp/config.yaml). Basecamp won’t ask again for commands like this — in this session or any future one.`,
+        `This adds the “${pattern}” pattern to your permanent allowlist (~/.basecamp/config.yaml). Basecamp won’t ask again for commands like this - in this session or any future one.`,
       alwaysAllow: 'Always allow'
     },
     clarify: {
@@ -2035,7 +2035,7 @@ export const en: Translations = {
     handoff: {
       pickPlatform: 'Choose a destination',
       success: platform => `Handed off to ${platform}. Resume here anytime.`,
-      systemNote: platform => `↻ Handed off to ${platform} — resume here anytime.`,
+      systemNote: platform => `↻ Handed off to ${platform} - resume here anytime.`,
       failed: error => `Handoff failed: ${error}`,
       timedOut: 'Timed out waiting for the gateway. Is `hermes gateway` running?'
     }

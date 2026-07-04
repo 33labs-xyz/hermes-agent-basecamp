@@ -25,7 +25,7 @@ export interface DesktopThemeCommandOption {
 /**
  * Local client action a command resolves to. Each id maps to exactly one
  * handler in the dispatcher (`use-prompt-actions`), so adding a command never
- * means adding a branch to a switch ladder — you add a row here + a handler
+ * means adding a branch to a switch ladder - you add a row here + a handler
  * keyed by the id.
  */
 export type DesktopActionId =
@@ -48,7 +48,7 @@ export type DesktopUnavailableReason = 'advanced' | 'messaging' | 'settings' | '
 
 /**
  * How the desktop fulfils a command. This is the single discriminator the
- * dispatcher, popover, pills, and pickers all read — no parallel block-lists.
+ * dispatcher, popover, pills, and pickers all read - no parallel block-lists.
  *
  * - `action`     → handled by a local client handler (new chat, branch, …)
  * - `picker`     → opens an overlay (`/model`, `/resume`); a typed arg is
@@ -80,7 +80,7 @@ export interface DesktopCommandSpec {
   /**
    * The command has an inline options "screen" (theme / personality / session /
    * platform / toolset list). Picking the bare command in the popover expands to
-   * that argument step instead of committing — mirroring typing `/<cmd> ` by hand.
+   * that argument step instead of committing - mirroring typing `/<cmd> ` by hand.
    */
   args?: boolean
 }
@@ -91,15 +91,15 @@ const picker = (id: DesktopPickerId): DesktopCommandSurface => ({ kind: 'picker'
 const unavailable = (reason: DesktopUnavailableReason): DesktopCommandSurface => ({ kind: 'unavailable', reason })
 
 /**
- * THE source of truth for desktop slash commands. Everything below — execution
+ * THE source of truth for desktop slash commands. Everything below - execution
  * gating, popover suggestions, catalog filtering, pill grouping, and the
- * dispatcher's behavior — derives from this one table.
+ * dispatcher's behavior - derives from this one table.
  */
 const DESKTOP_COMMAND_SPECS: readonly DesktopCommandSpec[] = [
   // Local client actions
   { name: '/new', description: 'Start a new desktop chat', aliases: ['/reset'], surface: action('new') },
   { name: '/branch', description: 'Branch the latest message into a new chat', aliases: ['/fork'], surface: action('branch') },
-  { name: '/yolo', description: 'Toggle YOLO — auto-approve dangerous commands', surface: action('yolo') },
+  { name: '/yolo', description: 'Toggle YOLO - auto-approve dangerous commands', surface: action('yolo') },
   { name: '/handoff', description: 'Hand off this session to a messaging platform', surface: action('handoff'), args: true },
   { name: '/profile', description: 'Switch the active Basecamp profile', surface: action('profile') },
   { name: '/skin', description: 'Switch desktop theme or cycle to the next one', surface: action('skin'), args: true },
@@ -147,7 +147,7 @@ const DESKTOP_COMMAND_SPECS: readonly DesktopCommandSpec[] = [
   { name: '/reload-skills', aliases: ['/reload_skills'], surface: unavailable('advanced') }
 ]
 
-// Known commands with no desktop surface (and no alias) — a flat name list
+// Known commands with no desktop surface (and no alias) - a flat name list
 // per reason beats 40 identical object literals.
 const NO_DESKTOP_SURFACE: Record<DesktopUnavailableReason, readonly string[]> = {
   terminal: [
@@ -213,7 +213,7 @@ function isKnownHermesSlashCommand(command: string): boolean {
 
 /**
  * An "extension" command is anything the backend surfaces that is NOT one of
- * Hermes' built-in slash commands — i.e. skill commands (`/gif-search`,
+ * Hermes' built-in slash commands - i.e. skill commands (`/gif-search`,
  * `/codex`, …) and user-defined quick commands. These are user-activated, so
  * they appear in the desktop slash palette and execute when typed.
  */

@@ -2,7 +2,7 @@
  * VS Code color-theme → DesktopTheme converter.
  *
  * VS Code themes carry ~hundreds of `workbench.colorCustomization` keys, but the
- * desktop theme model only needs a `DesktopThemeColors` struct — `applyTheme`
+ * desktop theme model only needs a `DesktopThemeColors` struct - `applyTheme`
  * derives every glass/shadcn token from a small seed chain via `color-mix()`.
  * In practice ~6 workbench keys carry the whole look (background, foreground,
  * accent, elevated surface, sidebar, error); everything else we derive by mixing
@@ -11,7 +11,7 @@
  * A VS Code theme is single-mode (light OR dark). Rather than synthesise the
  * opposite mode, we set both `colors` and `darkColors` to the converted palette
  * so the imported theme renders faithfully no matter where the light/dark toggle
- * sits — `renderedModeFor` still picks the `.dark` class from the real
+ * sits - `renderedModeFor` still picks the `.dark` class from the real
  * background luminance, so surface-bound UI matches what's on screen.
  */
 
@@ -20,7 +20,7 @@ import type { DesktopTerminalPalette, DesktopTheme, DesktopThemeColors } from '.
 
 // Section headers / sidebar labels render in --theme-primary directly on the
 // sidebar surface as small (~10px) uppercase text, so the accent has to clear
-// WCAG AA for normal text (4.5:1) or it's unreadable — the "invisible purple
+// WCAG AA for normal text (4.5:1) or it's unreadable - the "invisible purple
 // label" case. Imported accents below this get nudged lighter/darker.
 const ACCENT_MIN_CONTRAST = 4.5
 
@@ -72,7 +72,7 @@ export function parseVscodeTheme(text: string): VscodeColorTheme {
   const stripped = text
     // Block comments.
     .replace(/\/\*[\s\S]*?\*\//g, '')
-    // Line comments (not inside strings — naive but fine for theme files).
+    // Line comments (not inside strings - naive but fine for theme files).
     .replace(/(^|[^:"'\\])\/\/[^\n\r]*/g, '$1')
     // Trailing commas before } or ].
     .replace(/,(\s*[}\]])/g, '$1')
@@ -97,12 +97,12 @@ const isDarkType = (raw: VscodeColorTheme, background: string): boolean => {
     return true
   }
 
-  // No usable `type` — bucket by background luminance.
+  // No usable `type` - bucket by background luminance.
   return luminance(background) < 0.4
 }
 
 // xterm ITheme ANSI slots ← VS Code `terminal.ansi*` tokens. Background is
-// deliberately excluded — the pane keeps the live skin surface (transparency).
+// deliberately excluded - the pane keeps the live skin surface (transparency).
 const ANSI_TOKENS: ReadonlyArray<readonly [keyof DesktopTerminalPalette, string]> = [
   ['black', 'terminal.ansiBlack'],
   ['red', 'terminal.ansiRed'],
@@ -201,7 +201,7 @@ export function convertVscodeColorTheme(raw: VscodeColorTheme, opts: ConvertOpti
   const colors = raw.colors && typeof raw.colors === 'object' ? (raw.colors as Record<string, unknown>) : null
 
   if (!colors) {
-    throw new Error('Theme has no "colors" map — not a VS Code color theme.')
+    throw new Error('Theme has no "colors" map - not a VS Code color theme.')
   }
 
   const derived: string[] = []
@@ -230,10 +230,10 @@ export function convertVscodeColorTheme(raw: VscodeColorTheme, opts: ConvertOpti
 
   const foreground = take(['editor.foreground', 'foreground'], dark ? '#d4d4d4' : '#1f1f1f')
 
-  // Brand accent — the single most load-bearing token. Drives primary buttons,
+  // Brand accent - the single most load-bearing token. Drives primary buttons,
   // focus rings, the streaming cursor, active-session pills, and sidebar labels.
   // Prefer the saturated "brand" tokens (button / link / badge) over focusBorder,
-  // which many themes set to a muted gray — picking it first made imported
+  // which many themes set to a muted gray - picking it first made imported
   // accents look like the desktop defaults. We enforce contrast below regardless.
   const accentSource = take(
     [
@@ -266,7 +266,7 @@ export function convertVscodeColorTheme(raw: VscodeColorTheme, opts: ConvertOpti
   const sidebar = take(['sideBar.background', 'activityBar.background'], mix(background, foreground, dark ? 0.02 : 0.012))
 
   // The accent labels the sidebar (--theme-primary), so guarantee it reads
-  // there — otherwise low-contrast brand colors leave invisible section headers.
+  // there - otherwise low-contrast brand colors leave invisible section headers.
   const accent = ensureContrast(accentSource, sidebar, ACCENT_MIN_CONTRAST)
 
   const border = take(
@@ -335,7 +335,7 @@ export function convertVscodeColorTheme(raw: VscodeColorTheme, opts: ConvertOpti
       // recombine them into proper colors/darkColors via buildThemeFromMarketplace.
       colors: palette,
       darkColors: palette,
-      // Only set when the theme ships a full ANSI palette — the terminal keeps
+      // Only set when the theme ships a full ANSI palette - the terminal keeps
       // its built-in VS Code defaults otherwise.
       ...(terminal ? { terminal } : {})
     }

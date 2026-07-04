@@ -351,7 +351,7 @@ export const zh: Translations = {
       technicalDesc: '包含原始工具参数/结果及底层细节。',
       themeTitle: '主题',
       themeDesc: '仅桌面端调色板。所选模式叠加其上。',
-      themeProfileNote: profile => `已为「${profile}」配置文件保存——每个配置文件保留各自的主题。`,
+      themeProfileNote: profile => `已为「${profile}」配置文件保存--每个配置文件保留各自的主题。`,
       installTitle: '从 VS Code 安装',
       installDesc: '粘贴 Marketplace 扩展 ID（例如 dracula-theme.theme-dracula），将其配色主题转换为桌面调色板。',
       installPlaceholder: 'publisher.extension',
@@ -767,7 +767,7 @@ export const zh: Translations = {
       disconnect: '断开连接',
       disconnectInTerminal: '断开连接（在终端中运行移除命令）',
       removeConfirm: provider => `移除 ${provider}？`,
-      removeExternalGeneric: provider => `${provider} 由其自身的 CLI 管理 — 请在那里移除。`,
+      removeExternalGeneric: provider => `${provider} 由其自身的 CLI 管理 - 请在那里移除。`,
       removeKeyManaged: provider => `${provider} 由 API 密钥配置。请从 API Keys 中移除。`,
       removeTerminalConfirm: (provider, command) => `断开 ${provider}？这将在终端中运行 "${command}" 以清除凭据。`,
       removeTerminalRunning: provider => `正在终端中断开 ${provider}…`,
@@ -1120,7 +1120,7 @@ export const zh: Translations = {
       sms: '从 Twilio 控制台获取你的 Account SID 和 Auth Token，以及一个可发送短信的电话号码。',
       dingtalk: '在开发者控制台创建钉钉应用，然后在此复制 Client ID(App key) 和 Client Secret。',
       feishu: '创建飞书 / Lark 应用，配置机器人能力，复制 App ID、App secret 和事件加密密钥。',
-      wecom: '在企业微信中添加群机器人，复制其 webhook key 作为 WECOM_BOT_ID。仅可发送——双向请用企业微信 (应用) 选项。',
+      wecom: '在企业微信中添加群机器人，复制其 webhook key 作为 WECOM_BOT_ID。仅可发送--双向请用企业微信 (应用) 选项。',
       wecom_callback: '设置一个企业微信自建应用，暴露其回调 URL，并提供 corp ID、secret、agent ID 和 AES key。',
       weixin:
         '运行 `hermes gateway setup`，选择 Weixin，然后使用个人微信账号扫描并确认二维码。Basecamp 会通过腾讯 iLink Bot API 连接并保存凭据。',
@@ -1168,7 +1168,7 @@ export const zh: Translations = {
     soulPlaceholderEmpty: '空的',
     unsavedChanges: '有未保存的更改',
     loadingSoul: '正在加载 SOUL.md…',
-    emptySoul: '空的 SOUL.md —— 开始撰写人格设定…',
+    emptySoul: '空的 SOUL.md -- 开始撰写人格设定…',
     saving: '保存中…',
     saveSoul: '保存 SOUL.md',
     deleteTitle: '删除配置档案？',
@@ -1713,7 +1713,7 @@ export const zh: Translations = {
       restarting: '后端正在重启以加载更新…',
       notAvailable: '此后端无法更新。',
       failed: '后端更新失败。',
-      noReturn: '后端未恢复在线。更新可能未完成——请检查后端主机。'
+      noReturn: '后端未恢复在线。更新可能未完成--请检查后端主机。'
     }
   },
 
@@ -1790,14 +1790,14 @@ export const zh: Translations = {
     getKey: '获取密钥',
     replaceCurrent: '替换当前值',
     pasteApiKey: '粘贴 API 密钥',
-    localApiKeyPlaceholder: 'API 密钥（可选 — 仅当端点需要时填写）',
+    localApiKeyPlaceholder: 'API 密钥（可选 - 仅当端点需要时填写）',
     couldNotSave: '无法保存凭据。',
     connecting: '连接中',
     update: '更新',
     flowSubtitles: {
       pkce: '打开浏览器登录，然后回到这里继续',
-      device_code: '在浏览器中打开验证页面 — Basecamp 会自动连接',
-      loopback: '打开浏览器登录 — Basecamp 会自动连接',
+      device_code: '在浏览器中打开验证页面 - Basecamp 会自动连接',
+      loopback: '打开浏览器登录 - Basecamp 会自动连接',
       external: '先在终端登录一次，然后回来继续对话'
     },
     startingSignIn: provider => `正在为 ${provider} 启动登录...`,
@@ -1954,7 +1954,7 @@ export const zh: Translations = {
     remotePickerTitle: '选择远程文件夹',
     remotePickerDescription: '浏览已连接后端上的文件夹。',
     remotePickerSelect: '选择文件夹',
-    folderTip: cwd => `${cwd} — 点击更改文件夹`,
+    folderTip: cwd => `${cwd} - 点击更改文件夹`,
     openFolder: '打开文件夹',
     refreshTree: '刷新文件树',
     collapseAll: '折叠所有文件夹',
@@ -2077,7 +2077,7 @@ export const zh: Translations = {
       stop: '停止',
       restorePrevious: '恢复上一个检查点',
       restoreCheckpoint: '恢复检查点',
-      restoreFromHere: '恢复检查点 — 从此提示重新运行',
+      restoreFromHere: '恢复检查点 - 从此提示重新运行',
       restoreTitle: '恢复到此检查点？',
       restoreBody: '此提示之后的所有消息将从对话中移除，并从此处重新运行该提示。',
       restoreConfirm: '恢复并重新运行',
@@ -2212,7 +2212,7 @@ export const zh: Translations = {
     handoff: {
       pickPlatform: '选择目标平台',
       success: platform => `已移交到 ${platform}。随时可在此处恢复。`,
-      systemNote: platform => `↻ 已移交到 ${platform} — 随时可在此处恢复。`,
+      systemNote: platform => `↻ 已移交到 ${platform} - 随时可在此处恢复。`,
       failed: error => `移交失败：${error}`,
       timedOut: '等待网关超时。`hermes gateway` 是否正在运行？'
     }

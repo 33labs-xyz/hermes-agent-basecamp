@@ -18,7 +18,7 @@ import { SidebarLoadMoreRow } from './load-more-row'
 
 const INACTIVE_STATES = new Set(['completed', 'disabled', 'error', 'paused'])
 
-// Recent runs shown in the inline quick-peek — enough to glance at history
+// Recent runs shown in the inline quick-peek - enough to glance at history
 // without turning the sidebar into the full Cron page.
 const PEEK_RUN_LIMIT = 5
 
@@ -33,7 +33,7 @@ const LOAD_MORE_STEP = 10
 
 const relativeFmt = new Intl.RelativeTimeFormat(undefined, { numeric: 'auto', style: 'short' })
 
-// Localized "in 5 min" / "2 hr ago" without hand-rolled strings — picks the
+// Localized "in 5 min" / "2 hr ago" without hand-rolled strings - picks the
 // coarsest sensible unit so a daily job reads "in 14 hr", not "in 840 min".
 function relativeTime(targetMs: number, nowMs: number): string {
   const diff = targetMs - nowMs
@@ -65,18 +65,18 @@ function nextRunMs(job: CronJob): null | number {
   return Number.isNaN(ms) ? null : ms
 }
 
-// Runs all belong to the same job, so the run name just repeats the job name —
+// Runs all belong to the same job, so the run name just repeats the job name -
 // the timestamp is what tells them apart. Compact (no year, no seconds) for the
 // narrow sidebar.
 function formatRunTime(seconds?: null | number): string {
   if (!seconds) {
-    return '—'
+    return '-'
   }
 
   const date = new Date(seconds * 1000)
 
   return Number.isNaN(date.valueOf())
-    ? '—'
+    ? '-'
     : date.toLocaleString(undefined, { day: 'numeric', hour: 'numeric', minute: '2-digit', month: 'short' })
 }
 
@@ -216,7 +216,7 @@ function CronJobSidebarRow({
   const next = nextRunMs(job)
   const label = jobTitle(job)
 
-  const meta = INACTIVE_STATES.has(state) ? (c.states[state] ?? state) : next !== null ? relativeTime(next, nowMs) : '—'
+  const meta = INACTIVE_STATES.has(state) ? (c.states[state] ?? state) : next !== null ? relativeTime(next, nowMs) : '-'
 
   return (
     <div>
