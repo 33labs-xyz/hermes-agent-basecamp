@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import type { EnvVarInfo } from '@/types/hermes'
 
-import { defaultEnvKey, isProviderSetUpInApp, providerEnvKeys } from './provider-credentials'
+import { defaultEnvKey, envKeyToSlug, isProviderSetUpInApp, providerEnvKeys } from './provider-credentials'
 
 // Only `is_set` drives the predicate; the rest is EnvVarInfo boilerplate.
 function envInfo(isSet: boolean): EnvVarInfo {
@@ -72,5 +72,20 @@ describe('isProviderSetUpInApp', () => {
   it('is false for a null or undefined env (nothing known yet)', () => {
     expect(isProviderSetUpInApp('openrouter', null)).toBe(false)
     expect(isProviderSetUpInApp('openrouter', undefined)).toBe(false)
+  })
+})
+
+describe('envKeyToSlug', () => {
+  it('derives the default slug by stripping _API_KEY and lowercasing', () => {
+    expect(envKeyToSlug('OPENROUTER_API_KEY')).toBe('openrouter')
+  })
+
+  it('turns underscores into hyphens for compound providers', () => {
+    expect(envKeyToSlug('FIREWORKS_AI_API_KEY')).toBe('fireworks-ai')
+  })
+
+  it('maps override aliases back to their canonical slug', () => {
+    expect(envKeyToSlug('GOOGLE_API_KEY')).toBe('gemini')
+    expect(envKeyToSlug('GEMINI_API_KEY')).toBe('gemini')
   })
 })

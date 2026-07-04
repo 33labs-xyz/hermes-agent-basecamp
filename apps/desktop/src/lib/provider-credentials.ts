@@ -38,6 +38,20 @@ export function providerEnvKeys(slug: string): string[] {
   return ENV_KEY_OVERRIDES[slug] ?? [defaultEnvKey(slug)]
 }
 
+// Inverse of providerEnvKeys: given a saved env var name, return the backend
+// slug the user configured. Override aliases (GOOGLE_API_KEY -> gemini) win;
+// everything else strips the trailing _API_KEY and lowercases, mirroring
+// defaultEnvKey in reverse.
+export function envKeyToSlug(envKey: string): string {
+  for (const [slug, keys] of Object.entries(ENV_KEY_OVERRIDES)) {
+    if (keys.includes(envKey)) {
+      return slug
+    }
+  }
+
+  return envKey.replace(/_API_KEY$/, '').toLowerCase().replace(/_/g, '-')
+}
+
 // True only when the user SAVED a credential for this provider inside Basecamp.
 //
 // The signal is /api/env `is_set`, which the backend derives purely from the
