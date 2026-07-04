@@ -1,11 +1,27 @@
 import { describe, expect, it } from 'vitest'
 
-import type { ModelOptionProvider } from '@/types/hermes'
+import type { EnvVarInfo, ModelOptionProvider } from '@/types/hermes'
 
 import { hasAuthenticatedModels } from './model-menu-helpers'
 
 function prov(slug: string, models?: string[], extra: Partial<ModelOptionProvider> = {}): ModelOptionProvider {
   return { name: slug, slug, models, ...extra }
+}
+
+// Minimal env map: only `is_set` matters to the configured-env filter.
+function env(entries: Record<string, boolean>): Record<string, EnvVarInfo> {
+  const info = (isSet: boolean): EnvVarInfo => ({
+    advanced: false,
+    category: '',
+    description: '',
+    is_password: true,
+    is_set: isSet,
+    redacted_value: null,
+    tools: [],
+    url: null
+  })
+
+  return Object.fromEntries(Object.entries(entries).map(([key, isSet]) => [key, info(isSet)]))
 }
 
 describe('hasAuthenticatedModels', () => {
@@ -39,5 +55,15 @@ describe('hasAuthenticatedModels', () => {
     const providers = [prov('anthropic', ['claude-4-opus'], { authenticated: false })]
 
     expect(hasAuthenticatedModels(providers)).toBe(false)
+  })
+
+  it('with a loaded env, ignores authenticated providers not set up in-app', () => {
+    // Anthropic is authenticated (harvested ANTHROPIC_* env) with a catalog, but
+    // its key is_set:false — the user never saved it in Basecamp. It must not
+    // register as a usable model, so the composer still shows the Connect CTA.
+    const providers = [prov('anthropic', ['claude-4-opus'], { authenticated: true })]
+
+    expect(hasAuthenticatedModels(providers, env({ ANTHROPIC_API_KEY: false }))).toBe(false)
+    expect(hasAuthenticatedModels(providers, env({ ANTHROPIC_API_KEY: true }))).toBe(true)
   })
 })

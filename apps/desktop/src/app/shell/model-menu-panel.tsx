@@ -16,10 +16,11 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Skeleton } from '@/components/ui/skeleton'
 import type { HermesGateway } from '@/hermes'
-import { getGlobalModelOptions } from '@/hermes'
+import { getEnvVars, getGlobalModelOptions } from '@/hermes'
 import { useI18n } from '@/i18n'
 import { AlertCircle } from '@/lib/icons'
 import { currentPickerSelection, displayModelName, modelDisplayParts, reasoningEffortLabel } from '@/lib/model-status-label'
+import { isProviderSetUpInApp } from '@/lib/provider-credentials'
 import type { RuntimeReadinessResult } from '@/lib/runtime-readiness'
 import { cn } from '@/lib/utils'
 import { $modelPresets, applyModelPreset, modelPresetKey } from '@/store/model-presets'
@@ -40,7 +41,7 @@ import {
   $currentProvider,
   $currentReasoningEffort
 } from '@/store/session'
-import type { ModelOptionProvider, ModelOptionsResponse } from '@/types/hermes'
+import type { EnvVarInfo, ModelOptionProvider, ModelOptionsResponse } from '@/types/hermes'
 
 import { ModelEditSubmenu, resolveFastControl } from './model-edit-submenu'
 import { hasAuthenticatedModels } from './model-menu-helpers'
@@ -89,6 +90,18 @@ export function ModelMenuPanel({ gateway, inferenceStatus, onSelectModel, reques
     }
   })
 
+  // The user's SAVED env (~/.hermes/.env via /api/env). is_set here means the
+  // user configured a provider IN Basecamp; it excludes creds the backend
+  // harvested from the ambient shell (gh CLI -> Copilot, ANTHROPIC_* ->
+  // Anthropic). Undefined while loading (or on fetch failure) collapses to null,
+  // which keeps the picker fail-open (authenticated-only), never empty.
+  const envVars = useQuery({
+    queryFn: getEnvVars,
+    queryKey: ['env-vars']
+  })
+
+  const configuredEnv = envVars.data ?? null
+
   const { model: optionsModel, provider: optionsProvider } = currentPickerSelection(
     !!activeSessionId,
     { model: currentModel, provider: currentProvider },
@@ -107,7 +120,7 @@ export function ModelMenuPanel({ gateway, inferenceStatus, onSelectModel, reques
 
   // No authenticated provider => nothing to list; offer to connect one instead
   // of a dead "No models found" row (mirrors the dialog picker's Add-provider).
-  const hasModels = hasAuthenticatedModels(providers)
+  const hasModels = hasAuthenticatedModels(providers, configuredEnv)
 
   const effectiveVisibleModels = useMemo(
     () => effectiveVisibleKeys(visibleModels, providers ?? []),
@@ -145,8 +158,15 @@ export function ModelMenuPanel({ gateway, inferenceStatus, onSelectModel, reques
   }
 
   const groups = useMemo(
-    () => groupModels(providers ?? [], search, { model: optionsModel, provider: optionsProvider }, effectiveVisibleModels),
-    [providers, search, optionsModel, optionsProvider, effectiveVisibleModels]
+    () =>
+      groupModels(
+        providers ?? [],
+        search,
+        { model: optionsModel, provider: optionsProvider },
+        effectiveVisibleModels,
+        configuredEnv
+      ),
+    [providers, search, optionsModel, optionsProvider, effectiveVisibleModels, configuredEnv]
   )
 
   return (
@@ -385,7 +405,8 @@ export function groupModels(
   providers: ModelOptionProvider[],
   search: string,
   current: { model: string; provider: string },
-  visible: Set<string> | null
+  visible: Set<string> | null,
+  configuredEnv: null | Record<string, EnvVarInfo>
 ): ProviderGroup[] {
   const q = search.trim().toLowerCase()
   const groups: ProviderGroup[] = []
@@ -396,6 +417,16 @@ export function groupModels(
     // Settings → Model, where connecting them lives — here they'd just be
     // models that 401 on first use.
     if (provider.authenticated === false) {
+      continue
+    }
+
+    // With a loaded env map, only providers the user set up IN Basecamp are
+    // pickable — a key they saved (is_set) in ~/.hermes/.env. Providers the
+    // backend authenticated from harvested ambient creds (gh CLI token ->
+    // Copilot, an ANTHROPIC_* env -> Anthropic) read is_set:false and drop out
+    // here. A null env (still loading, or /api/env failed) is fail-open: fall
+    // back to the authenticated-only gate above so the user is never locked out.
+    if (configuredEnv && !isProviderSetUpInApp(provider.slug, configuredEnv)) {
       continue
     }
 

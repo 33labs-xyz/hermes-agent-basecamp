@@ -3,13 +3,14 @@ import { useState } from 'react'
 
 import { useI18n } from '@/i18n'
 import { currentPickerSelection } from '@/lib/model-status-label'
-import type { ModelOptionProvider, ModelOptionsResponse, ModelPricing } from '@/types/hermes'
+import type { EnvVarInfo, ModelOptionProvider, ModelOptionsResponse, ModelPricing } from '@/types/hermes'
 
 import type { HermesGateway } from '../hermes'
-import { getGlobalModelOptions } from '../hermes'
+import { getEnvVars, getGlobalModelOptions } from '../hermes'
 import { cn } from '../lib/utils'
 import { startManualOnboarding } from '../store/onboarding'
 
+import { pickableProviders } from './model-picker-helpers'
 import { InlineNotice } from './notifications'
 import { Button } from './ui/button'
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from './ui/command'
@@ -66,6 +67,19 @@ export function ModelPickerDialog({
     enabled: open
   })
 
+  // The user's SAVED env (~/.hermes/.env via /api/env). is_set means the user
+  // configured a provider IN Basecamp; it excludes creds the backend harvested
+  // from the ambient shell (gh CLI -> Copilot, ANTHROPIC_* -> Anthropic).
+  // Undefined while loading (or on fetch failure) collapses to null, which
+  // keeps the picker fail-open (catalog-only), never empty.
+  const envVars = useQuery({
+    enabled: open,
+    queryFn: getEnvVars,
+    queryKey: ['env-vars']
+  })
+
+  const configuredEnv = envVars.data ?? null
+
   const providers = modelOptions.data?.providers ?? []
 
   const { model: optionsModel, provider: optionsProvider } = currentPickerSelection(
@@ -117,6 +131,7 @@ export function ModelPickerDialog({
           <CommandList className="max-h-96">
             {!loading && !error && <CommandEmpty>{copy.noModels}</CommandEmpty>}
             <ModelResults
+              configuredEnv={configuredEnv}
               currentModel={optionsModel || currentModel}
               currentProvider={optionsProvider || currentProvider}
               error={error}
@@ -145,6 +160,7 @@ function ModelResults({
   loading,
   error,
   providers,
+  configuredEnv,
   currentModel,
   currentProvider,
   onSelectModel,
@@ -153,6 +169,7 @@ function ModelResults({
   loading: boolean
   error: string | null
   providers: ModelOptionProvider[]
+  configuredEnv: null | Record<string, EnvVarInfo>
   currentModel: string
   currentProvider: string
   onSelectModel: (provider: ModelOptionProvider, model: string) => void
@@ -187,10 +204,10 @@ function ModelResults({
     provider.name.toLowerCase().includes(q) ||
     provider.slug.toLowerCase().includes(q)
 
-  // Only configured providers (those with curated models) are selectable
-  // here. Switching to a NOT-yet-configured provider goes through the
-  // "Add provider" footer button, which opens the full onboarding selector.
-  const configured = providers.filter(p => (p.models ?? []).length > 0)
+  // Only providers the user set up in Basecamp (with curated models) are
+  // selectable here. Switching to a NOT-yet-configured provider goes through
+  // the "Add provider" footer button, which opens the full onboarding selector.
+  const configured = pickableProviders(providers, configuredEnv)
 
   return (
     <>
