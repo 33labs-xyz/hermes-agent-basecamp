@@ -5,7 +5,6 @@ import { useParams, useRouter } from "next/navigation";
 import {
   getTemplateWorkflows,
   getUserWorkflows,
-  getPublishedWorkflows,
   createWorkflow,
   updateWorkflowName,
   deleteWorkflow,
@@ -14,6 +13,7 @@ import {
   getAllNodeSchemas,
   getWorkflowData,
 } from "../muapi.js";
+import { filterFeaturedTemplates } from "./featured-templates";
 import dynamic from "next/dynamic";
 
 // True when the string has no Devanagari (Hindi) block. Used to avoid
@@ -144,7 +144,7 @@ export default function WorkflowStudio({ apiKey, isHeaderVisible = true, onToggl
   const [loading, setLoading] = useState(true);
   const [selectedWorkflow, setSelectedWorkflow] = useState(null);
   const [activeSubTab, setActiveSubTab] = useState("builder"); // builder only (playground removed)
-  const [activeMainTab, setActiveMainTab] = useState("templates"); // 'templates' | 'my-workflows' | 'published'
+  const [activeMainTab, setActiveMainTab] = useState("templates"); // 'templates' | 'my-workflows'
   const [renamingWorkflow, setRenamingWorkflow] = useState(null);
   const [newWorkflowName, setNewWorkflowName] = useState("");
   const [isDeletingId, setIsDeletingId] = useState(null);
@@ -365,11 +365,9 @@ export default function WorkflowStudio({ apiKey, isHeaderVisible = true, onToggl
         setLoading(true);
         let data = [];
         if (activeMainTab === "templates") {
-          data = await getTemplateWorkflows(apiKey);
+          data = filterFeaturedTemplates(await getTemplateWorkflows(apiKey));
         } else if (activeMainTab === "my-workflows") {
           data = await getUserWorkflows(apiKey);
-        } else if (activeMainTab === "published") {
-          data = await getPublishedWorkflows(apiKey);
         }
         setWorkflows(data);
       } catch (err) {
@@ -843,16 +841,6 @@ export default function WorkflowStudio({ apiKey, isHeaderVisible = true, onToggl
               }`}
             >
               My Workflows
-            </button>
-            <button
-              onClick={() => setActiveMainTab("published")}
-              className={`px-6 py-4 text-xs font-black uppercase tracking-[0.2em] transition-all border-b-2 ${
-                activeMainTab === "published"
-                  ? "text-[#8b80e8] border-[#8b80e8]"
-                  : "text-white/30 border-transparent hover:text-white"
-              }`}
-            >
-              Community
             </button>
           </div>
         </div>
