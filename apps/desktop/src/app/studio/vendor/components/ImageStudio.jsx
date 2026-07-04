@@ -433,7 +433,7 @@ function UploadButton({ apiKey, maxImages, onSelect, onClear, initialUrls = [], 
           {/* Header */}
           <div className="flex items-center justify-between px-1 pb-3 mb-2 border-b border-white/5">
             <div className="flex flex-col gap-0.5">
-              <span className="text-xs font-bold text-secondary">
+              <span className="text-xs font-bold text-white/90">
                 Reference Images
               </span>
               {isMulti && (
@@ -480,7 +480,7 @@ function UploadButton({ apiKey, maxImages, onSelect, onClear, initialUrls = [], 
 
           {/* Grid or empty state */}
           {uploadHistory.length === 0 ? (
-            <div className="py-6 flex flex-col items-center gap-2 opacity-40">
+            <div className="py-6 flex flex-col items-center gap-2">
               <svg
                 width="28"
                 height="28"
@@ -488,13 +488,13 @@ function UploadButton({ apiKey, maxImages, onSelect, onClear, initialUrls = [], 
                 fill="none"
                 stroke="currentColor"
                 strokeWidth="1.5"
-                className="text-secondary"
+                className="text-white/30"
               >
                 <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
                 <polyline points="17 8 12 3 7 8" />
                 <line x1="12" y1="3" x2="12" y2="15" />
               </svg>
-              <span className="text-xs text-secondary">No uploads yet</span>
+              <span className="text-xs text-white/55">No uploads yet</span>
             </div>
           ) : (
             <div className="grid grid-cols-3 gap-2 max-h-56 overflow-y-auto custom-scrollbar pr-0.5">
