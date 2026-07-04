@@ -11,6 +11,7 @@ import { $studioKey, ensureStudioKeyLoaded, saveStudioKey } from '@/store/studio
 import { PAGE_INSET_X } from '../layout-constants'
 import type { SetStatusbarItemGroup } from '../shell/statusbar-controls'
 
+import { StudioKeyUpdate } from './studio-key-update'
 import { StudioLibrary } from './library'
 import {
   AudioStudio,
@@ -211,6 +212,7 @@ export function StudioView({ setStatusbarItemGroup }: StudioViewProps) {
             </button>
           ))}
         </div>
+        {hasKey ? <StudioKeyUpdate /> : null}
       </div>
       {/* While the hard gate is showing there is no studio to protect, and the
           typing-trigger would stack the overlay on top of the gate's own input. */}
