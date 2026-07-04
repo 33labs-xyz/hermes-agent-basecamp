@@ -5879,6 +5879,39 @@ ipcMain.handle('hermes:logs:reveal', async () => {
   }
 })
 
+// Reveal an artifact's file in the OS file manager (Finder/Explorer), selecting
+// it in its containing folder. Remote artifacts (http/https/data) have no local
+// folder, so we report failure and let the renderer open the URL instead.
+ipcMain.handle('hermes:shell:showItemInFolder', async (_event, target) => {
+  const raw = String(target || '').trim()
+
+  if (!raw || /^(?:https?|data):/i.test(raw)) {
+    return { ok: false, error: 'not a local file' }
+  }
+
+  let localPath
+  try {
+    localPath = resolveRequestedPathForIpc(/^file:/i.test(raw) ? raw : expandUserPath(raw), {
+      purpose: 'Reveal in folder'
+    })
+  } catch (error) {
+    rememberLog(`[reveal] path resolve failed: ${error.message}`)
+    return { ok: false, error: error.message }
+  }
+
+  if (!fileExists(localPath) && !directoryExists(localPath)) {
+    return { ok: false, error: 'not found' }
+  }
+
+  try {
+    shell.showItemInFolder(localPath)
+    return { ok: true, path: localPath }
+  } catch (error) {
+    rememberLog(`[reveal] showItemInFolder failed: ${error.message}`)
+    return { ok: false, error: error.message }
+  }
+})
+
 ipcMain.handle('hermes:logs:recent', async () => ({ path: DESKTOP_LOG_PATH, lines: hermesLog.slice(-200) }))
 
 function isExecutableFile(filePath) {

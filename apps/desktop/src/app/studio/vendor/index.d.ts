@@ -41,8 +41,6 @@ export const ImageStudio: ComponentType<StudioProps>
 export const VideoStudio: ComponentType<StudioProps>
 export const AudioStudio: ComponentType<StudioProps>
 export const CinemaStudio: ComponentType<StudioProps>
-export const ClippingStudio: ComponentType<StudioProps>
-export const LipSyncStudio: ComponentType<StudioProps>
 export const MarketingStudio: ComponentType<StudioProps>
 export const RecastStudio: ComponentType<StudioProps>
 export const VibeMotionStudio: ComponentType<StudioProps>

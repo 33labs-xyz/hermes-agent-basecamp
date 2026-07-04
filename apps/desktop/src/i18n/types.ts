@@ -891,7 +891,7 @@ export interface Translations {
     kindImage: string
     kindFile: string
     kindLink: string
-    chat: string
+    showInFolder: string
     copyUrl: string
     copyPath: string
   }

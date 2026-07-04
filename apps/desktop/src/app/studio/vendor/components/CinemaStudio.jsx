@@ -43,6 +43,45 @@ const APERTURE_EFFECT = {
   "f/11": "deep focus clarity, sharp foreground to background",
 };
 
+// ─── Camera-control thumbnails ──────────────────────────────────────────────
+// Vite base is './' and the packaged app loads renderer assets over file://, so
+// absolute '/assets/...' URLs do not resolve. import.meta.glob yields
+// base-correct hashed URLs that work in dev and in the packaged Electron build.
+const CINEMA_ASSETS = import.meta.glob("../assets/cinema/*.webp", {
+  eager: true,
+  query: "?url",
+  import: "default",
+});
+
+const ASSET_FILES = {
+  "Modular 8K Digital": "modular_8k_digital.webp",
+  "Full-Frame Cine Digital": "full_frame_cine_digital.webp",
+  "Grand Format 70mm Film": "grand_format_70mm_film.webp",
+  "Studio Digital S35": "studio_digital_s35.webp",
+  "Classic 16mm Film": "classic_16mm_film.webp",
+  "Premium Large Format Digital": "premium_large_format_digital.webp",
+  "Creative Tilt Lens": "creative_tilt_lens.webp",
+  "Compact Anamorphic": "compact_anamorphic.webp",
+  "Extreme Macro": "extreme_macro.webp",
+  "70s Cinema Prime": "70s_cinema_prime.webp",
+  "Classic Anamorphic": "classic_anamorphic.webp",
+  "Premium Modern Prime": "premium_modern_prime.webp",
+  "Warm Cinema Prime": "warm_cinema_prime.webp",
+  "Swirl Bokeh Portrait": "swirl_bokeh_portrait.webp",
+  "Vintage Prime": "vintage_prime.webp",
+  "Halation Diffusion": "halation_diffusion.webp",
+  "Clinical Sharp Prime": "clinical_sharp_prime.webp",
+  "f/1.4": "f_1_4.webp",
+  "f/4": "f_4.webp",
+  "f/11": "f_11.webp",
+};
+
+function assetUrlFor(item) {
+  const file = ASSET_FILES[item];
+  if (!file) return null;
+  return CINEMA_ASSETS[`../assets/cinema/${file}`] ?? null;
+}
+
 const ASPECT_RATIOS = ["16:9", "21:9", "9:16", "1:1", "4:5"];
 const RESOLUTIONS = ["1K", "2K", "4K"];
 const CAMERAS = Object.keys(CAMERA_MAP);
@@ -281,6 +320,7 @@ function ScrollColumn({ title, items, columnKey, value, onChange }) {
           <div style={{ height: "calc(50% - 35px)" }} />
 
           {items.map((item) => {
+            const imageUrl = assetUrlFor(item);
             return (
               <div
                 key={item}
@@ -292,9 +332,17 @@ function ScrollColumn({ title, items, columnKey, value, onChange }) {
                   data-imgbox="true"
                   className="w-10 h-10 rounded-lg border border-transparent flex items-center justify-center transition-all duration-300 overflow-hidden relative"
                 >
-                  <span className="text-sm font-bold text-white/40">
-                    {item}
-                  </span>
+                  {imageUrl ? (
+                    <img
+                      src={imageUrl}
+                      alt={String(item)}
+                      className="w-full h-full object-cover opacity-70"
+                    />
+                  ) : (
+                    <span className="text-sm font-bold text-white/40">
+                      {item}
+                    </span>
+                  )}
                 </div>
                 <span
                   data-label="true"

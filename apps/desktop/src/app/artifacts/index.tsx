@@ -393,6 +393,7 @@ function paginationItems(page: number, pageCount: number): Array<number | 'ellip
 type CellCtx = {
   onOpen: (href: string) => void | Promise<void>
   onOpenChat: (artifact: ArtifactRecord) => void
+  onReveal: (artifact: ArtifactRecord) => void | Promise<void>
 }
 
 interface ArtifactColumn {
@@ -552,9 +553,24 @@ export function ArtifactsView({ setStatusbarItemGroup: _setStatusbarItemGroup, .
     [navigate]
   )
 
+  // Reveal the artifact's file in the OS file manager. Remote artifacts have no
+  // local folder, so main reports failure and we open the URL externally instead.
+  const revealArtifact = useCallback(async (artifact: ArtifactRecord) => {
+    try {
+      const result = await window.hermesDesktop?.showItemInFolder?.(artifact.value)
+
+      if (!result?.ok) {
+        await openArtifact(artifact.href)
+      }
+    } catch (err) {
+      notifyError(err, a.openFailed)
+    }
+  }, [a, openArtifact])
+
   const cellCtx: CellCtx = {
     onOpen: openArtifact,
-    onOpenChat: openArtifactSource
+    onOpenChat: openArtifactSource,
+    onReveal: revealArtifact
   }
 
   return (
@@ -632,7 +648,7 @@ export function ArtifactsView({ setStatusbarItemGroup: _setStatusbarItemGroup, .
                       failedImage={failedImageIds.has(artifact.id)}
                       key={artifact.id}
                       onImageError={markImageFailed}
-                      onOpenChat={openArtifactSource}
+                      onReveal={revealArtifact}
                     />
                   ))}
                 </div>
@@ -726,10 +742,10 @@ interface ArtifactImageCardProps {
   artifact: ArtifactRecord
   failedImage: boolean
   onImageError: (id: string) => void
-  onOpenChat: (artifact: ArtifactRecord) => void
+  onReveal: (artifact: ArtifactRecord) => void | Promise<void>
 }
 
-function ArtifactImageCard({ artifact, failedImage, onImageError, onOpenChat }: ArtifactImageCardProps) {
+function ArtifactImageCard({ artifact, failedImage, onImageError, onReveal }: ArtifactImageCardProps) {
   const { t } = useI18n()
   const a = t.artifacts
   const kindLabel = artifact.kind === 'image' ? a.kindImage : artifact.kind === 'file' ? a.kindFile : a.kindLink
@@ -773,9 +789,9 @@ function ArtifactImageCard({ artifact, failedImage, onImageError, onOpenChat }: 
         </div>
 
         <div className="flex flex-wrap gap-1.5">
-          <Button onClick={() => onOpenChat(artifact)} size="xs" type="button" variant="textStrong">
+          <Button onClick={() => void onReveal(artifact)} size="xs" type="button" variant="textStrong">
             <FolderOpen className="size-3" />
-            {a.chat}
+            {a.showInFolder}
           </Button>
         </div>
       </div>
@@ -844,23 +860,31 @@ function PrimaryCell({ artifact, ctx }: { artifact: ArtifactRecord; ctx: CellCtx
   )
 }
 
-function LocationCell({ artifact }: { artifact: ArtifactRecord; ctx: CellCtx }) {
+function LocationCell({ artifact, ctx }: { artifact: ArtifactRecord; ctx: CellCtx }) {
   const { t } = useI18n()
   const isLink = artifact.kind === 'link'
   const value = isLink ? hostPathLabel(artifact.value) : artifact.value
   const copyLabel = isLink ? t.artifacts.copyUrl : t.artifacts.copyPath
+  const pathClasses = cn(
+    'min-w-0 flex-1 truncate text-[length:var(--conversation-caption-font-size)] text-(--ui-text-tertiary)',
+    isLink ? 'font-normal' : 'font-mono'
+  )
 
   return (
     <div className="group/location flex min-w-0 items-center gap-1.5">
       <Tip label={artifact.value}>
-        <div
-          className={cn(
-            'min-w-0 flex-1 truncate text-[length:var(--conversation-caption-font-size)] text-(--ui-text-tertiary)',
-            isLink ? 'font-normal' : 'font-mono'
-          )}
-        >
-          {value}
-        </div>
+        {isLink ? (
+          <div className={pathClasses}>{value}</div>
+        ) : (
+          <button
+            className={cn(pathClasses, 'text-left transition-colors hover:text-foreground hover:underline')}
+            onClick={() => void ctx.onReveal(artifact)}
+            title={t.artifacts.showInFolder}
+            type="button"
+          >
+            {value}
+          </button>
+        )}
       </Tip>
       <CopyButton
         appearance="icon"

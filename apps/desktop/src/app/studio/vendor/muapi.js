@@ -1,4 +1,4 @@
-import { getModelById, getVideoModelById, getI2IModelById, getI2VModelById, getV2VModelById, getRecastModelById, getLipSyncModelById, getAudioModelById } from './models.js';
+import { getModelById, getVideoModelById, getI2IModelById, getI2VModelById, getV2VModelById, getRecastModelById, getAudioModelById } from './models.js';
 
 // In an http(s) browser we route through the host app's proxy (Next.js routes
 // under /api/* re-issue the call server-side) so api.muapi.ai CORS is bypassed.
@@ -220,19 +220,6 @@ export async function processRecast(apiKey, params) {
     if (params.aspect_ratio) {
         payload.aspect_ratio = params.aspect_ratio;
     }
-    return submitAndPoll(endpoint, payload, apiKey, params.onRequestId, 900);
-}
-
-export async function processLipSync(apiKey, params) {
-    const modelInfo = getLipSyncModelById(params.model);
-    const endpoint = modelInfo?.endpoint || params.model;
-    const payload = {};
-    if (params.audio_url) payload.audio_url = params.audio_url;
-    if (params.image_url) payload.image_url = params.image_url;
-    if (params.video_url) payload.video_url = params.video_url;
-    if (modelInfo?.hasPrompt) payload.prompt = params.prompt || '';
-    if (params.resolution) payload.resolution = params.resolution;
-    if (params.seed !== undefined && params.seed !== -1) payload.seed = params.seed;
     return submitAndPoll(endpoint, payload, apiKey, params.onRequestId, 900);
 }
 
@@ -791,16 +778,6 @@ export async function getAppInterests(apiKey) {
         throw new Error(`Failed to fetch interests: ${response.status} - ${errText.slice(0, 100)}`);
     }
     return await response.json();
-}
-
-export async function runClipping(apiKey, params) {
-    const payload = {
-        video_url: params.video_url,
-        num_highlights: params.num_highlights || 3,
-        aspect_ratio: params.aspect_ratio || "9:16",
-        return_coordinates_only: !!params.return_coordinates_only
-    };
-    return submitAndPoll("ai-clipping", payload, apiKey, params.onRequestId, 900);
 }
 
 export async function runMotionGraphics(apiKey, params) {

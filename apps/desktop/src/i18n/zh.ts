@@ -1345,7 +1345,7 @@ export const zh: Translations = {
     kindImage: '图片',
     kindFile: '文件',
     kindLink: '链接',
-    chat: '对话',
+    showInFolder: '在文件夹中显示',
     copyUrl: '复制 URL',
     copyPath: '复制路径'
   },

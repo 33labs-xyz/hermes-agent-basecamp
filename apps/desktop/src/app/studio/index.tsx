@@ -17,9 +17,7 @@ import { StudioCredits } from './studio-credits'
 import {
   AudioStudio,
   CinemaStudio,
-  ClippingStudio,
   ImageStudio,
-  LipSyncStudio,
   MarketingStudio,
   RecastStudio,
   type StudioGeneration,
@@ -38,8 +36,6 @@ type StudioTabId =
   | 'video'
   | 'audio'
   | 'cinema'
-  | 'clipping'
-  | 'lipsync'
   | 'marketing'
   | 'recast'
   | 'vibe'
@@ -68,8 +64,6 @@ const STUDIO_TABS: readonly StudioTab[] = [
   { id: 'video', label: 'Video', Component: VideoStudio },
   { id: 'audio', label: 'Audio', Component: AudioStudio },
   { id: 'cinema', label: 'Cinema', Component: CinemaStudio },
-  { id: 'clipping', label: 'Clipping', Component: ClippingStudio },
-  { id: 'lipsync', label: 'Lip Sync', Component: LipSyncStudio },
   { id: 'marketing', label: 'Marketing', Component: MarketingStudio },
   { id: 'recast', label: 'Body Swap', Component: RecastStudio },
   { id: 'vibe', label: 'Vibe Motion', Component: VibeMotionStudio },
