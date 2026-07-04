@@ -52,3 +52,14 @@ describe('SessionsPanel', () => {
     expect(screen.getByText(/No sessions yet/i)).toBeTruthy()
   })
 })
+
+import { $rightSidebarView, setRightSidebarView } from './store'
+
+describe('rightSidebar view store', () => {
+  it('defaults to files and switches to sessions', () => {
+    setRightSidebarView('files')
+    expect($rightSidebarView.get()).toBe('files')
+    setRightSidebarView('sessions')
+    expect($rightSidebarView.get()).toBe('sessions')
+  })
+})

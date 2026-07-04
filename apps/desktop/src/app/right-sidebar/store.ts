@@ -28,3 +28,9 @@ export const runInTerminal = (command: string) => {
   setTerminalTakeover(true)
   $terminalInjection.set(trimmed)
 }
+
+/** Which surface the right sidebar shows: the file tree or the claude Sessions
+ *  list. In-memory only (resets each launch) - the file tree is the default. */
+export const $rightSidebarView = atom<'files' | 'sessions'>('files')
+
+export const setRightSidebarView = (view: 'files' | 'sessions') => $rightSidebarView.set(view)
