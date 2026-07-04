@@ -141,6 +141,13 @@ declare global {
           organise: () => Promise<StudioGenerationEntry[]>
         }
       }
+      terminalSessions?: {
+        list: () => Promise<{ projects: unknown[]; sessions: unknown[] }>
+        getTranscript: (id: string) => Promise<Array<{ role: 'assistant' | 'user'; text: string; ts: string }>>
+        forget: (id: string, opts: { deleteTranscript: boolean }) => Promise<boolean>
+        recordFork: (payload: { newId: string; fromId: string; projectPath: string }) => Promise<boolean>
+        onChanged: (cb: () => void) => () => void
+      }
     }
   }
 }
