@@ -1,3 +1,54 @@
 #!/bin/sh
-# Basecamp claude shim (passthrough placeholder - real mint logic added later).
-exec "${BASECAMP_REAL_CLAUDE:-claude}" "$@"
+# Basecamp claude shim: on a fresh interactive `claude` launch, mint a tracked
+# --session-id and record it; every other invocation is pure passthrough. Never
+# breaks a valid claude command - if real-claude is unresolved or the log write
+# fails, still exec claude.
+
+real="$BASECAMP_REAL_CLAUDE"
+if [ ! -x "$real" ]; then
+  self_dir=$(CDPATH= cd -- "$(dirname -- "$0")" 2>/dev/null && pwd -P)
+  real=""
+  oldifs="$IFS"; IFS=:
+  for d in $PATH; do
+    if [ "$d" != "$self_dir" ] && [ -x "$d/claude" ]; then real="$d/claude"; break; fi
+  done
+  IFS="$oldifs"
+fi
+[ -z "$real" ] && exec claude "$@"
+
+# Find the first non-flag arg (the subcommand, if any).
+first=""
+for a in "$@"; do
+  case "$a" in
+    -*) : ;;
+    *) first="$a"; break ;;
+  esac
+done
+
+mint=1
+case "$first" in
+  mcp|config|update|doctor|migrate-installer|setup-token|install) mint=0 ;;
+esac
+for a in "$@"; do
+  case "$a" in
+    -r|--resume|-c|--continue|--session-id|-p|--print|--version|-v|--help|-h|--fork-session)
+      mint=0; break ;;
+  esac
+done
+
+[ "$mint" = "0" ] && exec "$real" "$@"
+
+id=$(uuidgen 2>/dev/null | tr 'A-Z' 'a-z')
+[ -z "$id" ] && id=$(python3 -c 'import uuid;print(uuid.uuid4())' 2>/dev/null)
+[ -z "$id" ] && id=$(python -c 'import uuid;print(uuid.uuid4())' 2>/dev/null)
+[ -z "$id" ] && exec "$real" "$@"
+
+if [ -n "$BASECAMP_TS_DIR" ]; then
+  esc() { printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'; }
+  root=$(git rev-parse --show-toplevel 2>/dev/null || echo "")
+  ts=$(date +%s 2>/dev/null || echo 0)
+  printf '{"id":"%s","cwd":"%s","gitRoot":"%s","ts":%s,"kind":"launch"}\n' \
+    "$id" "$(esc "$PWD")" "$(esc "$root")" "$ts" >> "$BASECAMP_TS_DIR/launches.jsonl" 2>/dev/null || true
+fi
+
+exec "$real" --session-id "$id" "$@"

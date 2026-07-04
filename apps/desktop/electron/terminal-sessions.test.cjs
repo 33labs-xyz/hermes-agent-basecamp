@@ -60,3 +60,56 @@ test('materializeShim writes an executable claude into binDir', () => {
     assert.equal(mode & 0o100, 0o100, 'POSIX shim must be owner-executable')
   }
 })
+
+const { execFileSync } = require('node:child_process')
+
+// A stub "real claude" that just prints its argv, one per line, so the test can
+// assert what the shim exec'd.
+function writeStubClaude(dir) {
+  fs.mkdirSync(dir, { recursive: true })
+  const p = path.join(dir, 'real-claude')
+  fs.writeFileSync(p, '#!/bin/sh\nfor a in "$@"; do printf "%s\\n" "$a"; done\n')
+  fs.chmodSync(p, 0o755)
+  return p
+}
+
+function runShim(args, { pwd, tsDir, real }) {
+  const shim = mod.materializeShim(path.join(mkTmp(), 'bin')).claude
+  const out = execFileSync('/bin/sh', [shim, ...args], {
+    cwd: pwd,
+    env: { ...process.env, BASECAMP_REAL_CLAUDE: real, BASECAMP_TS_DIR: tsDir, PATH: process.env.PATH },
+    encoding: 'utf8'
+  })
+  return out.split('\n').filter(Boolean)
+}
+
+test('shim mints --session-id on a fresh launch and appends one record', { skip: process.platform === 'win32' }, () => {
+  const work = mkTmp()
+  const tsDir = mkTmp()
+  const real = writeStubClaude(mkTmp())
+  const argv = runShim([], { pwd: work, tsDir, real })
+  assert.equal(argv[0], '--session-id')
+  assert.match(argv[1], /^[0-9a-f-]{36}$/)
+  const lines = fs.readFileSync(path.join(tsDir, 'launches.jsonl'), 'utf8').split('\n').filter(Boolean)
+  assert.equal(lines.length, 1)
+  const rec = JSON.parse(lines[0])
+  assert.equal(rec.id, argv[1])
+  assert.equal(rec.kind, 'launch')
+  assert.equal(typeof rec.ts, 'number')
+})
+
+test('shim passes through resume/continue/mcp/version with no record', { skip: process.platform === 'win32' }, () => {
+  const tsDir = mkTmp()
+  const real = writeStubClaude(mkTmp())
+  for (const args of [['--resume', 'abc'], ['-c'], ['mcp', 'list'], ['--version']]) {
+    const argv = runShim(args, { pwd: mkTmp(), tsDir, real })
+    assert.deepEqual(argv, args, `passthrough for ${args.join(' ')}`)
+  }
+  assert.equal(fs.existsSync(path.join(tsDir, 'launches.jsonl')), false)
+})
+
+test('shim still execs when the log dir is unwritable', { skip: process.platform === 'win32' }, () => {
+  const real = writeStubClaude(mkTmp())
+  const argv = runShim([], { pwd: mkTmp(), tsDir: '/proc/nonexistent-ts-dir', real })
+  assert.equal(argv[0], '--session-id') // mint proceeds; append failure is swallowed
+})
