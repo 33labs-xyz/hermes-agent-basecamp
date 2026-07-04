@@ -55,6 +55,7 @@ const {
 } = require('./desktop-uninstall.cjs')
 const { isPackagedInstallPath: isPackagedInstallPathUnderRoots } = require('./workspace-cwd.cjs')
 const { registerStudioIpc } = require('./studio.cjs')
+const { registerTerminalSessionsIpc } = require('./terminal-sessions.cjs')
 const {
   authModeFromStatus,
   buildGatewayWsUrl,
@@ -5748,6 +5749,8 @@ ipcMain.handle('hermes:writeClipboard', (_event, text) => {
 // Studio (generative-AI) backend: Muapi key/proxy + local generation library.
 registerStudioIpc({ ipcMain, app, safeStorage })
 
+const terminalSessionsIpc = registerTerminalSessionsIpc({ ipcMain, app })
+
 ipcMain.handle('hermes:saveImageFromUrl', (_event, url) => saveImageFromUrl(String(url || '')))
 
 ipcMain.handle('hermes:saveImageBuffer', async (_event, payload) => {
@@ -6071,7 +6074,7 @@ function terminalShellEnv() {
   // which marks the agent *backend* and gates cron/gateway behavior.
   env.HERMES_DESKTOP_TERMINAL = '1'
 
-  return env
+  return terminalSessionsIpc.applyEnv(env)
 }
 
 function terminalChannel(id, suffix) {
