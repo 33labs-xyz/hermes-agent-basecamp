@@ -9,128 +9,112 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
-import { Input } from '@/components/ui/input'
+import { pickDisplayedProvider, resolveDefaultProvider } from '@/lib/provider-balances'
 import { cn } from '@/lib/utils'
-import { $studioBalanceVersion } from '@/store/studio-balance'
-import { $studioKey, ensureStudioKeyLoaded, saveStudioKey } from '@/store/studio-key'
+import { $balanceProvider, setBalanceProvider } from '@/store/balance-provider'
+import { ensureStudioKeyLoaded } from '@/store/studio-key'
 
-import { formatCredits, useStudioBalance } from '../studio/use-studio-balance'
+import { formatCredits } from '../studio/use-studio-balance'
 
+import { useOverlayRouting } from './hooks/use-overlay-routing'
 import { titlebarButtonClass } from './titlebar'
+import { useProviderBalances } from './use-provider-balances'
 
-// Persistent profile control in the titlebar's right cluster. Shows the Muapi
-// credit balance next to the avatar once a key is connected; the dropdown
-// carries the add/update key form (appears automatically while no key is
-// stored). Strings stay hardcoded English like the rest of the Studio surface.
+// Persistent profile control in the titlebar's right cluster. Shows the balance
+// of the active provider (OpenRouter-first, Muapi on the Studio screen) beside
+// the avatar, with a dropdown to pick which configured provider's balance to
+// show. The whole control hides when no configured provider exposes a number.
+// Muapi key entry now lives on the Studio screen, not here. Strings stay
+// hardcoded English, matching the rest of the surface.
 export function TitlebarProfile() {
-  const storedKey = useStore($studioKey)
-  const hasKey = Boolean(storedKey)
-  // Live refresh signal: bumped by studio generation-complete handlers so the
-  // single credit readout refetches after each spend instead of going stale.
-  const balanceVersion = useStore($studioBalanceVersion)
-  const balance = useStudioBalance(storedKey || null, balanceVersion)
+  const isStudio = useOverlayRouting().currentView === 'studio'
+  const selected = useStore($balanceProvider)
   const [open, setOpen] = useState(false)
-  const [editing, setEditing] = useState(false)
-  const [draft, setDraft] = useState('')
+  const [refreshSignal, setRefreshSignal] = useState(0)
+  const rows = useProviderBalances(refreshSignal)
 
   useEffect(() => {
+    // Load the Muapi key so its balance row can populate even before the Studio
+    // screen is opened.
     ensureStudioKeyLoaded()
   }, [])
 
-  // No stored key → the form IS the dropdown. With a key, the form hides
-  // behind an explicit "Update Muapi key" row.
-  const showForm = !hasKey || editing
+  const hasOk = rows.some(row => row.status === 'ok')
+  const displayedSlug = pickDisplayedProvider({
+    isStudio,
+    selected,
+    fallback: resolveDefaultProvider(rows),
+    isOk: slug => rows.some(row => row.slug === slug && row.status === 'ok')
+  })
+  const displayedRow = rows.find(row => row.slug === displayedSlug) ?? null
+  const displayedBalance = displayedRow && displayedRow.status === 'ok' ? displayedRow.balance : null
 
-  const save = () => {
-    const trimmed = draft.trim()
-
-    if (!trimmed) {return}
-    saveStudioKey(trimmed)
-    setDraft('')
-    setEditing(false)
-    setOpen(false)
+  // Nothing configured exposes a number: hide the whole control.
+  if (!hasOk) {
+    return null
   }
 
   return (
     <DropdownMenu
-      onOpenChange={nextOpen => {
-        setOpen(nextOpen)
+      onOpenChange={next => {
+        setOpen(next)
 
-        if (!nextOpen) {setEditing(false)}
+        // Refetch balances each time the picker opens (spec: fetch on open),
+        // with no background polling.
+        if (next) {
+          setRefreshSignal(signal => signal + 1)
+        }
       }}
       open={open}
     >
       <DropdownMenuTrigger asChild>
         <Button
           aria-label="Profile"
-          className={cn(titlebarButtonClass, 'w-auto gap-1.5 bg-transparent px-1.5 select-none')}
-          onPointerDown={event => event.stopPropagation()}
+          className={cn(titlebarButtonClass, 'w-auto gap-1.5 px-2')}
           size="icon-titlebar"
           title="Profile"
           type="button"
           variant="ghost"
         >
           <Codicon name="account" />
-          {balance !== null ? (
+          {displayedBalance !== null ? (
             <span className="text-xs font-medium tabular-nums" data-testid="titlebar-credits">
-              {formatCredits(balance)}
+              {formatCredits(displayedBalance)}
             </span>
           ) : null}
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-64">
-        {hasKey && balance !== null ? (
-          <div className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-muted-foreground">
-            <Codicon className="opacity-70" name="credit-card" size={13} />
-            <span className="font-medium tabular-nums text-foreground">{formatCredits(balance)}</span>
-            <span>credits remaining</span>
-          </div>
-        ) : null}
-        {showForm ? (
-          <div
-            className="space-y-2 px-2.5 py-2"
-            onKeyDown={event => {
-              // Keep printable keys out of Radix's typeahead; Escape still
-              // closes the menu.
-              if (event.key !== 'Escape') {event.stopPropagation()}
-            }}
-          >
-            <div className="text-xs font-medium text-foreground">{hasKey ? 'Update Muapi key' : 'Add Muapi key'}</div>
-            <div className="flex items-center gap-2">
-              <Input
-                autoFocus
-                onChange={event => setDraft(event.target.value)}
-                onKeyDown={event => {
-                  if (event.key === 'Enter') {save()}
-                }}
-                placeholder="Muapi API key"
-                type="password"
-                value={draft}
-              />
-              <Button disabled={!draft.trim()} onClick={save} size="sm">
-                Save
-              </Button>
-            </div>
-            <a
-              className="block text-xs text-(--ui-text-tertiary) underline-offset-4 transition-colors hover:text-foreground hover:underline"
-              href="https://muapi.ai/access-keys"
-              rel="noreferrer"
-              target="_blank"
+        <div className="px-2.5 py-1.5 text-xs text-muted-foreground">Show balance for</div>
+        {rows.map(row => {
+          const isOk = row.status === 'ok'
+
+          return (
+            <DropdownMenuItem
+              className="flex items-center gap-2"
+              disabled={!isOk}
+              key={row.slug}
+              onSelect={event => {
+                event.preventDefault()
+
+                if (isOk) {
+                  setBalanceProvider(row.slug)
+                  setOpen(false)
+                }
+              }}
             >
-              Get a Muapi API key
-            </a>
-          </div>
-        ) : (
-          <DropdownMenuItem
-            onSelect={event => {
-              event.preventDefault()
-              setEditing(true)
-            }}
-          >
-            <Codicon name="key" size={13} />
-            Update Muapi key
-          </DropdownMenuItem>
-        )}
+              <span className="flex-1 truncate">{row.label}</span>
+              <span className="tabular-nums text-muted-foreground">
+                {isOk && row.balance !== null
+                  ? formatCredits(row.balance)
+                  : row.status === 'unsupported'
+                    ? 'n/a'
+                    : 'unavailable'}
+              </span>
+              {row.slug === displayedSlug ? <Codicon name="check" size={13} /> : null}
+            </DropdownMenuItem>
+          )
+        })}
       </DropdownMenuContent>
     </DropdownMenu>
   )
