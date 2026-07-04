@@ -113,3 +113,57 @@ test('shim still execs when the log dir is unwritable', { skip: process.platform
   const argv = runShim([], { pwd: mkTmp(), tsDir: '/proc/nonexistent-ts-dir', real })
   assert.equal(argv[0], '--session-id') // mint proceeds; append failure is swallowed
 })
+
+test('buildSessionList groups by project and extracts titles', () => {
+  const projectsDir = mkTmp()
+  const cwd = path.join(mkTmp(), 'my repo') // space in path exercises the slug
+  const slug = mod.slugForCwd(cwd)
+  const dir = path.join(projectsDir, slug)
+  fs.mkdirSync(dir, { recursive: true })
+  const id = '11111111-1111-4111-8111-111111111111'
+  const tx = [
+    JSON.stringify({ type: 'user', cwd, gitBranch: 'main', message: { role: 'user', content: 'Fix the login bug please' } }),
+    JSON.stringify({ type: 'assistant', message: { role: 'assistant', content: 'On it.' } })
+  ].join('\n')
+  fs.writeFileSync(path.join(dir, `${id}.jsonl`), tx)
+
+  const launchesText = JSON.stringify({ id, cwd, gitRoot: cwd, ts: 1720000000, kind: 'launch' }) + '\n'
+  const { projects, sessions } = mod.buildSessionList({ launchesText, claudeProjectsDir: projectsDir })
+
+  assert.equal(sessions.length, 1)
+  assert.equal(sessions[0].title, 'Fix the login bug please')
+  assert.equal(sessions[0].messageCount, 2)
+  assert.equal(sessions[0].transcriptAvailable, true)
+  assert.equal(sessions[0].startedAt, 1720000000)
+  assert.equal(projects.length, 1)
+  assert.equal(projects[0].name, 'my repo')
+  assert.equal(projects[0].sessionCount, 1)
+})
+
+test('buildSessionList marks missing transcripts unavailable but keeps the row', () => {
+  const projectsDir = mkTmp()
+  const cwd = '/tmp/ghost'
+  const id = '22222222-2222-4222-8222-222222222222'
+  const launchesText = JSON.stringify({ id, cwd, gitRoot: cwd, ts: 1, kind: 'launch' }) + '\n'
+  const { sessions } = mod.buildSessionList({ launchesText, claudeProjectsDir: projectsDir })
+  assert.equal(sessions.length, 1)
+  assert.equal(sessions[0].transcriptAvailable, false)
+})
+
+test('parseLaunches skips corrupt lines', () => {
+  const text = ['{"id":"a","ts":1,"kind":"launch"}', 'not json', '{"id":"b","ts":2,"kind":"launch"}'].join('\n')
+  const recs = mod.parseLaunches(text)
+  assert.deepEqual(recs.map(r => r.id), ['a', 'b'])
+})
+
+test('parseTranscriptTurns keeps user/assistant and skips tool + corrupt', () => {
+  const text = [
+    JSON.stringify({ type: 'user', message: { role: 'user', content: 'hello' } }),
+    'garbage',
+    JSON.stringify({ type: 'attachment', message: {} }),
+    JSON.stringify({ type: 'assistant', message: { role: 'assistant', content: 'hi there' } })
+  ].join('\n')
+  const turns = mod.parseTranscriptTurns(text)
+  assert.deepEqual(turns.map(t => t.role), ['user', 'assistant'])
+  assert.equal(turns[0].text, 'hello')
+})

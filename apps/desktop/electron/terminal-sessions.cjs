@@ -74,6 +74,150 @@ function materializeShim(binDir) {
   return { claude, cmd }
 }
 
+// ---- store: merge launches.jsonl (scope gate) with claude transcripts ------
+
+function slugForCwd(cwd) {
+  return String(cwd || '').replace(/[/. ]/g, '-')
+}
+
+function parseLaunches(text) {
+  const out = []
+  for (const line of String(text || '').split('\n')) {
+    const trimmed = line.trim()
+    if (!trimmed) continue
+    try {
+      const rec = JSON.parse(trimmed)
+      if (rec && typeof rec.id === 'string') out.push(rec)
+    } catch {
+      // corrupt line - skip
+    }
+  }
+  return out
+}
+
+function findTranscriptPath(claudeProjectsDir, id, cwd) {
+  const bySlug = path.join(claudeProjectsDir, slugForCwd(cwd), `${id}.jsonl`)
+  if (fs.existsSync(bySlug)) return bySlug
+  let entries = []
+  try {
+    entries = fs.readdirSync(claudeProjectsDir, { withFileTypes: true })
+  } catch {
+    return null
+  }
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue
+    const candidate = path.join(claudeProjectsDir, entry.name, `${id}.jsonl`)
+    if (fs.existsSync(candidate)) return candidate
+  }
+  return null
+}
+
+// Content of a jsonl record's message, flattened to text.
+function messageText(rec) {
+  const content = rec && rec.message && rec.message.content
+  if (typeof content === 'string') return content
+  if (Array.isArray(content)) {
+    return content
+      .map(part => (typeof part === 'string' ? part : part && part.type === 'text' ? part.text : ''))
+      .filter(Boolean)
+      .join(' ')
+  }
+  return ''
+}
+
+function parseTranscriptTurns(text) {
+  const turns = []
+  for (const line of String(text || '').split('\n')) {
+    const trimmed = line.trim()
+    if (!trimmed) continue
+    let rec
+    try {
+      rec = JSON.parse(trimmed)
+    } catch {
+      continue
+    }
+    if (rec.type !== 'user' && rec.type !== 'assistant') continue
+    const body = messageText(rec).trim()
+    if (!body) continue
+    turns.push({ role: rec.type, text: body, ts: rec.timestamp || '' })
+  }
+  return turns
+}
+
+function readTranscriptMeta(transcriptPath, statFn = fs.statSync) {
+  const meta = { title: '', messageCount: 0, cwd: '', gitBranch: '', lastActiveAt: 0 }
+  let text = ''
+  try {
+    text = fs.readFileSync(transcriptPath, 'utf8')
+    meta.lastActiveAt = statFn(transcriptPath).mtimeMs
+  } catch {
+    return meta
+  }
+  let summary = ''
+  let firstUser = ''
+  for (const line of text.split('\n')) {
+    const trimmed = line.trim()
+    if (!trimmed) continue
+    let rec
+    try {
+      rec = JSON.parse(trimmed)
+    } catch {
+      continue
+    }
+    if (rec.cwd && !meta.cwd) meta.cwd = rec.cwd
+    if (rec.gitBranch && !meta.gitBranch) meta.gitBranch = rec.gitBranch
+    if (rec.type === 'summary' && !summary) summary = String(rec.summary || messageText(rec) || '').trim()
+    if (rec.type === 'user' || rec.type === 'assistant') {
+      meta.messageCount += 1
+      if (rec.type === 'user' && !firstUser) firstUser = messageText(rec).trim()
+    }
+  }
+  const raw = summary || firstUser
+  meta.title = raw.length > 80 ? raw.slice(0, 80).trimEnd() : raw
+  return meta
+}
+
+function buildSessionList({ launchesText, claudeProjectsDir, statFn = fs.statSync }) {
+  const launches = parseLaunches(launchesText)
+  const sessions = []
+  for (const launch of launches) {
+    const transcriptPath = findTranscriptPath(claudeProjectsDir, launch.id, launch.cwd)
+    const meta = transcriptPath ? readTranscriptMeta(transcriptPath, statFn) : null
+    const cwd = (meta && meta.cwd) || launch.cwd || ''
+    const projectPath = launch.gitRoot || cwd
+    sessions.push({
+      id: launch.id,
+      title: (meta && meta.title) || `${String(launch.id).slice(0, 8)}`,
+      startedAt: launch.ts || 0,
+      lastActiveAt: (meta && meta.lastActiveAt) || launch.ts || 0,
+      messageCount: (meta && meta.messageCount) || 0,
+      cwd,
+      gitBranch: (meta && meta.gitBranch) || '',
+      transcriptPath: transcriptPath || '',
+      transcriptAvailable: Boolean(transcriptPath),
+      projectPath
+    })
+  }
+  const byProject = new Map()
+  for (const s of sessions) {
+    const key = s.projectPath || s.cwd || 'unknown'
+    const existing = byProject.get(key) || {
+      path: key,
+      name: path.basename(key) || key,
+      sessionCount: 0,
+      lastActiveAt: 0,
+      gitBranch: s.gitBranch
+    }
+    existing.sessionCount += 1
+    existing.lastActiveAt = Math.max(existing.lastActiveAt, s.lastActiveAt)
+    if (!existing.gitBranch && s.gitBranch) existing.gitBranch = s.gitBranch
+    byProject.set(key, existing)
+  }
+  const projects = [...byProject.values()].sort((a, b) => b.lastActiveAt - a.lastActiveAt)
+  sessions.sort((a, b) => b.lastActiveAt - a.lastActiveAt)
+  return { projects, sessions }
+}
+
 // ---- registration ---------------------------------------------------------
 
 function registerTerminalSessionsIpc({ ipcMain, app, watch = true }) {
@@ -98,5 +242,11 @@ module.exports = {
   applyEnvWith,
   materializeShim,
   registerTerminalSessionsIpc,
-  resolveRealClaude
+  resolveRealClaude,
+  buildSessionList,
+  findTranscriptPath,
+  parseLaunches,
+  parseTranscriptTurns,
+  readTranscriptMeta,
+  slugForCwd
 }
