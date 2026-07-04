@@ -226,9 +226,78 @@ function registerTerminalSessionsIpc({ ipcMain, app, watch = true }) {
   fs.mkdirSync(storeDir, { recursive: true })
   materializeShim(binDir)
 
-  // (IPC handlers + fs.watch are added in later tasks.)
-  void ipcMain
-  void watch
+  const launchesPath = path.join(storeDir, 'launches.jsonl')
+  const claudeProjectsDir = path.join(app.getPath('home'), '.claude', 'projects')
+
+  const readLaunches = () => {
+    try {
+      return fs.readFileSync(launchesPath, 'utf8')
+    } catch {
+      return ''
+    }
+  }
+
+  ipcMain.handle('terminalSessions:list', () =>
+    buildSessionList({ launchesText: readLaunches(), claudeProjectsDir })
+  )
+
+  ipcMain.handle('terminalSessions:getTranscript', (_event, id) => {
+    const record = parseLaunches(readLaunches()).find(r => r.id === String(id))
+    const transcriptPath = record && findTranscriptPath(claudeProjectsDir, record.id, record.cwd)
+    if (!transcriptPath) return []
+    try {
+      return parseTranscriptTurns(fs.readFileSync(transcriptPath, 'utf8'))
+    } catch {
+      return []
+    }
+  })
+
+  ipcMain.handle('terminalSessions:forget', (_event, id, options = {}) => {
+    const target = String(id)
+    const records = parseLaunches(readLaunches())
+    const record = records.find(r => r.id === target)
+    if (options && options.deleteTranscript && record) {
+      const transcriptPath = findTranscriptPath(claudeProjectsDir, record.id, record.cwd)
+      if (transcriptPath) {
+        try {
+          fs.unlinkSync(transcriptPath)
+        } catch {
+          // already gone
+        }
+      }
+    }
+    const kept = records.filter(r => r.id !== target)
+    try {
+      fs.writeFileSync(launchesPath, kept.map(r => JSON.stringify(r)).join('\n') + (kept.length ? '\n' : ''))
+    } catch {
+      // best effort
+    }
+    return true
+  })
+
+  if (watch) {
+    let timer = null
+    const broadcast = () => {
+      timer = null
+      try {
+        const { BrowserWindow } = require('electron')
+        for (const win of BrowserWindow.getAllWindows()) win.webContents.send('terminalSessions:changed')
+      } catch {
+        // no windows / not in electron - ignore
+      }
+    }
+    const schedule = () => {
+      if (timer) clearTimeout(timer)
+      timer = setTimeout(broadcast, 250)
+    }
+    try {
+      fs.mkdirSync(claudeProjectsDir, { recursive: true })
+      fs.watch(claudeProjectsDir, { recursive: true }, schedule)
+      fs.watch(storeDir, schedule)
+    } catch {
+      // watch unsupported here - list still works on demand
+    }
+  }
 
   return {
     binDir,

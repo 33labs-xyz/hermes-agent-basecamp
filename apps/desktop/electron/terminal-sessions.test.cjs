@@ -167,3 +167,46 @@ test('parseTranscriptTurns keeps user/assistant and skips tool + corrupt', () =>
   assert.deepEqual(turns.map(t => t.role), ['user', 'assistant'])
   assert.equal(turns[0].text, 'hello')
 })
+
+function fakeIpc() {
+  const handlers = new Map()
+  return { ipcMain: { handle: (ch, fn) => handlers.set(ch, fn) }, invoke: (ch, ...a) => handlers.get(ch)(null, ...a) }
+}
+
+test('list + getTranscript + forget IPC work end to end', async () => {
+  const userData = mkTmp()
+  const home = mkTmp()
+  const projectsDir = path.join(home, '.claude', 'projects')
+  const cwd = path.join(mkTmp(), 'proj')
+  const dir = path.join(projectsDir, mod.slugForCwd(cwd))
+  fs.mkdirSync(dir, { recursive: true })
+  const id = '33333333-3333-4333-8333-333333333333'
+  fs.writeFileSync(
+    path.join(dir, `${id}.jsonl`),
+    [
+      JSON.stringify({ type: 'user', cwd, message: { role: 'user', content: 'hello world' } }),
+      JSON.stringify({ type: 'assistant', message: { role: 'assistant', content: 'hi' } })
+    ].join('\n')
+  )
+
+  const storeDir = path.join(userData, 'terminal-sessions')
+  fs.mkdirSync(storeDir, { recursive: true })
+  fs.writeFileSync(path.join(storeDir, 'launches.jsonl'), JSON.stringify({ id, cwd, gitRoot: cwd, ts: 5, kind: 'launch' }) + '\n')
+
+  const { ipcMain, invoke } = fakeIpc()
+  const app = { getPath: name => (name === 'userData' ? userData : home) }
+  mod.registerTerminalSessionsIpc({ ipcMain, app, watch: false })
+
+  const list = await invoke('terminalSessions:list')
+  assert.equal(list.sessions.length, 1)
+  assert.equal(list.sessions[0].title, 'hello world')
+
+  const turns = await invoke('terminalSessions:getTranscript', id)
+  assert.deepEqual(turns.map(t => t.role), ['user', 'assistant'])
+
+  const forgot = await invoke('terminalSessions:forget', id, { deleteTranscript: true })
+  assert.equal(forgot, true)
+  assert.equal(fs.existsSync(path.join(dir, `${id}.jsonl`)), false)
+  const after = await invoke('terminalSessions:list')
+  assert.equal(after.sessions.length, 0)
+})
