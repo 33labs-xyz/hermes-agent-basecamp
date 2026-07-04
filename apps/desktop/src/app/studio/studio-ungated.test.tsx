@@ -46,7 +46,6 @@ vi.mock('./vendor', () => {
   }
 })
 vi.mock('./library', () => ({ StudioLibrary: () => null }))
-vi.mock('./studio-credits', () => ({ StudioCredits: () => null }))
 
 beforeEach(() => {
   resetStudioKeyForTests()

@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
+import { $studioBalanceVersion } from '@/store/studio-balance'
 import { $studioKey, ensureStudioKeyLoaded, saveStudioKey } from '@/store/studio-key'
 
 import { formatCredits, useStudioBalance } from '../studio/use-studio-balance'
@@ -24,7 +25,10 @@ import { titlebarButtonClass } from './titlebar'
 export function TitlebarProfile() {
   const storedKey = useStore($studioKey)
   const hasKey = Boolean(storedKey)
-  const balance = useStudioBalance(storedKey || null, 0)
+  // Live refresh signal: bumped by studio generation-complete handlers so the
+  // single credit readout refetches after each spend instead of going stale.
+  const balanceVersion = useStore($studioBalanceVersion)
+  const balance = useStudioBalance(storedKey || null, balanceVersion)
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState('')

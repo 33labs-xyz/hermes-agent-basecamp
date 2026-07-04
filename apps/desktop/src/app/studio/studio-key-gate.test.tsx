@@ -25,7 +25,6 @@ vi.mock('./vendor', () => ({
   getUserBalance: vi.fn()
 }))
 vi.mock('./library', () => ({ StudioLibrary: () => null }))
-vi.mock('./studio-credits', () => ({ StudioCredits: () => null }))
 
 afterEach(() => {
   cleanup()

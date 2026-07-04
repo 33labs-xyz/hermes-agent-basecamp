@@ -5,13 +5,13 @@ import { Button } from '@/components/ui/button'
 import { Codicon } from '@/components/ui/codicon'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
+import { bumpStudioBalance } from '@/store/studio-balance'
 import { $studioKey, ensureStudioKeyLoaded, saveStudioKey } from '@/store/studio-key'
 
 import { PAGE_INSET_X } from '../layout-constants'
 import type { SetStatusbarItemGroup } from '../shell/statusbar-controls'
 
 import { StudioLibrary } from './library'
-import { StudioCredits } from './studio-credits'
 import {
   AudioStudio,
   CinemaStudio,
@@ -165,6 +165,8 @@ export function StudioView({ setStatusbarItemGroup }: StudioViewProps) {
           }
 
           setLibraryVersion(version => version + 1)
+          // Refresh the titlebar credit readout: this job just spent credits.
+          bumpStudioBalance()
         })()
       })
     }
@@ -209,7 +211,6 @@ export function StudioView({ setStatusbarItemGroup }: StudioViewProps) {
             </button>
           ))}
         </div>
-        <StudioCredits apiKey={storedKey || null} refreshSignal={libraryVersion} />
       </div>
       {/* While the hard gate is showing there is no studio to protect, and the
           typing-trigger would stack the overlay on top of the gate's own input. */}
