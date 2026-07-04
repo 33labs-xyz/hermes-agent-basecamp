@@ -178,4 +178,17 @@ contextBridge.exposeInMainWorld('hermesDesktop', {
       organise: () => ipcRenderer.invoke('studio:gen:organise')
     }
   }
+  ,
+  // Sessions: claude CLI sessions launched inside the built-in terminal.
+  terminalSessions: {
+    list: () => ipcRenderer.invoke('terminalSessions:list'),
+    getTranscript: id => ipcRenderer.invoke('terminalSessions:getTranscript', id),
+    forget: (id, opts) => ipcRenderer.invoke('terminalSessions:forget', id, opts),
+    recordFork: payload => ipcRenderer.invoke('terminalSessions:recordFork', payload),
+    onChanged: callback => {
+      const listener = () => callback()
+      ipcRenderer.on('terminalSessions:changed', listener)
+      return () => ipcRenderer.removeListener('terminalSessions:changed', listener)
+    }
+  }
 })
