@@ -1,0 +1,3 @@
+#!/bin/sh
+# Basecamp claude shim (passthrough placeholder - real mint logic added later).
+exec "${BASECAMP_REAL_CLAUDE:-claude}" "$@"
