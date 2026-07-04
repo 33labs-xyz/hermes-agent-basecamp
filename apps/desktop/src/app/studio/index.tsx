@@ -1,5 +1,5 @@
 import { useStore } from '@nanostores/react'
-import { type ComponentType, useCallback, useEffect, useState } from 'react'
+import { type ComponentType, useCallback, useEffect, useMemo, useState } from 'react'
 
 import { Button } from '@/components/ui/button'
 import { Codicon } from '@/components/ui/codicon'
@@ -10,8 +10,6 @@ import { $studioKey, ensureStudioKeyLoaded, saveStudioKey } from '@/store/studio
 import { PAGE_INSET_X } from '../layout-constants'
 import type { SetStatusbarItemGroup } from '../shell/statusbar-controls'
 
-import { AgentsHost } from './agents-host'
-import { DesignHost } from './design-host'
 import { StudioLibrary } from './library'
 import { StudioCredits } from './studio-credits'
 import {
@@ -19,7 +17,6 @@ import {
   CinemaStudio,
   ImageStudio,
   MarketingStudio,
-  RecastStudio,
   type StudioGeneration,
   type StudioProps,
   VibeMotionStudio,
@@ -37,11 +34,8 @@ type StudioTabId =
   | 'audio'
   | 'cinema'
   | 'marketing'
-  | 'recast'
   | 'vibe'
   | 'workflow'
-  | 'agents'
-  | 'design'
   | 'library'
 
 interface StudioTab {
@@ -56,20 +50,17 @@ interface StudioTab {
 
 // Order mirrors the source studio's tab order. Each generation entry is a
 // self-contained vendored studio (react + muapi only, zero new npm deps).
-// Workflow/Agents/Design are the router-driven studios (hosted to bridge
-// their Next.js routing onto the memory-router shim). Library is the local
-// generation manager, not a Muapi studio.
+// Workflow is the router-driven studio (hosted to bridge its Next.js routing
+// onto the memory-router shim). Library is the local generation manager, not
+// a Muapi studio.
 const STUDIO_TABS: readonly StudioTab[] = [
   { id: 'image', label: 'Image', Component: ImageStudio },
   { id: 'video', label: 'Video', Component: VideoStudio },
   { id: 'audio', label: 'Audio', Component: AudioStudio },
   { id: 'cinema', label: 'Cinema', Component: CinemaStudio },
   { id: 'marketing', label: 'Marketing', Component: MarketingStudio },
-  { id: 'recast', label: 'Body Swap', Component: RecastStudio },
   { id: 'vibe', label: 'Vibe Motion', Component: VibeMotionStudio },
   { id: 'workflow', label: 'Workflows', Component: WorkflowHost, requiresKey: true },
-  { id: 'agents', label: 'Agents', Component: AgentsHost, requiresKey: true },
-  { id: 'design', label: 'Design', Component: DesignHost, requiresKey: true },
   { id: 'library', label: 'Library' }
 ]
 
@@ -80,6 +71,16 @@ function urlsFromGeneration(generation: StudioGeneration): string[] {
   const single = typeof generation.url === 'string' ? [generation.url] : []
 
   return [...urls, ...single].filter(Boolean)
+}
+
+// A generation studio (Image/Video/Audio/etc.) runs a long poll in
+// component-local state, so unmounting it on a tab switch tears down the run.
+// These are kept mounted once visited (keep-alive) and hidden when inactive.
+// The router-driven hard-gated studios and the Library hold no in-flight state,
+// so they render active-only.
+type GenerationTab = StudioTab & { Component: ComponentType<StudioProps> }
+function isGenerationStudio(tab: StudioTab): tab is GenerationTab {
+  return Boolean(tab.Component) && !tab.requiresKey
 }
 
 // The ported generative-AI studio (Muapi BYOK) as a local Basecamp function.
@@ -98,6 +99,9 @@ export function StudioView({ setStatusbarItemGroup }: StudioViewProps) {
   const storedKey = useStore($studioKey)
   const hasKey = Boolean(storedKey)
   const [activeTab, setActiveTab] = useState<StudioTabId>('image')
+  // Generation studios stay mounted once visited (keep-alive), so a running
+  // generation survives a tab switch. Image is active on first render.
+  const [mountedTabs, setMountedTabs] = useState<ReadonlySet<StudioTabId>>(() => new Set<StudioTabId>(['image']))
   // Bumped after each save so the Library refreshes when the user switches to it.
   const [libraryVersion, setLibraryVersion] = useState(0)
   const [keyGateOpen, setKeyGateOpen] = useState(false)
@@ -112,6 +116,8 @@ export function StudioView({ setStatusbarItemGroup }: StudioViewProps) {
   const openTab = useCallback((id: StudioTabId) => {
     setActiveTab(id)
     setKeyGateDismissed(false)
+    // Fresh Set copy (prev untouched) so the newly opened tab keeps its mount.
+    setMountedTabs(prev => (prev.has(id) ? prev : new Set(prev).add(id)))
   }, [])
 
   // Typing anywhere inside a studio (prompt boxes included) without a stored
@@ -131,31 +137,40 @@ export function StudioView({ setStatusbarItemGroup }: StudioViewProps) {
   }, [])
 
   // Auto-save: as soon as a job resolves, persist every result to the local
-  // library. Best-effort; a save failure never blocks the studio.
-  const handleGenerationComplete = useCallback(
-    (generation: StudioGeneration) => {
-      const gen = window.hermesDesktop?.studio?.gen
+  // library. Best-effort; a save failure never blocks the studio. One stable
+  // handler per tab, keyed by the tab that owns the studio (not the active tab):
+  // a keep-alive pane can finish a job while hidden, and it must file under the
+  // studio that produced it. Stable refs also keep a tab switch from re-rendering
+  // every mounted pane.
+  const genCompleteHandlers = useMemo(() => {
+    const handlers = new Map<StudioTabId, (generation: StudioGeneration) => void>()
 
-      if (!gen) {return}
-      void (async () => {
-        for (const url of urlsFromGeneration(generation)) {
-          try {
-            await gen.save({
-              url,
-              prompt: typeof generation.prompt === 'string' ? generation.prompt : '',
-              model: typeof generation.model === 'string' ? generation.model : '',
-              tab: activeTab
-            })
-          } catch {
-            // ignore individual save failures
+    for (const tab of STUDIO_TABS) {
+      handlers.set(tab.id, (generation: StudioGeneration) => {
+        const gen = window.hermesDesktop?.studio?.gen
+
+        if (!gen) {return}
+        void (async () => {
+          for (const url of urlsFromGeneration(generation)) {
+            try {
+              await gen.save({
+                url,
+                prompt: typeof generation.prompt === 'string' ? generation.prompt : '',
+                model: typeof generation.model === 'string' ? generation.model : '',
+                tab: tab.id
+              })
+            } catch {
+              // ignore individual save failures
+            }
           }
-        }
 
-        setLibraryVersion(version => version + 1)
-      })()
-    },
-    [activeTab]
-  )
+          setLibraryVersion(version => version + 1)
+        })()
+      })
+    }
+
+    return handlers
+  }, [])
 
   const active = STUDIO_TABS.find(tab => tab.id === activeTab) ?? STUDIO_TABS[0]
   const ActiveStudio = active.Component
@@ -202,12 +217,32 @@ export function StudioView({ setStatusbarItemGroup }: StudioViewProps) {
         className="relative min-h-0 flex-1 overflow-auto"
         onInputCapture={active.requiresKey && !hasKey ? undefined : handleStudioInput}
       >
-        {active.requiresKey && !hasKey ? (
-          <StudioKeyGate onSubmit={handleConnect} />
-        ) : ActiveStudio ? (
-          <ActiveStudio apiKey={storedKey ?? ''} onGenerationComplete={handleGenerationComplete} />
-        ) : (
-          <StudioLibrary refreshKey={libraryVersion} />
+        {/* Keep-alive: every generation studio opened this session stays mounted
+            and is hidden (not unmounted) when inactive, so a running generation
+            is never torn down by a tab switch. */}
+        {STUDIO_TABS.filter(isGenerationStudio).map(tab => {
+          if (!mountedTabs.has(tab.id)) {return null}
+
+          const Studio = tab.Component
+
+          return (
+            <div className="h-full" data-studio-pane={tab.id} hidden={tab.id !== activeTab} key={tab.id}>
+              <Studio apiKey={storedKey ?? ''} onGenerationComplete={genCompleteHandlers.get(tab.id)} />
+            </div>
+          )
+        })}
+        {/* Active-only: hard-gated studios and the Library hold no in-flight
+            state, so they mount lazily for the active tab. */}
+        {isGenerationStudio(active) ? null : (
+          <div className="h-full" data-studio-pane={active.id}>
+            {active.requiresKey && !hasKey ? (
+              <StudioKeyGate onSubmit={handleConnect} />
+            ) : ActiveStudio ? (
+              <ActiveStudio apiKey={storedKey ?? ''} onGenerationComplete={genCompleteHandlers.get(active.id)} />
+            ) : (
+              <StudioLibrary refreshKey={libraryVersion} />
+            )}
+          </div>
         )}
         {keyGateOpen ? (
           <div

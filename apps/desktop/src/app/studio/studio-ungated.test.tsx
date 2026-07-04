@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { $studioKey, resetStudioKeyForTests } from '@/store/studio-key'
@@ -15,6 +15,16 @@ vi.mock('./vendor', () => {
     </div>
   )
 
+  // Image stub carries an extra uncontrolled field. Its value only survives a
+  // tab switch if the studio is kept mounted (keep-alive) rather than remounted.
+  const ImageStudioStub = ({ apiKey }: { apiKey: string }) => (
+    <div>
+      <input aria-label="prompt" />
+      <input aria-label="scratch" />
+      <span data-testid="stub-api-key">{apiKey}</span>
+    </div>
+  )
+
   return {
     AgentProfile: StudioStub,
     AgentStudio: StudioStub,
@@ -24,7 +34,7 @@ vi.mock('./vendor', () => {
     CreateAgentPage: StudioStub,
     DesignAgentStudio: StudioStub,
     EditAgentPage: StudioStub,
-    ImageStudio: StudioStub,
+    ImageStudio: ImageStudioStub,
     MarketingStudio: StudioStub,
     RecastStudio: StudioStub,
     VibeMotionStudio: StudioStub,
@@ -49,6 +59,17 @@ afterEach(() => {
 
 function renderStudio() {
   return render(<StudioView setStatusbarItemGroup={vi.fn()} />)
+}
+
+// With keep-alive, previously-visited studios stay mounted but hidden. Exactly
+// one pane lacks the `hidden` attribute (the active one); scope queries to it so
+// stub duplicates in the hidden panes don't trigger multi-match errors.
+function visiblePane(): HTMLElement {
+  const pane = document.querySelector('[data-studio-pane]:not([hidden])')
+
+  if (!pane) {throw new Error('no visible studio pane')}
+
+  return pane as HTMLElement
 }
 
 describe('StudioView ungated', () => {
@@ -118,15 +139,33 @@ describe('StudioView ungated', () => {
     fireEvent.input(screen.getByLabelText('prompt'), { target: { value: 'ab' } })
     expect(screen.queryByTestId('studio-key-overlay')).toBeNull()
 
-    // New tab: prompt re-arms.
+    // New tab: prompt re-arms. Image stays mounted (hidden) so scope to Video.
     fireEvent.click(screen.getByRole('button', { name: 'Video' }))
-    fireEvent.input(screen.getByLabelText('prompt'), { target: { value: 'b' } })
+    fireEvent.input(within(visiblePane()).getByLabelText('prompt'), { target: { value: 'b' } })
     expect(screen.getByTestId('studio-key-overlay')).toBeTruthy()
+  })
+
+  // A generation runs in component-local state inside the vendored studio. If a
+  // tab switch unmounts that studio, the run is torn down. Keep-alive must hold
+  // the studio in the tree (hidden) so in-flight state survives the round trip.
+  it('keeps a generation studio mounted across a tab switch', async () => {
+    renderStudio()
+
+    const scratch = (await screen.findByLabelText('scratch')) as HTMLInputElement
+    fireEvent.change(scratch, { target: { value: 'in-flight-state' } })
+
+    // Leave to Video, then return to Image.
+    fireEvent.click(screen.getByRole('button', { name: 'Video' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Image' }))
+
+    // A remount would reset the uncontrolled field; keep-alive preserves it.
+    const scratchAfter = screen.getByLabelText('scratch') as HTMLInputElement
+    expect(scratchAfter.value).toBe('in-flight-state')
   })
 })
 
-// Workflows/Agents/Design fetch account data on mount, so without a key they
-// render the connect pane in place of the studio (no typing-trigger overlay).
+// Workflows fetches account data on mount, so without a key it renders the
+// connect pane in place of the studio (no typing-trigger overlay).
 describe('StudioView hard-gated tabs', () => {
   it('renders the connect pane instead of the studio without a key', async () => {
     renderStudio()
@@ -134,7 +173,9 @@ describe('StudioView hard-gated tabs', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Workflows' }))
 
     expect(screen.getByText('Connect Studio')).toBeTruthy()
-    expect(screen.queryByLabelText('prompt')).toBeNull()
+    // Keep-alive leaves the Image pane mounted (hidden); the visible Workflows
+    // pane is the gate, so it must hold no prompt.
+    expect(within(visiblePane()).queryByLabelText('prompt')).toBeNull()
 
     // Typing the key into the in-pane gate must not stack the overlay on top.
     fireEvent.input(screen.getByPlaceholderText('Muapi API key'), { target: { value: 'sk' } })
@@ -143,7 +184,7 @@ describe('StudioView hard-gated tabs', () => {
     // Connecting through the pane swaps in the studio.
     fireEvent.change(screen.getByPlaceholderText('Muapi API key'), { target: { value: 'sk-flow' } })
     fireEvent.click(screen.getByRole('button', { name: 'Connect' }))
-    expect(screen.getByTestId('stub-api-key').textContent).toBe('sk-flow')
+    expect(within(visiblePane()).getByTestId('stub-api-key').textContent).toBe('sk-flow')
   })
 
   it('renders the studio directly when a key is stored', async () => {
@@ -153,6 +194,6 @@ describe('StudioView hard-gated tabs', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Workflows' }))
 
     expect(screen.queryByText('Connect Studio')).toBeNull()
-    expect(screen.getByTestId('stub-api-key').textContent).toBe('sk-live')
+    expect(within(visiblePane()).getByTestId('stub-api-key').textContent).toBe('sk-live')
   })
 })

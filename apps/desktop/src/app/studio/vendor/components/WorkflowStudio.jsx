@@ -143,7 +143,7 @@ export default function WorkflowStudio({ apiKey, isHeaderVisible = true, onToggl
   const [workflows, setWorkflows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedWorkflow, setSelectedWorkflow] = useState(null);
-  const [activeSubTab, setActiveSubTab] = useState("playground"); // 'playground' | 'builder'
+  const [activeSubTab, setActiveSubTab] = useState("builder"); // builder only (playground removed)
   const [activeMainTab, setActiveMainTab] = useState("templates"); // 'templates' | 'my-workflows' | 'published'
   const [renamingWorkflow, setRenamingWorkflow] = useState(null);
   const [newWorkflowName, setNewWorkflowName] = useState("");
@@ -167,15 +167,15 @@ export default function WorkflowStudio({ apiKey, isHeaderVisible = true, onToggl
       setResult(null);
       setError(null);
       
-      const targetTab = urlTab || "playground";
-      setActiveSubTab(targetTab);
+      // Playground removed; workflows always open in the full builder.
+      setActiveSubTab("builder");
 
       if (!fromUrl) {
         // Always route to /workflow/[id] so the builder library's useParams().id resolves correctly
-        router.push(`/workflow/${wf.id}/${targetTab}`);
+        router.push(`/workflow/${wf.id}/builder`);
       }
     },
-    [router, urlTab],
+    [router],
   );
 
   // Dedicated data fetching effect for the active workflow
@@ -359,15 +359,6 @@ export default function WorkflowStudio({ apiKey, isHeaderVisible = true, onToggl
     handleSelectWorkflow,
   ]);
 
-  // Handle reload on exit to clear builder CSS
-  useEffect(() => {
-    const fromBuilder = sessionStorage.getItem("fromWorkflowBuilder");
-    if (fromBuilder && (!urlWorkflowId || activeSubTab !== "builder")) {
-      sessionStorage.removeItem("fromWorkflowBuilder");
-      window.location.reload();
-    }
-  }, [urlWorkflowId, activeSubTab]);
-
   useEffect(() => {
     async function loadWorkflows() {
       try {
@@ -468,41 +459,6 @@ export default function WorkflowStudio({ apiKey, isHeaderVisible = true, onToggl
                 </svg>
                 All Workflows
               </button>
-
-              <div className="h-4 w-[1px] bg-white/10" />
-
-              <div className="flex h-full">
-                <div className="flex bg-white/5 p-1 rounded-lg my-auto">
-                  <button
-                    onClick={() => {
-                        setActiveSubTab("playground");
-                        if (selectedWorkflow?.id) router.push(`/workflow/${selectedWorkflow.id}/playground`);
-                    }}
-                    type="button"
-                    className={`px-4 py-1.5 text-[10px] font-black uppercase tracking-widest rounded-md transition-all ${
-                      activeSubTab === "playground"
-                        ? "bg-[#8b80e8] text-black shadow-[0_0_15px_rgba(139,128,232,0.2)]"
-                        : "text-white/40 hover:text-white"
-                    }`}
-                  >
-                    Playground
-                  </button>
-                  <button
-                    onClick={() => {
-                        setActiveSubTab("builder");
-                        if (selectedWorkflow?.id) router.push(`/workflow/${selectedWorkflow.id}/builder`);
-                    }}
-                    type="button"
-                    className={`px-4 py-1.5 text-[10px] font-black uppercase tracking-widest rounded-md transition-all ${
-                      activeSubTab === "builder"
-                        ? "bg-[#8b80e8] text-black shadow-[0_0_15px_rgba(139,128,232,0.2)]"
-                        : "text-white/40 hover:text-white"
-                    }`}
-                  >
-                    Full Workflow
-                  </button>
-                </div>
-              </div>
             </div>
 
             <div className="flex items-center gap-3">
@@ -535,28 +491,6 @@ export default function WorkflowStudio({ apiKey, isHeaderVisible = true, onToggl
             
             <div className="h-4 w-[1px] bg-white/10" />
             
-            <div className="flex bg-white/5 p-1 rounded-lg">
-               <button
-                 onClick={() => setActiveSubTab("playground")}
-                 type="button"
-                 className={`px-3 py-1 text-[9px] font-black uppercase tracking-widest rounded-md transition-all ${
-                   activeSubTab === "playground" ? "bg-[#8b80e8] text-black" : "text-white/40"
-                 }`}
-               >
-                 Play
-               </button>
-               <button
-                 onClick={() => setActiveSubTab("builder")}
-                 type="button"
-                 className={`px-3 py-1 text-[9px] font-black uppercase tracking-widest rounded-md transition-all ${
-                   activeSubTab === "builder" ? "bg-[#8b80e8] text-black" : "text-white/40"
-                 }`}
-               >
-                 Builder
-               </button>
-            </div>
-
-            <div className="h-4 w-[1px] bg-white/10" />
 
             <button
               onClick={() => onToggleHeader?.(true)}
