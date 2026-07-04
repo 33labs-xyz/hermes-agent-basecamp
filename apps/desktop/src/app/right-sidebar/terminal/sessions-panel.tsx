@@ -44,6 +44,7 @@ export function SessionsPanel() {
   }
 
   const sessionsByProject = new Map<string, TerminalSession[]>()
+
   for (const session of payload.sessions) {
     const list = sessionsByProject.get(session.projectPath) ?? []
     list.push(session)
@@ -53,7 +54,7 @@ export function SessionsPanel() {
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
       {payload.projects.map(project => (
-        <div key={project.path} className="flex flex-col">
+        <div className="flex flex-col" key={project.path}>
           <RightSidebarSectionHeader>
             <div className="min-w-0 flex-1 truncate text-[0.72rem] font-semibold text-(--ui-text-secondary)">
               {project.name}
@@ -61,7 +62,7 @@ export function SessionsPanel() {
             <span className="text-[0.62rem] text-muted-foreground/60">{project.sessionCount}</span>
           </RightSidebarSectionHeader>
           {(sessionsByProject.get(project.path) ?? []).map(session => (
-            <div key={session.id} className="flex flex-col border-b border-(--ui-stroke-secondary)/40">
+            <div className="flex flex-col border-b border-(--ui-stroke-secondary)/40" key={session.id}>
               <button
                 className="flex items-center gap-2 px-3 py-1.5 text-left hover:bg-accent/40"
                 onClick={() => setOpenId(openId === session.id ? null : session.id)}

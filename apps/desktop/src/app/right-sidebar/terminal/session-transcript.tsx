@@ -17,6 +17,7 @@ export function SessionTranscript({ sessionId }: { sessionId: string }) {
           setTurns(result ?? [])
         }
       })
+
     return () => {
       live = false
     }
@@ -33,7 +34,7 @@ export function SessionTranscript({ sessionId }: { sessionId: string }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-3 py-2">
       {turns.map((turn, index) => (
-        <div key={index} className="text-[0.72rem] leading-relaxed">
+        <div className="text-[0.72rem] leading-relaxed" key={index}>
           <div className="mb-0.5 font-semibold uppercase tracking-[0.06em] text-muted-foreground/60">
             {turn.role}
           </div>

@@ -12,7 +12,6 @@
 //   launches.jsonl               one {id,cwd,gitRoot,ts,kind} per fresh launch
 
 const fs = require('node:fs')
-const os = require('node:os')
 const path = require('node:path')
 
 // ---- PATH / env injection -------------------------------------------------
