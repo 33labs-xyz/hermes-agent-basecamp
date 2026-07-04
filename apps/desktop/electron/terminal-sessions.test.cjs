@@ -210,3 +210,21 @@ test('list + getTranscript + forget IPC work end to end', async () => {
   const after = await invoke('terminalSessions:list')
   assert.equal(after.sessions.length, 0)
 })
+
+test('recordFork appends a kind:fork launch record', async () => {
+  const userData = mkTmp()
+  const home = mkTmp()
+  const storeDir = path.join(userData, 'terminal-sessions')
+  fs.mkdirSync(storeDir, { recursive: true })
+  const { ipcMain, invoke } = fakeIpc()
+  const app = { getPath: name => (name === 'userData' ? userData : home) }
+  mod.registerTerminalSessionsIpc({ ipcMain, app, watch: false })
+
+  const ok = await invoke('terminalSessions:recordFork', { newId: 'fork-9', fromId: 'src-1', projectPath: '/x/proj' })
+  assert.equal(ok, true)
+  const lines = fs.readFileSync(path.join(storeDir, 'launches.jsonl'), 'utf8').split('\n').filter(Boolean)
+  const rec = JSON.parse(lines[lines.length - 1])
+  assert.equal(rec.id, 'fork-9')
+  assert.equal(rec.kind, 'fork')
+  assert.equal(rec.cwd, '/x/proj')
+})

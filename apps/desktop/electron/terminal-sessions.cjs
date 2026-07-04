@@ -275,6 +275,25 @@ function registerTerminalSessionsIpc({ ipcMain, app, watch = true }) {
     return true
   })
 
+  ipcMain.handle('terminalSessions:recordFork', (_event, payload = {}) => {
+    const newId = String(payload.newId || '')
+    if (!newId) return false
+    const projectPath = String(payload.projectPath || '')
+    const record = {
+      id: newId,
+      cwd: projectPath,
+      gitRoot: projectPath,
+      ts: Math.floor(Date.now() / 1000),
+      kind: 'fork'
+    }
+    try {
+      fs.appendFileSync(launchesPath, JSON.stringify(record) + '\n')
+    } catch {
+      return false
+    }
+    return true
+  })
+
   if (watch) {
     let timer = null
     const broadcast = () => {
