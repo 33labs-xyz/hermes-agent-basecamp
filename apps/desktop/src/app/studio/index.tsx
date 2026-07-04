@@ -162,7 +162,20 @@ export function StudioView({ setStatusbarItemGroup }: StudioViewProps) {
 
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col">
-      <div className={cn('flex shrink-0 items-center gap-2 border-b border-border py-1.5', PAGE_INSET_X)}>
+      {/* Tab bar shares the titlebar strip, so its right edge must clear the
+          floating window-control cluster (haptics / keybinds / profile /
+          settings / sidebar toggle). Same reservation the chat header uses in
+          titlebarHeaderBaseClass — keep PAGE_INSET_X for the left content
+          gutter, override the right padding to the cluster footprint + gap.
+          The pr-[...] wins over PAGE_INSET_X's px-[...] right value, and the
+          calc tracks --titlebar-tools-width so it grows with any pane tools. */}
+      <div
+        className={cn(
+          'flex shrink-0 items-center gap-2 border-b border-border py-1.5',
+          PAGE_INSET_X,
+          'pr-[calc(var(--titlebar-tools-right,0.75rem)+var(--titlebar-tools-width,0px)+0.75rem)]'
+        )}
+      >
         <div className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto">
           {STUDIO_TABS.map(tab => (
             <button

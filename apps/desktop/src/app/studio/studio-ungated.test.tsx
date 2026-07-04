@@ -61,6 +61,19 @@ describe('StudioView ungated', () => {
     expect(screen.queryByText('Connect Studio')).toBeNull()
   })
 
+  // Regression guard: the tab bar shares the titlebar strip, so its right edge
+  // must reserve room for the floating window-control cluster or the credits
+  // pill slides under it (the 0.15.13 top-corner overlap). The reservation
+  // tracks --titlebar-tools-width, matching titlebarHeaderBaseClass.
+  it('reserves right-edge space for the floating titlebar controls', async () => {
+    renderStudio()
+
+    const tabList = (await screen.findByRole('button', { name: 'Image' })).parentElement
+    const tabBarRow = tabList?.parentElement
+
+    expect(tabBarRow?.className).toContain('--titlebar-tools-width')
+  })
+
   it('opens the key prompt when typing without a key', async () => {
     renderStudio()
 
