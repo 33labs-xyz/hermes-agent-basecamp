@@ -582,6 +582,7 @@ export function UploadButton({ apiKey, maxImages, onSelect, onClear, initialUrls
               </div>
             ) : (
               <div className="grid grid-cols-3 gap-2 max-h-56 overflow-y-auto custom-scrollbar pr-0.5">
+                {/* Accessible title/label for Library grid cells; hardcoded English. */}
                 {libraryImages.map((entry) => {
                   const busy = libraryBusyId === entry.id;
                   const failed = libraryErrorId === entry.id;

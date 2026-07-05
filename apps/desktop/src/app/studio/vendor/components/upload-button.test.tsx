@@ -75,7 +75,7 @@ describe('UploadButton Library source', () => {
     await waitFor(() => expect(uploadFile).toHaveBeenCalledTimes(1))
     await waitFor(() =>
       expect(onSelect).toHaveBeenCalledWith(
-        expect.objectContaining({ url: 'https://signed/g1', urls: ['https://signed/g1'] }),
+        expect.objectContaining({ url: 'https://signed/g1', urls: ['https://signed/g1'], thumbnail: 'https://signed/g1' }),
       ),
     )
   })
@@ -90,5 +90,18 @@ describe('UploadButton Library source', () => {
 
     await waitFor(() => expect(uploadFile).toHaveBeenCalled())
     expect(onSelect).not.toHaveBeenCalled()
+  })
+
+  it('shows empty Library state when the Studio bridge is absent', async () => {
+    // Override bridge so studio is undefined for this case; restore via afterEach.
+    ;(window as unknown as { hermesDesktop: unknown }).hermesDesktop = {
+      studio: undefined,
+      readFileDataUrl: vi.fn(),
+    }
+
+    render(<UploadButton apiKey="k" maxImages={1} onSelect={vi.fn()} onClear={vi.fn()} />)
+    openPanel()
+
+    expect(await screen.findByText('No saved images yet')).toBeTruthy()
   })
 })
