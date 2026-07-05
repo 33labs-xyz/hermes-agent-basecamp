@@ -265,7 +265,13 @@ function registerStudioIpc({ ipcMain, app, safeStorage }) {
   })
 
   ipcMain.handle('studio:gen:list', () => {
-    return readIndex().map(entry => ({ ...entry, path: fileFor(entry) }))
+    // Skip entries whose file was deleted from disk outside the app, so the
+    // Artifacts gallery and Studio Library never render an empty shell for a
+    // generation the user removed from the local folder. The manifest keeps the
+    // stale record; the list just hides it (self-heals on the next read).
+    return readIndex()
+      .map(entry => ({ ...entry, path: fileFor(entry) }))
+      .filter(entry => fs.existsSync(entry.path))
   })
 
   function moveEntry(id, toArchived) {
