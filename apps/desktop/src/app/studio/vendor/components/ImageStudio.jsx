@@ -16,6 +16,7 @@ import {
   getDefaultEffectForI2IModel,
   getI2IModelById,
 } from "../models.js";
+import { libraryImageEntries } from "./library-images";
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -38,7 +39,7 @@ async function downloadImage(url, filename) {
 
 // ─── UploadButton (inline picker) ───────────────────────────────────────────
 
-function UploadButton({ apiKey, maxImages, onSelect, onClear, initialUrls = [], label = null }) {
+export function UploadButton({ apiKey, maxImages, onSelect, onClear, initialUrls = [], label = null }) {
   const [panelOpen, setPanelOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [selectedEntries, setSelectedEntries] = useState([]); // [{url, thumbnail}]
@@ -47,6 +48,12 @@ function UploadButton({ apiKey, maxImages, onSelect, onClear, initialUrls = [], 
   const fileInputRef = useRef(null);
   const panelRef = useRef(null);
   const triggerRef = useRef(null);
+
+  // Library source: saved Studio generations, pickable as reference images.
+  const [source, setSource] = useState("library"); // "uploads" | "library"
+  const [libraryEntries, setLibraryEntries] = useState([]); // StudioGenerationEntry[]
+  const [libraryBusyId, setLibraryBusyId] = useState(null); // id currently re-uploading
+  const [libraryErrorId, setLibraryErrorId] = useState(null); // id whose re-upload failed
 
   // Close on outside click
   useEffect(() => {
@@ -64,6 +71,37 @@ function UploadButton({ apiKey, maxImages, onSelect, onClear, initialUrls = [], 
     window.addEventListener("click", handler);
     return () => window.removeEventListener("click", handler);
   }, [panelOpen]);
+
+  // Load saved Library generations when the panel opens. Bridge is optional;
+  // a missing bridge (or a failed list) yields an empty Library.
+  useEffect(() => {
+    if (!panelOpen) return;
+    let cancelled = false;
+    void (async () => {
+      const gen = window.hermesDesktop?.studio?.gen;
+      if (!gen) {
+        if (!cancelled) setLibraryEntries([]);
+        return;
+      }
+      try {
+        const list = await gen.list();
+        if (!cancelled) setLibraryEntries(Array.isArray(list) ? list : []);
+      } catch {
+        if (!cancelled) setLibraryEntries([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [panelOpen]);
+
+  // Default the panel to Library when there are no session uploads yet (the
+  // common first-open case); otherwise show the fresh session Uploads.
+  useEffect(() => {
+    if (panelOpen) {
+      setSource(uploadHistory.length === 0 ? "library" : "uploads");
+    }
+  }, [panelOpen]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Sync initialUrls from parent (e.g. restored from localStorage)
   useEffect(() => {
@@ -108,12 +146,57 @@ function UploadButton({ apiKey, maxImages, onSelect, onClear, initialUrls = [], 
     [onSelect],
   );
 
+  const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10MB
+
+  // Upload one File to Muapi, register it in the session history, and auto-
+  // select it (firing onSelect for single-select). Shared by the OS file picker
+  // and the Library re-upload path. Throws on oversize/upload failure so the
+  // Library caller can show a per-cell error.
+  const uploadAndRegister = async (file) => {
+    if (file.size > MAX_IMAGE_SIZE) {
+      throw new Error(`"${file.name}" is too large (max 10MB)`);
+    }
+
+    const id = Date.now().toString() + Math.random();
+    // Add a placeholder to history immediately without local preview
+    const placeholder = { id, name: file.name, url: null, progress: 0 };
+    setUploadHistory((prev) => [placeholder, ...prev]);
+
+    try {
+      const uploadedUrl = await uploadFile(apiKey, file, (pct) => {
+        setLastUploadProgress(pct);
+        setUploadHistory((prev) =>
+          prev.map((h) => (h.id === id ? { ...h, progress: pct } : h)),
+        );
+      });
+
+      // Update history with real URL and mark as 100%
+      setUploadHistory((prev) =>
+        prev.map((h) => (h.id === id ? { ...h, url: uploadedUrl, progress: 100 } : h)),
+      );
+
+      // Auto-select if there's room
+      if (selectedEntries.length < maxImages) {
+        const newEntry = { url: uploadedUrl };
+        setSelectedEntries((prev) => [...prev, newEntry]);
+
+        if (maxImages === 1) {
+          fireOnSelect([newEntry]);
+          setPanelOpen(false);
+        }
+      }
+    } catch (err) {
+      console.error("[UploadButton] Upload failed for", file.name, err);
+      setUploadHistory((prev) => prev.filter((h) => h.id !== id));
+      throw err;
+    }
+  };
+
   const handleFileChange = async (e) => {
     const files = Array.from(e.target.files);
     if (!files.length) return;
     e.target.value = "";
 
-    const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10MB
     const tooLarge = files.filter((f) => f.size > MAX_IMAGE_SIZE);
     if (tooLarge.length > 0) {
       alert(
@@ -129,54 +212,35 @@ function UploadButton({ apiKey, maxImages, onSelect, onClear, initialUrls = [], 
           ? files.slice(0, 1)
           : files.slice(0, maxImages - selectedEntries.length || 1);
 
-      await Promise.all(
-        toUpload.map(async (file) => {
-          const id = Date.now().toString() + Math.random();
-
-          // Add a placeholder to history immediately without local preview
-          const placeholder = { id, name: file.name, url: null, progress: 0 };
-          setUploadHistory((prev) => [placeholder, ...prev]);
-
-          try {
-            const uploadedUrl = await uploadFile(apiKey, file, (pct) => {
-              setLastUploadProgress(pct);
-              setUploadHistory((prev) =>
-                prev.map((h) => (h.id === id ? { ...h, progress: pct } : h)),
-              );
-            });
-
-            // Update history with real URL and Mark as 100%
-            setUploadHistory((prev) =>
-              prev.map((h) => {
-                if (h.id === id) {
-                  return { ...h, url: uploadedUrl, progress: 100 };
-                }
-                return h;
-              }),
-            );
-
-            // Auto-select if there's room
-            if (selectedEntries.length < maxImages) {
-              const newEntry = { url: uploadedUrl };
-              setSelectedEntries((prev) => [...prev, newEntry]);
-
-              if (maxImages === 1) {
-                fireOnSelect([newEntry]);
-                setPanelOpen(false);
-              }
-            }
-          } catch (err) {
-            console.error("[UploadButton] Upload failed for", file.name, err);
-            setUploadHistory((prev) => prev.filter((h) => h.id !== id));
-            throw err;
-          }
-        }),
-      );
+      await Promise.all(toUpload.map((file) => uploadAndRegister(file)));
     } catch (err) {
       alert(`Image upload failed: ${err.message}`);
     } finally {
       setUploading(false);
       setLastUploadProgress(0);
+    }
+  };
+
+  // Re-upload a saved Library generation's bytes, then register it like any
+  // other upload. sourceUrl may be expired or rejected as a model input, so we
+  // always re-upload the on-disk file rather than reuse the stored URL.
+  const handleLibraryPick = async (entry) => {
+    if (!entry.path) return;
+    setLibraryErrorId(null);
+    setLibraryBusyId(entry.id);
+    try {
+      const dataUrl = await window.hermesDesktop?.readFileDataUrl?.(entry.path);
+      if (!dataUrl) throw new Error("Could not read image from disk");
+      const blob = await (await fetch(dataUrl)).blob();
+      const file = new File([blob], `${entry.id}.${entry.ext}`, {
+        type: blob.type || "image/*",
+      });
+      await uploadAndRegister(file);
+    } catch (err) {
+      console.error("[UploadButton] Library pick failed for", entry.id, err);
+      setLibraryErrorId(entry.id);
+    } finally {
+      setLibraryBusyId(null);
     }
   };
 
@@ -236,6 +300,7 @@ function UploadButton({ apiKey, maxImages, onSelect, onClear, initialUrls = [], 
   const isMulti = maxImages > 1;
   const count = selectedEntries.length;
   const hasSelection = count > 0;
+  const libraryImages = libraryImageEntries(libraryEntries); // newest saved images, capped
 
   // Trigger icon content
   let triggerContent;
@@ -478,8 +543,72 @@ function UploadButton({ apiKey, maxImages, onSelect, onClear, initialUrls = [], 
             </div>
           </div>
 
+          {/* Source toggle: session Uploads vs saved Library. */}
+          <div className="flex items-center gap-1 mb-2 p-0.5 bg-white/5 rounded-lg w-fit">
+            {["uploads", "library"].map((s) => (
+              <button
+                key={s}
+                type="button"
+                onClick={() => setSource(s)}
+                className={`px-3 py-1 rounded-md text-[11px] font-bold transition-colors ${
+                  source === s ? "bg-primary text-black" : "text-white/60 hover:text-white"
+                }`}
+              >
+                {/* Hardcoded English labels, matching the rest of the Studio surface. */}
+                {s === "uploads" ? "Uploads" : "Library"}
+              </button>
+            ))}
+          </div>
+
           {/* Grid or empty state */}
-          {uploadHistory.length === 0 ? (
+          {source === "library" ? (
+            libraryImages.length === 0 ? (
+              <div className="py-6 flex flex-col items-center gap-2">
+                <svg
+                  width="28"
+                  height="28"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  className="text-white/30"
+                >
+                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                  <circle cx="8.5" cy="8.5" r="1.5" />
+                  <polyline points="21 15 16 10 5 21" />
+                </svg>
+                {/* Empty Library state; hardcoded English. */}
+                <span className="text-xs text-white/55">No saved images yet</span>
+              </div>
+            ) : (
+              <div className="grid grid-cols-3 gap-2 max-h-56 overflow-y-auto custom-scrollbar pr-0.5">
+                {libraryImages.map((entry) => {
+                  const busy = libraryBusyId === entry.id;
+                  const failed = libraryErrorId === entry.id;
+                  return (
+                    <button
+                      key={entry.id}
+                      type="button"
+                      title={entry.prompt || "Saved image"}
+                      aria-label={entry.prompt ? `Use ${entry.prompt}` : "Use saved image"}
+                      disabled={busy}
+                      onClick={() => handleLibraryPick(entry)}
+                      className={`relative rounded-xl overflow-hidden border-2 aspect-square transition-all ${
+                        failed ? "border-red-500/70" : "border-white/10 hover:border-white/30"
+                      } ${busy ? "cursor-wait" : "cursor-pointer"}`}
+                    >
+                      <LibraryThumb path={entry.path} />
+                      {busy && (
+                        <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                          <div className="w-6 h-6 rounded-full border-2 border-primary/30 border-t-primary animate-spin" />
+                        </div>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            )
+          ) : uploadHistory.length === 0 ? (
             <div className="py-6 flex flex-col items-center gap-2">
               <svg
                 width="28"
@@ -602,6 +731,33 @@ function UploadButton({ apiKey, maxImages, onSelect, onClear, initialUrls = [], 
       )}
     </div>
   );
+}
+
+// ─── LibraryThumb ─────────────────────────────────────────────────────────────
+
+// Lazily loads a saved generation's on-disk bytes as a data URL for preview,
+// cancelling if unmounted before the read resolves (mirrors the Library grid).
+function LibraryThumb({ path }) {
+  const [dataUrl, setDataUrl] = useState("");
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const url = (await window.hermesDesktop?.readFileDataUrl?.(path)) || "";
+      if (!cancelled) setDataUrl(url);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [path]);
+
+  if (!dataUrl) {
+    return (
+      <div className="w-full h-full bg-white/5 flex items-center justify-center">
+        <div className="w-6 h-6 rounded-full border-2 border-primary/20 border-t-primary animate-spin" />
+      </div>
+    );
+  }
+  return <img src={dataUrl} alt="" className="w-full h-full object-cover" />;
 }
 
 // ─── ModelDropdown ────────────────────────────────────────────────────────────

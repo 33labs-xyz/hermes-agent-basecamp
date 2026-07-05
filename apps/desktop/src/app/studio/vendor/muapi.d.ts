@@ -7,3 +7,11 @@ export interface StudioBalance {
 }
 
 export function getUserBalance(apiKey: string): Promise<StudioBalance>
+
+// Uploads a File to the Muapi storage endpoint and returns the signed URL.
+// onProgress is called with 0-100 as the upload progresses.
+export function uploadFile(
+  apiKey: string,
+  file: File,
+  onProgress?: (pct: number) => void,
+): Promise<string>
