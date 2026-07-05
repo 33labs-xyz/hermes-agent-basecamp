@@ -408,7 +408,17 @@ const NodeFlow = ({ initialNodeSchemas, initialWorkflowData }) => {
       return;
     }
 
-    if (!id || !nodeSchemas?.categories) return;
+    // Without node-schema categories the palette cannot render and there is
+    // nothing to restore. Clear the restoring flag so the canvas falls back
+    // to its empty state instead of spinning forever. Root cause of the
+    // "stuck on Loading" report: this guard used to bail without clearing
+    // isRestoring when the schema fetch returned no categories.
+    if (!nodeSchemas?.categories) {
+      setIsRestoring(false);
+      return;
+    }
+
+    if (!id) return;
 
     axios.get(`/api/workflow/get-workflow-def/${id}`)
       .then(res => {

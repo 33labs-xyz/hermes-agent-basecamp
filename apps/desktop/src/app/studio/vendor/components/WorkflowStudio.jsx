@@ -14,6 +14,7 @@ import {
   getWorkflowData,
 } from "../muapi.js";
 import { filterFeaturedTemplates } from "./featured-templates";
+import { resolveWorkflowBuilderState } from "../../workflow-builder-state";
 import dynamic from "next/dynamic";
 
 // True when the string has no Devanagari (Hindi) block. Used to avoid
@@ -158,6 +159,18 @@ export default function WorkflowStudio({ apiKey, isHeaderVisible = true, onToggl
   // Maps a template id -> the user's cloned (owned) workflow id, so repeated
   // runs of the same template reuse one copy instead of cloning every time.
   const [clonedIds, setClonedIds] = useState({});
+  // Bumped by the load-failed "Retry" button to re-run the details fetch.
+  const [reloadNonce, setReloadNonce] = useState(0);
+
+  // Resolve the builder mount gate to an explicit state. A failed node-schema
+  // fetch sets nodeSchemas to [] (truthy), which used to slip past the old
+  // `nodeSchemas && workflowDef` check and mount a canvas that spins forever.
+  const builderState = resolveWorkflowBuilderState({
+    loading,
+    apiKey,
+    nodeSchemas,
+    workflowDef,
+  });
 
 
   // Handlers defined early so they can be used in effects
@@ -241,7 +254,7 @@ export default function WorkflowStudio({ apiKey, isHeaderVisible = true, onToggl
     }
 
     loadWorkflowDetails();
-  }, [selectedWorkflow?.id, apiKey]);
+  }, [selectedWorkflow?.id, apiKey, reloadNonce]);
 
   const handleCreateWorkflow = useCallback(
     async (fromUrl = false) => {
@@ -759,7 +772,7 @@ export default function WorkflowStudio({ apiKey, isHeaderVisible = true, onToggl
             </>
           ) : (
             <div className="flex-1 relative bg-[#08081c]">
-              {nodeSchemas && workflowDef ? (
+              {builderState === "ready" ? (
                 <WorkflowUI
                   workflowId={selectedWorkflow?.id}
                   initialNodeSchemas={nodeSchemas}
@@ -769,6 +782,39 @@ export default function WorkflowStudio({ apiKey, isHeaderVisible = true, onToggl
                     workflow_id: selectedWorkflow?.id
                   }}
                 />
+              ) : builderState === "needs-key" ? (
+                <div className="absolute inset-0 flex items-center justify-center p-8">
+                  <div className="flex flex-col items-center gap-3 max-w-sm text-center">
+                    {/* Shown when no Muapi key is configured (key entry lives in Settings). */}
+                    <div className="text-sm font-bold text-white/80">
+                      Add your Muapi API key to use the workflow builder
+                    </div>
+                    <div className="text-xs text-white/40 leading-relaxed">
+                      Open Settings and paste your Muapi key under the Studio section, then reopen this workflow.
+                    </div>
+                  </div>
+                </div>
+              ) : builderState === "load-failed" ? (
+                <div className="absolute inset-0 flex items-center justify-center p-8">
+                  <div className="flex flex-col items-center gap-4 max-w-sm text-center">
+                    {/* Shown when the node-schema or definition fetch failed. */}
+                    <div className="text-sm font-bold text-white/80">
+                      Couldn't load the workflow builder
+                    </div>
+                    <div className="text-xs text-white/40 leading-relaxed">
+                      The builder data failed to load. Check your Muapi key and network connection, then retry.
+                    </div>
+                    <button
+                      onClick={() => {
+                        setError(null);
+                        setReloadNonce((n) => n + 1);
+                      }}
+                      className="px-5 py-2.5 bg-[#8b80e8] text-black text-xs font-black uppercase tracking-widest rounded-lg hover:bg-white transition-all"
+                    >
+                      Retry
+                    </button>
+                  </div>
+                </div>
               ) : (
                 <div className="absolute inset-0 flex items-center justify-center">
                   <div className="flex flex-col items-center gap-4">
