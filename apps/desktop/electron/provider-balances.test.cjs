@@ -1,7 +1,7 @@
 const test = require('node:test')
 const assert = require('node:assert/strict')
 
-const { fetchProviderBalance, ADAPTERS, parseOpenRouterKeyRemaining, createProviderBalanceResolver } = require('./provider-balances.cjs')
+const { fetchProviderBalance, ADAPTERS, parseOpenRouterCreditsRemaining, createProviderBalanceResolver } = require('./provider-balances.cjs')
 
 const SECRET = 'sk-or-v1-secrettoken'
 
@@ -22,7 +22,7 @@ test('unknown slug returns unsupported without revealing a key', async () => {
   assert.equal(revealed, false)
 })
 
-test('openrouter builds a Bearer request to /api/v1/key and parses limit_remaining', async () => {
+test('openrouter builds a Bearer request to /api/v1/credits and parses total_credits - total_usage', async () => {
   let calledUrl = null
   let calledInit = null
   const result = await fetchProviderBalance('openrouter', {
@@ -33,10 +33,10 @@ test('openrouter builds a Bearer request to /api/v1/key and parses limit_remaini
     fetchImpl: async (url, init) => {
       calledUrl = url
       calledInit = init
-      return okResponse({ data: { limit_remaining: 74.5 } })
+      return okResponse({ data: { total_credits: 100, total_usage: 25.5 } })
     }
   })
-  assert.equal(calledUrl, 'https://openrouter.ai/api/v1/key')
+  assert.equal(calledUrl, 'https://openrouter.ai/api/v1/credits')
   assert.equal(calledInit.headers.Authorization, `Bearer ${SECRET}`)
   assert.deepEqual(result, { balance: 74.5, status: 'ok' })
 })
@@ -62,10 +62,10 @@ test('a non-OK fetch returns unavailable', async () => {
   assert.deepEqual(result, { balance: null, status: 'unavailable' })
 })
 
-test('null limit_remaining (unlimited key) returns unavailable', async () => {
+test('a credits payload missing either field returns unavailable', async () => {
   const result = await fetchProviderBalance('openrouter', {
     revealKey: async () => SECRET,
-    fetchImpl: async () => okResponse({ data: { limit_remaining: null } })
+    fetchImpl: async () => okResponse({ data: { total_credits: 100 } })
   })
   assert.deepEqual(result, { balance: null, status: 'unavailable' })
 })
@@ -73,21 +73,23 @@ test('null limit_remaining (unlimited key) returns unavailable', async () => {
 test('the returned object never contains the key value', async () => {
   const result = await fetchProviderBalance('openrouter', {
     revealKey: async () => SECRET,
-    fetchImpl: async () => okResponse({ data: { limit_remaining: 10 } })
+    fetchImpl: async () => okResponse({ data: { total_credits: 10, total_usage: 0 } })
   })
   assert.equal(JSON.stringify(result).includes(SECRET), false)
 })
 
-test('parseOpenRouterKeyRemaining returns null on non-finite or missing', () => {
-  assert.equal(parseOpenRouterKeyRemaining({ data: { limit_remaining: 5 } }), 5)
-  assert.equal(parseOpenRouterKeyRemaining({ data: { limit_remaining: Infinity } }), null)
-  assert.equal(parseOpenRouterKeyRemaining({}), null)
-  assert.equal(parseOpenRouterKeyRemaining(null), null)
+test('parseOpenRouterCreditsRemaining returns total_credits - total_usage or null', () => {
+  assert.equal(parseOpenRouterCreditsRemaining({ data: { total_credits: 100, total_usage: 25 } }), 75)
+  assert.equal(parseOpenRouterCreditsRemaining({ data: { total_credits: 10, total_usage: 10 } }), 0)
+  assert.equal(parseOpenRouterCreditsRemaining({ data: { total_credits: 5 } }), null)
+  assert.equal(parseOpenRouterCreditsRemaining({ data: { total_credits: Infinity, total_usage: 0 } }), null)
+  assert.equal(parseOpenRouterCreditsRemaining({}), null)
+  assert.equal(parseOpenRouterCreditsRemaining(null), null)
 })
 
-test('ADAPTERS exposes the openrouter entry with the inference-key endpoint', () => {
+test('ADAPTERS exposes the openrouter entry with the account-credits endpoint', () => {
   assert.equal(ADAPTERS.openrouter.envKey, 'OPENROUTER_API_KEY')
-  assert.equal(ADAPTERS.openrouter.endpoint, 'https://openrouter.ai/api/v1/key')
+  assert.equal(ADAPTERS.openrouter.endpoint, 'https://openrouter.ai/api/v1/credits')
 })
 
 // --- createProviderBalanceResolver (Task 3 IPC seam) ---
@@ -104,7 +106,7 @@ test('createProviderBalanceResolver reveals the env key and returns the balance'
 
       return { value: 'sk-secret' }
     },
-    fetchImpl: async () => resolverOkJson({ data: { limit_remaining: 12 } })
+    fetchImpl: async () => resolverOkJson({ data: { total_credits: 20, total_usage: 8 } })
   })
 
   const result = await resolve('openrouter')
@@ -117,7 +119,7 @@ test('createProviderBalanceResolver reveals the env key and returns the balance'
 test('createProviderBalanceResolver returns unavailable when no key is revealed', async () => {
   const resolve = createProviderBalanceResolver({
     requestJsonForProfile: async () => ({}),
-    fetchImpl: async () => resolverOkJson({ data: { limit_remaining: 12 } })
+    fetchImpl: async () => resolverOkJson({ data: { total_credits: 20, total_usage: 8 } })
   })
 
   assert.deepStrictEqual(await resolve('openrouter'), { balance: null, status: 'unavailable' })

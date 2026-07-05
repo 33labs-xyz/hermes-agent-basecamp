@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import {
-  parseOpenRouterKeyRemaining,
+  parseOpenRouterCreditsRemaining,
   pickDisplayedProvider,
   resolveDefaultProvider,
   sortBalanceRows,
@@ -86,19 +86,20 @@ describe('pickDisplayedProvider', () => {
   })
 })
 
-describe('parseOpenRouterKeyRemaining', () => {
-  it('returns limit_remaining when finite', () => {
-    expect(parseOpenRouterKeyRemaining({ data: { limit_remaining: 74.5 } })).toBe(74.5)
+describe('parseOpenRouterCreditsRemaining', () => {
+  it('returns total_credits - total_usage when both finite', () => {
+    expect(parseOpenRouterCreditsRemaining({ data: { total_credits: 100, total_usage: 25.5 } })).toBe(74.5)
   })
 
-  it('returns null when limit_remaining is null (unlimited key)', () => {
-    expect(parseOpenRouterKeyRemaining({ data: { limit_remaining: null } })).toBeNull()
+  it('returns 0 when the account is fully used', () => {
+    expect(parseOpenRouterCreditsRemaining({ data: { total_credits: 10, total_usage: 10 } })).toBe(0)
   })
 
-  it('returns null when the field or data is missing or non-finite', () => {
-    expect(parseOpenRouterKeyRemaining({ data: {} })).toBeNull()
-    expect(parseOpenRouterKeyRemaining({})).toBeNull()
-    expect(parseOpenRouterKeyRemaining(null)).toBeNull()
-    expect(parseOpenRouterKeyRemaining({ data: { limit_remaining: Infinity } })).toBeNull()
+  it('returns null when a field or data is missing or non-finite', () => {
+    expect(parseOpenRouterCreditsRemaining({ data: { total_credits: 5 } })).toBeNull()
+    expect(parseOpenRouterCreditsRemaining({ data: {} })).toBeNull()
+    expect(parseOpenRouterCreditsRemaining({})).toBeNull()
+    expect(parseOpenRouterCreditsRemaining(null)).toBeNull()
+    expect(parseOpenRouterCreditsRemaining({ data: { total_credits: Infinity, total_usage: 0 } })).toBeNull()
   })
 })

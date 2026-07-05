@@ -70,10 +70,15 @@ export function pickDisplayedProvider(args: {
   return fallback
 }
 
-// Parses OpenRouter GET /api/v1/key. Returns data.limit_remaining when finite,
-// else null (missing, null, or non-finite) - the credits remaining on the
-// inference key when a per-key limit is set.
-export function parseOpenRouterKeyRemaining(json: unknown): number | null {
-  const value = (json as { data?: { limit_remaining?: unknown } } | null | undefined)?.data?.limit_remaining
-  return typeof value === 'number' && Number.isFinite(value) ? value : null
+// Parses OpenRouter GET /api/v1/credits. Returns total_credits - total_usage (the
+// account-wide dollar balance) when both fields are finite, else null (missing,
+// null, or non-finite). Mirrors parseOpenRouterCreditsRemaining in
+// electron/provider-balances.cjs, which is the one used for the real fetch.
+export function parseOpenRouterCreditsRemaining(json: unknown): number | null {
+  const data = (json as { data?: { total_credits?: unknown; total_usage?: unknown } } | null | undefined)?.data
+  const total = data?.total_credits
+  const used = data?.total_usage
+  if (typeof total !== 'number' || !Number.isFinite(total)) return null
+  if (typeof used !== 'number' || !Number.isFinite(used)) return null
+  return total - used
 }

@@ -7,24 +7,29 @@
 // fetchImpl are injected so this module is testable with node:test and no
 // network. Mirrors the self-contained style of electron/studio.cjs.
 
-// OpenRouter: GET /api/v1/key works with the configured inference key and
-// returns data.limit_remaining (credits remaining on that key). The account-wide
-// /api/v1/credits endpoint needs a management key the inference key is not, so it
-// is not used. When the key has no per-key limit, limit_remaining is null and the
-// balance reads unavailable.
-function parseOpenRouterKeyRemaining(json) {
-  const value = json && json.data ? json.data.limit_remaining : undefined
-  return typeof value === 'number' && Number.isFinite(value) ? value : null
+// OpenRouter: GET /api/v1/credits works with the configured inference key and
+// returns data.total_credits (lifetime purchased) and data.total_usage (lifetime
+// spent); remaining = total_credits - total_usage, the account-wide dollar balance
+// the chip shows. This is the number the user means by "credits left", unlike the
+// per-key limit_remaining on /api/v1/key which is null for normal unlimited keys.
+// Both fields must be finite; anything else degrades to null (reads unavailable).
+function parseOpenRouterCreditsRemaining(json) {
+  const data = json && json.data ? json.data : null
+  const total = data ? data.total_credits : undefined
+  const used = data ? data.total_usage : undefined
+  if (typeof total !== 'number' || !Number.isFinite(total)) return null
+  if (typeof used !== 'number' || !Number.isFinite(used)) return null
+  return total - used
 }
 
 const ADAPTERS = {
   openrouter: {
     envKey: 'OPENROUTER_API_KEY',
-    endpoint: 'https://openrouter.ai/api/v1/key',
+    endpoint: 'https://openrouter.ai/api/v1/credits',
     buildRequest(key) {
       return { headers: { Authorization: `Bearer ${key}` } }
     },
-    parse: parseOpenRouterKeyRemaining
+    parse: parseOpenRouterCreditsRemaining
   }
 }
 
@@ -79,4 +84,4 @@ function createProviderBalanceResolver({ requestJsonForProfile, fetchImpl }) {
   return slug => fetchProviderBalance(slug, { revealKey, fetchImpl })
 }
 
-module.exports = { ADAPTERS, fetchProviderBalance, parseOpenRouterKeyRemaining, createProviderBalanceResolver }
+module.exports = { ADAPTERS, fetchProviderBalance, parseOpenRouterCreditsRemaining, createProviderBalanceResolver }
