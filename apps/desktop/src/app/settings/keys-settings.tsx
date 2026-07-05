@@ -7,6 +7,7 @@ import { CredentialKeyCard, credentialPlaceholder, credentialRowLabel } from './
 import { useEnvCredentials } from './env-credentials'
 import { asText } from './helpers'
 import { LoadingState, SettingsContent } from './primitives'
+import { StudioKeySetting } from './studio-key-setting'
 
 // Sub-views surfaced as sidebar subnav under Tools & Keys (see settings/index.tsx).
 export const KEYS_VIEWS = ['tools', 'settings'] as const
@@ -60,6 +61,11 @@ export function KeysSettings({ view }: KeysSettingsProps) {
 
   return (
     <SettingsContent>
+      {/* Muapi (Studio) key is stored via the main-process safeStorage path, not
+          the env-var credential list, so it renders as its own row atop the tool
+          keys rather than coming from useEnvCredentials. */}
+      {view === 'tools' && <StudioKeySetting />}
+
       {visible.map(group => (
         <div className="grid gap-2" key={group.category}>
           {group.entries.map(([key, info]: [string, EnvVarInfo]) => {
@@ -82,7 +88,7 @@ export function KeysSettings({ view }: KeysSettingsProps) {
         </div>
       ))}
 
-      {visible.length === 0 && (
+      {visible.length === 0 && view !== 'tools' && (
         <div className="rounded-lg border border-dashed border-(--ui-stroke-tertiary) px-4 py-8 text-center text-[length:var(--conversation-caption-font-size)] text-muted-foreground">
           {t.settings.keys.empty}
         </div>
