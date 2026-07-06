@@ -681,6 +681,22 @@ export function useTerminalSession({ cwd, isActive, onAddSelectionToChat }: UseT
     return () => clearActiveTerminalReader(reader)
   }, [isActive, status])
 
+  // Tab switches only flip CSS visibility, so nothing tells xterm it was
+  // re-shown. A hidden WebGL canvas is not recomposited and can come back
+  // holding a stale or blank frame until the next repaint trigger (cursor
+  // blink, PTY output). Mark every row dirty so the renderer redraws now, and
+  // hand the re-shown tab the keyboard so typing works without a click.
+  useEffect(() => {
+    const term = termRef.current
+
+    if (!isActive || !term || status === 'starting') {
+      return
+    }
+
+    term.refresh(0, term.rows - 1)
+    term.focus()
+  }, [isActive, status])
+
   useEffect(() => {
     const term = termRef.current
 
