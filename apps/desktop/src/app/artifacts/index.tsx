@@ -23,7 +23,7 @@ import { getSessionMessages, listAllProfileSessions } from '@/hermes'
 import { type Translations, useI18n } from '@/i18n'
 import { sessionTitle } from '@/lib/chat-runtime'
 import { ExternalLink, ExternalLinkIcon, hostPathLabel, urlSlugTitleLabel, useLinkTitle } from '@/lib/external-link'
-import { FileImage, FileText, FolderOpen, Link2 } from '@/lib/icons'
+import { FileImage, FileText, FolderOpen, Link2, Trash2 } from '@/lib/icons'
 import { mediaExternalUrl, mediaName } from '@/lib/media'
 import { cn } from '@/lib/utils'
 import { notifyError } from '@/store/notifications'
@@ -35,6 +35,9 @@ import { PAGE_INSET_NEG_X, PAGE_INSET_X } from '../layout-constants'
 import { PageSearchShell } from '../page-search-shell'
 import { sessionRoute, STUDIO_ROUTE } from '../routes'
 import type { SetStatusbarItemGroup } from '../shell/statusbar-controls'
+
+import { isFileDeleteOk, planArtifactDeletion } from './artifact-deletion'
+import { filterExistingArtifacts } from './filter-existing-artifacts'
 
 type ArtifactKind = 'image' | 'file' | 'link'
 type ArtifactFilter = 'all' | ArtifactKind
@@ -391,6 +394,7 @@ function paginationItems(page: number, pageCount: number): Array<number | 'ellip
 }
 
 type CellCtx = {
+  onDelete: (artifact: ArtifactRecord) => void
   onOpen: (href: string) => void | Promise<void>
   onOpenChat: (artifact: ArtifactRecord) => void
   onReveal: (artifact: ArtifactRecord) => void | Promise<void>
@@ -442,9 +446,30 @@ export function ArtifactsView({ setStatusbarItemGroup: _setStatusbarItemGroup, .
         nextArtifacts.push(...collectArtifactsForSession(session, result.value.messages))
       })
 
-      nextArtifacts.push(...(await collectStudioArtifacts()))
+      // Chat-scraped records (regex-extracted from message text) get no
+      // filesystem existence check at collection time, so a deleted local
+      // file still yields a stale tile. Batch-check every local-file/image
+      // path in one IPC round trip and drop the ones confirmed gone. On IPC
+      // failure, fail open (skip the filter) so a transient error never
+      // hides real artifacts.
+      const localPaths = nextArtifacts
+        .filter(artifact => artifact.kind === 'file' || artifact.kind === 'image')
+        .map(artifact => artifact.value)
 
-      setArtifacts(nextArtifacts.sort((left, right) => right.timestamp - left.timestamp))
+      let filteredArtifacts = [...nextArtifacts]
+
+      if (localPaths.length > 0 && window.hermesDesktop?.checkArtifactPathsExist) {
+        try {
+          const existsMap = await window.hermesDesktop.checkArtifactPathsExist(localPaths)
+          filteredArtifacts = filterExistingArtifacts(nextArtifacts, existsMap)
+        } catch (err) {
+          console.warn('[artifacts] existence check failed, skipping filter', err)
+        }
+      }
+
+      const allArtifacts = [...filteredArtifacts, ...(await collectStudioArtifacts())]
+
+      setArtifacts(allArtifacts.sort((left, right) => right.timestamp - left.timestamp))
     } catch (err) {
       notifyError(err, a.failedLoad)
       setArtifacts([])
@@ -567,7 +592,56 @@ export function ArtifactsView({ setStatusbarItemGroup: _setStatusbarItemGroup, .
     }
   }, [a, openArtifact])
 
+  // Permanently deletes the artifact's underlying file (or, for Studio
+  // generations, archives then permanently deletes the manifest entry).
+  // Destructive and irreversible; gated behind planArtifactDeletion + confirm.
+  const deleteArtifact = useCallback(async (artifact: ArtifactRecord) => {
+    const plan = planArtifactDeletion(artifact)
+
+    if (!plan) {
+      return
+    }
+
+    // Destructive, permanent. Confirm with the exact target shown. Hardcoded
+    // English, i18n-exempt (tester-scoped copy; not routed through i18n).
+    const message =
+      plan.kind === 'file'
+        ? `Permanently delete this file from disk?\n\n${plan.path}\n\nThis cannot be undone.`
+        : `Permanently delete this generation and its file?\n\n${artifact.label || artifact.value}\n\nThis cannot be undone.`
+
+    if (!window.confirm(message)) {
+      return
+    }
+
+    try {
+      if (plan.kind === 'studio') {
+        const gen = window.hermesDesktop?.studio?.gen
+        if (!gen) {
+          // i18n-exempt: tester-scoped error title
+          notifyError('Studio is unavailable', 'Could not delete this generation')
+          return
+        }
+        await gen.archive(plan.genId)
+        await gen.deleteForever(plan.genId)
+      } else {
+        const res = await window.hermesDesktop?.deleteArtifactFile?.(plan.path)
+        if (!isFileDeleteOk(res)) {
+          // i18n-exempt: tester-scoped error title
+          notifyError(res?.error ?? 'Delete is unavailable', 'Could not delete file')
+          return
+        }
+      }
+
+      // Optimistic remove by id; prev can be null before the first load resolves.
+      setArtifacts(prev => (prev ? prev.filter(item => item.id !== artifact.id) : prev))
+    } catch (err) {
+      // i18n-exempt: tester-scoped error title
+      notifyError(err, 'Could not delete artifact')
+    }
+  }, [])
+
   const cellCtx: CellCtx = {
+    onDelete: deleteArtifact,
     onOpen: openArtifact,
     onOpenChat: openArtifactSource,
     onReveal: revealArtifact
@@ -647,6 +721,7 @@ export function ArtifactsView({ setStatusbarItemGroup: _setStatusbarItemGroup, .
                       artifact={artifact}
                       failedImage={failedImageIds.has(artifact.id)}
                       key={artifact.id}
+                      onDelete={planArtifactDeletion(artifact) ? () => void deleteArtifact(artifact) : undefined}
                       onImageError={markImageFailed}
                       onReveal={revealArtifact}
                     />
@@ -741,11 +816,12 @@ function ArtifactsPagination({ className, itemLabel, onPageChange, page, pageSiz
 interface ArtifactImageCardProps {
   artifact: ArtifactRecord
   failedImage: boolean
+  onDelete?: () => void
   onImageError: (id: string) => void
   onReveal: (artifact: ArtifactRecord) => void | Promise<void>
 }
 
-function ArtifactImageCard({ artifact, failedImage, onImageError, onReveal }: ArtifactImageCardProps) {
+function ArtifactImageCard({ artifact, failedImage, onDelete, onImageError, onReveal }: ArtifactImageCardProps) {
   const { t } = useI18n()
   const a = t.artifacts
   const kindLabel = artifact.kind === 'image' ? a.kindImage : artifact.kind === 'file' ? a.kindFile : a.kindLink
@@ -793,6 +869,13 @@ function ArtifactImageCard({ artifact, failedImage, onImageError, onReveal }: Ar
             <FolderOpen className="size-3" />
             {a.showInFolder}
           </Button>
+          {onDelete && (
+            <Button className="hover:text-destructive" onClick={onDelete} size="xs" type="button" variant="textStrong">
+              <Trash2 className="size-3" />
+              {/* i18n-exempt: tester-scoped label */}
+              Delete
+            </Button>
+          )}
         </div>
       </div>
     </article>
@@ -865,6 +948,7 @@ function LocationCell({ artifact, ctx }: { artifact: ArtifactRecord; ctx: CellCt
   const isLink = artifact.kind === 'link'
   const value = isLink ? hostPathLabel(artifact.value) : artifact.value
   const copyLabel = isLink ? t.artifacts.copyUrl : t.artifacts.copyPath
+  const deletable = planArtifactDeletion(artifact) !== null
   const pathClasses = cn(
     'min-w-0 flex-1 truncate text-[length:var(--conversation-caption-font-size)] text-(--ui-text-tertiary)',
     isLink ? 'font-normal' : 'font-mono'
@@ -895,6 +979,17 @@ function LocationCell({ artifact, ctx }: { artifact: ArtifactRecord; ctx: CellCt
         text={artifact.value}
         title={copyLabel}
       />
+      {deletable && (
+        // i18n-exempt: tester-scoped icon button
+        <button
+          aria-label="Delete artifact"
+          className="opacity-0 transition group-hover/location:opacity-100 text-muted-foreground/60 hover:text-destructive"
+          onClick={() => void ctx.onDelete(artifact)}
+          type="button"
+        >
+          <Codicon name="trash" size="0.72rem" />
+        </button>
+      )}
     </div>
   )
 }

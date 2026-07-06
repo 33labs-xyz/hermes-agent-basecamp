@@ -150,6 +150,139 @@ test('buildSessionList marks missing transcripts unavailable but keeps the row',
   assert.equal(sessions[0].transcriptAvailable, false)
 })
 
+// ---- listTranscripts (Fix B: populate the panel directly from ~/.claude/projects transcripts) ----
+
+test('listTranscripts returns all <id>.jsonl transcripts with sessionId + mtimeMs', () => {
+  const projectsDir = mkTmp()
+  const dirA = path.join(projectsDir, 'proj-a')
+  const dirB = path.join(projectsDir, 'proj-b')
+  fs.mkdirSync(dirA, { recursive: true })
+  fs.mkdirSync(dirB, { recursive: true })
+  const idA = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
+  const idB = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'
+  fs.writeFileSync(path.join(dirA, `${idA}.jsonl`), '{}')
+  fs.writeFileSync(path.join(dirB, `${idB}.jsonl`), '{}')
+  // non-.jsonl / non-session bookkeeping files must be ignored
+  fs.writeFileSync(path.join(dirA, 'notes.txt'), 'ignore me')
+  fs.writeFileSync(path.join(dirB, '.DS_Store'), '')
+
+  const entries = mod.listTranscripts({
+    claudeProjectsDir: projectsDir,
+    readdirFn: fs.readdirSync,
+    statFn: fs.statSync
+  })
+
+  assert.equal(entries.length, 2)
+  const ids = entries.map(e => e.sessionId).sort()
+  assert.deepEqual(ids, [idA, idB])
+  for (const entry of entries) {
+    assert.equal(typeof entry.mtimeMs, 'number')
+    assert.ok(entry.transcriptPath.endsWith(`${entry.sessionId}.jsonl`))
+  }
+})
+
+test('listTranscripts works with an injected in-memory readdir/stat (no bare fs)', () => {
+  const claudeProjectsDir = '/fake/.claude/projects'
+  const slug = '-fake-repo'
+  const id = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc'
+  const dirEntries = {
+    [claudeProjectsDir]: [{ name: slug, isDirectory: () => true }],
+    [path.join(claudeProjectsDir, slug)]: [
+      { name: `${id}.jsonl`, isDirectory: () => false },
+      { name: 'launches.jsonl', isDirectory: () => false } // bookkeeping file elsewhere, not a session id here but still not a dir
+    ]
+  }
+  const readdirFn = dir => dirEntries[dir] || []
+  const statFn = () => ({ mtimeMs: 42 })
+
+  const entries = mod.listTranscripts({ claudeProjectsDir, readdirFn, statFn })
+
+  assert.equal(entries.length, 2)
+  const ids = entries.map(e => e.sessionId).sort()
+  assert.deepEqual(ids, ['launches', id].sort())
+  assert.equal(entries[0].mtimeMs, 42)
+})
+
+// ---- buildSessionList union with transcripts (the core Fix B bug) ----
+
+test('buildSessionList surfaces a session for a transcript with NO launch record', () => {
+  const projectsDir = mkTmp()
+  const cwd = path.join(mkTmp(), 'orphan-repo')
+  const dir = path.join(projectsDir, mod.slugForCwd(cwd))
+  fs.mkdirSync(dir, { recursive: true })
+  const id = '44444444-4444-4444-8444-444444444444'
+  fs.writeFileSync(
+    path.join(dir, `${id}.jsonl`),
+    [
+      JSON.stringify({ type: 'user', cwd, gitBranch: 'main', message: { role: 'user', content: 'Untracked session' } }),
+      JSON.stringify({ type: 'assistant', message: { role: 'assistant', content: 'ack' } })
+    ].join('\n')
+  )
+
+  // No launches at all - this used to return [] (the bug).
+  const { sessions } = mod.buildSessionList({
+    launchesText: '',
+    claudeProjectsDir: projectsDir,
+    readdirFn: fs.readdirSync
+  })
+
+  assert.equal(sessions.length, 1)
+  assert.equal(sessions[0].id, id)
+  assert.equal(sessions[0].title, 'Untracked session')
+  assert.equal(sessions[0].cwd, cwd)
+  assert.equal(sessions[0].gitBranch, 'main')
+  assert.equal(sessions[0].messageCount, 2)
+  assert.equal(sessions[0].transcriptAvailable, true)
+})
+
+test('buildSessionList dedupes an id present in both launches and transcripts, keeping launch-derived gitRoot', () => {
+  const projectsDir = mkTmp()
+  const cwd = path.join(mkTmp(), 'dup-repo')
+  const dir = path.join(projectsDir, mod.slugForCwd(cwd))
+  fs.mkdirSync(dir, { recursive: true })
+  const id = '55555555-5555-4555-8555-555555555555'
+  fs.writeFileSync(
+    path.join(dir, `${id}.jsonl`),
+    JSON.stringify({ type: 'user', cwd, gitBranch: 'main', message: { role: 'user', content: 'Dup session' } })
+  )
+  const gitRoot = '/some/enclosing/git/root'
+  const launchesText = JSON.stringify({ id, cwd, gitRoot, ts: 123, kind: 'launch' }) + '\n'
+
+  const { sessions } = mod.buildSessionList({ launchesText, claudeProjectsDir: projectsDir, readdirFn: fs.readdirSync })
+
+  const matches = sessions.filter(s => s.id === id)
+  assert.equal(matches.length, 1, 'must appear exactly once')
+  assert.equal(matches[0].projectPath, gitRoot, 'launch-derived gitRoot/provenance wins')
+})
+
+test('buildSessionList caps transcript-only sessions at MAX_TRANSCRIPT_SESSIONS, keeping most-recent by mtime', async () => {
+  const projectsDir = mkTmp()
+  const dir = path.join(projectsDir, 'many-sessions')
+  fs.mkdirSync(dir, { recursive: true })
+
+  const total = mod.MAX_TRANSCRIPT_SESSIONS + 1
+  const ids = []
+  for (let i = 0; i < total; i++) {
+    const id = `66666666-6666-4666-8666-${String(i).padStart(12, '0')}`
+    ids.push(id)
+    fs.writeFileSync(path.join(dir, `${id}.jsonl`), JSON.stringify({ type: 'user', message: { role: 'user', content: `msg ${i}` } }))
+    // Force distinct, increasing mtimes so ordering is deterministic: id[0] oldest, id[total-1] newest.
+    const when = new Date(Date.now() + i * 1000)
+    fs.utimesSync(path.join(dir, `${id}.jsonl`), when, when)
+  }
+
+  const { sessions } = mod.buildSessionList({ launchesText: '', claudeProjectsDir: projectsDir, readdirFn: fs.readdirSync })
+
+  assert.equal(sessions.length, mod.MAX_TRANSCRIPT_SESSIONS)
+  const keptIds = new Set(sessions.map(s => s.id))
+  assert.ok(!keptIds.has(ids[0]), 'oldest transcript must be dropped')
+  assert.ok(keptIds.has(ids[total - 1]), 'newest transcript must be kept')
+  for (const s of sessions) {
+    assert.equal(typeof s.projectPath, 'string', 'projectPath must be a string, never null')
+    assert.ok(s.projectPath.length > 0, 'projectPath must be non-empty even for an empty-cwd transcript')
+  }
+})
+
 test('parseLaunches skips corrupt lines', () => {
   const text = ['{"id":"a","ts":1,"kind":"launch"}', 'not json', '{"id":"b","ts":2,"kind":"launch"}'].join('\n')
   const recs = mod.parseLaunches(text)
@@ -209,6 +342,39 @@ test('list + getTranscript + forget IPC work end to end', async () => {
   assert.equal(fs.existsSync(path.join(dir, `${id}.jsonl`)), false)
   const after = await invoke('terminalSessions:list')
   assert.equal(after.sessions.length, 0)
+})
+
+// ---- transcriptPathToForget (Fix B forget-no-op fix: transcript-only sessions have no launch record) ----
+
+test('transcriptPathToForget resolves by id via injected findTranscriptFn when record is undefined (transcript-only session)', () => {
+  const calls = []
+  const findTranscriptFn = (claudeProjectsDir, target, cwd) => {
+    calls.push({ claudeProjectsDir, target, cwd })
+    return '/fake/.claude/projects/proj/target-id.jsonl'
+  }
+  const result = mod.transcriptPathToForget({
+    target: 'target-id',
+    deleteTranscript: true,
+    record: undefined,
+    claudeProjectsDir: '/fake/.claude/projects',
+    findTranscriptFn
+  })
+  assert.equal(result, '/fake/.claude/projects/proj/target-id.jsonl')
+  assert.equal(calls.length, 1)
+  assert.equal(calls[0].target, 'target-id')
+  assert.equal(calls[0].cwd, undefined)
+})
+
+test('transcriptPathToForget returns null when deleteTranscript is false', () => {
+  const findTranscriptFn = () => '/should/not/be/used.jsonl'
+  const result = mod.transcriptPathToForget({
+    target: 'target-id',
+    deleteTranscript: false,
+    record: undefined,
+    claudeProjectsDir: '/fake/.claude/projects',
+    findTranscriptFn
+  })
+  assert.equal(result, null)
 })
 
 test('recordFork appends a kind:fork launch record', async () => {

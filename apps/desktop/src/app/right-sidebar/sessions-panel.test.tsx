@@ -49,7 +49,7 @@ describe('SessionsPanel', () => {
   it('shows an empty state when there are no sessions', () => {
     $terminalSessions.set({ projects: [], sessions: [] })
     render(<SessionsPanel />)
-    expect(screen.getByText(/No sessions yet/i)).toBeTruthy()
+    expect(screen.getByText(/No Claude sessions yet/i)).toBeTruthy()
   })
 })
 

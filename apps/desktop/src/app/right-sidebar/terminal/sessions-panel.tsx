@@ -33,11 +33,9 @@ export function SessionsPanel() {
   if (payload.sessions.length === 0) {
     return (
       <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-1 px-4 text-center">
-        <div className="text-[0.7rem] font-semibold uppercase tracking-[0.07em] text-muted-foreground/75">
-          No sessions yet
-        </div>
+        {/* tester-scoped copy; intentionally not routed through i18n */}
         <div className="text-[0.68rem] leading-relaxed text-muted-foreground/65">
-          Run <code>claude</code> in the built-in terminal and it shows up here.
+          No Claude sessions yet. Run <code>claude</code> in any terminal and your sessions show up here.
         </div>
       </div>
     )

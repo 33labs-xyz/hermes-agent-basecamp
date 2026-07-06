@@ -61,6 +61,11 @@ declare global {
       setPreviewShortcutActive?: (active: boolean) => void
       openExternal: (url: string) => Promise<void>
       showItemInFolder: (target: string) => Promise<{ ok: boolean; path?: string; error?: string }>
+      // Batch filesystem existence check for the Artifacts screen (one call
+      // per refresh, not one per file). Keys are the input paths verbatim;
+      // a path absent from the result means the check didn't cover it.
+      checkArtifactPathsExist: (paths: string[]) => Promise<Record<string, boolean>>
+      deleteArtifactFile: (rawPath: string) => Promise<{ ok: boolean; error?: string }>
       fetchLinkTitle: (url: string) => Promise<string>
       sanitizeWorkspaceCwd: (cwd?: null | string) => Promise<{ cwd: string; sanitized: boolean }>
       settings: {

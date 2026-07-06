@@ -111,6 +111,46 @@ function findTranscriptPath(claudeProjectsDir, id, cwd) {
   return null
 }
 
+// Pure, injectable transcript enumerator (Fix B): every real `claude` writes a
+// per-session transcript under <claudeProjectsDir>/<slugified-cwd>/<id>.jsonl.
+// This lists ALL of them, independent of launches.jsonl, so buildSessionList
+// can surface a session even when no in-app launch record exists.
+// sessionId is the transcript filename stem (the .jsonl basename minus
+// extension), which is exactly the session UUID `claude --resume <id>` expects.
+function listTranscripts({ claudeProjectsDir, readdirFn, statFn }) {
+  const out = []
+  let projectDirs = []
+  try {
+    projectDirs = readdirFn(claudeProjectsDir, { withFileTypes: true })
+  } catch {
+    return out
+  }
+  for (const projectDir of projectDirs) {
+    if (!projectDir.isDirectory()) continue
+    const dirPath = path.join(claudeProjectsDir, projectDir.name)
+    let files = []
+    try {
+      files = readdirFn(dirPath, { withFileTypes: true })
+    } catch {
+      continue
+    }
+    for (const file of files) {
+      if (file.isDirectory()) continue
+      if (!file.name.endsWith('.jsonl')) continue
+      const sessionId = file.name.slice(0, -'.jsonl'.length)
+      const transcriptPath = path.join(dirPath, file.name)
+      let mtimeMs = 0
+      try {
+        mtimeMs = statFn(transcriptPath).mtimeMs
+      } catch {
+        continue
+      }
+      out.push({ sessionId, transcriptPath, mtimeMs })
+    }
+  }
+  return out
+}
+
 // Content of a jsonl record's message, flattened to text.
 function messageText(rec) {
   const content = rec && rec.message && rec.message.content
@@ -176,9 +216,15 @@ function readTranscriptMeta(transcriptPath, statFn = fs.statSync) {
   return meta
 }
 
-function buildSessionList({ launchesText, claudeProjectsDir, statFn = fs.statSync }) {
+// Fix B cap: transcript-only sessions (no launch record) are sorted by mtime
+// DESC and truncated to this many, so a huge ~/.claude/projects history can't
+// flood the panel.
+const MAX_TRANSCRIPT_SESSIONS = 50
+
+function buildSessionList({ launchesText, claudeProjectsDir, statFn = fs.statSync, readdirFn = fs.readdirSync }) {
   const launches = parseLaunches(launchesText)
   const sessions = []
+  const seenIds = new Set()
   for (const launch of launches) {
     const transcriptPath = findTranscriptPath(claudeProjectsDir, launch.id, launch.cwd)
     const meta = transcriptPath ? readTranscriptMeta(transcriptPath, statFn) : null
@@ -196,7 +242,34 @@ function buildSessionList({ launchesText, claudeProjectsDir, statFn = fs.statSyn
       transcriptAvailable: Boolean(transcriptPath),
       projectPath
     })
+    seenIds.add(launch.id)
   }
+
+  // Fix B: union in transcript-only sessions (no launch record) so a session
+  // appears whenever its transcript exists, regardless of the shim ever
+  // having run. Launch-derived records win on id collision (kept above,
+  // via seenIds) so they keep their gitRoot/provenance.
+  const transcripts = listTranscripts({ claudeProjectsDir, readdirFn, statFn })
+    .filter(t => !seenIds.has(t.sessionId))
+    .sort((a, b) => b.mtimeMs - a.mtimeMs)
+    .slice(0, MAX_TRANSCRIPT_SESSIONS)
+  for (const t of transcripts) {
+    const meta = readTranscriptMeta(t.transcriptPath, statFn)
+    const cwd = meta.cwd || ''
+    sessions.push({
+      id: t.sessionId,
+      title: meta.title || `${t.sessionId.slice(0, 8)}`,
+      startedAt: 0,
+      lastActiveAt: meta.lastActiveAt || t.mtimeMs || 0,
+      messageCount: meta.messageCount || 0,
+      cwd,
+      gitBranch: meta.gitBranch || '',
+      transcriptPath: t.transcriptPath,
+      transcriptAvailable: true,
+      projectPath: cwd || 'unknown'
+    })
+  }
+
   const byProject = new Map()
   for (const s of sessions) {
     const key = s.projectPath || s.cwd || 'unknown'
@@ -215,6 +288,16 @@ function buildSessionList({ launchesText, claudeProjectsDir, statFn = fs.statSyn
   const projects = [...byProject.values()].sort((a, b) => b.lastActiveAt - a.lastActiveAt)
   sessions.sort((a, b) => b.lastActiveAt - a.lastActiveAt)
   return { projects, sessions }
+}
+
+// Fix B: decide which transcript file (if any) a forget call must delete.
+// Transcript-only sessions have no launch record, so resolve by id directly -
+// otherwise "delete permanently" silently no-ops on the exact rows the
+// transcript union newly surfaces. Returns an absolute path or null.
+function transcriptPathToForget({ target, deleteTranscript, record, claudeProjectsDir, findTranscriptFn = findTranscriptPath }) {
+  if (!deleteTranscript) return null
+  const cwd = record ? record.cwd : undefined
+  return findTranscriptFn(claudeProjectsDir, target, cwd) || null
 }
 
 // ---- registration ---------------------------------------------------------
@@ -237,7 +320,7 @@ function registerTerminalSessionsIpc({ ipcMain, app, watch = true }) {
   }
 
   ipcMain.handle('terminalSessions:list', () =>
-    buildSessionList({ launchesText: readLaunches(), claudeProjectsDir })
+    buildSessionList({ launchesText: readLaunches(), claudeProjectsDir, readdirFn: fs.readdirSync })
   )
 
   ipcMain.handle('terminalSessions:getTranscript', (_event, id) => {
@@ -255,14 +338,17 @@ function registerTerminalSessionsIpc({ ipcMain, app, watch = true }) {
     const target = String(id)
     const records = parseLaunches(readLaunches())
     const record = records.find(r => r.id === target)
-    if (options && options.deleteTranscript && record) {
-      const transcriptPath = findTranscriptPath(claudeProjectsDir, record.id, record.cwd)
-      if (transcriptPath) {
-        try {
-          fs.unlinkSync(transcriptPath)
-        } catch {
-          // already gone
-        }
+    const transcriptPath = transcriptPathToForget({
+      target,
+      deleteTranscript: Boolean(options && options.deleteTranscript),
+      record,
+      claudeProjectsDir
+    })
+    if (transcriptPath) {
+      try {
+        fs.unlinkSync(transcriptPath)
+      } catch {
+        // already gone
       }
     }
     const kept = records.filter(r => r.id !== target)
@@ -332,8 +418,11 @@ module.exports = {
   resolveRealClaude,
   buildSessionList,
   findTranscriptPath,
+  listTranscripts,
+  MAX_TRANSCRIPT_SESSIONS,
   parseLaunches,
   parseTranscriptTurns,
   readTranscriptMeta,
-  slugForCwd
+  slugForCwd,
+  transcriptPathToForget
 }

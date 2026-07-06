@@ -42,6 +42,7 @@ const { initAutoUpdater, checkForUpdatesManual } = require('./auto-updater.cjs')
 const { readWindowsUserEnvVar } = require('./windows-user-env.cjs')
 const { readDirForIpc } = require('./fs-read-dir.cjs')
 const { gitRootForIpc } = require('./git-root.cjs')
+const { resolveDeletableFilePath } = require('./artifact-file-guard.cjs')
 const { worktreesForIpc } = require('./git-worktrees.cjs')
 const { OFFICIAL_REPO_HTTPS_URL, isOfficialSshRemote } = require('./update-remote.cjs')
 const {
@@ -5923,6 +5924,41 @@ ipcMain.handle('hermes:shell:showItemInFolder', async (_event, target) => {
   } catch (error) {
     rememberLog(`[reveal] showItemInFolder failed: ${error.message}`)
     return { ok: false, error: error.message }
+  }
+})
+
+// Batch existence check for the Artifacts screen: chat-scraped artifact
+// records (regex-extracted from message text) get no filesystem check at
+// collection time, so a deleted local file still yields a stale tile. The
+// renderer has no `fs`, so it gathers every local-file/image path from one
+// refresh and checks them all in a single round trip here instead of one
+// IPC call per file.
+ipcMain.handle('hermes:artifacts:checkExistence', async (_event, paths) => {
+  const result = {}
+
+  if (!Array.isArray(paths)) {
+    return result
+  }
+
+  for (const rawPath of paths) {
+    const key = String(rawPath || '').trim()
+
+    if (!key) continue
+
+    result[key] = fileExists(key)
+  }
+
+  return result
+})
+
+ipcMain.handle('hermes:artifacts:deleteFile', async (_event, rawPath) => {
+  const resolved = resolveDeletableFilePath(rawPath)
+  if (!resolved.ok) return { ok: false, error: resolved.error }
+  try {
+    fs.unlinkSync(resolved.path)
+    return { ok: true }
+  } catch (err) {
+    return { ok: false, error: String((err && err.message) || err) }
   }
 })
 
