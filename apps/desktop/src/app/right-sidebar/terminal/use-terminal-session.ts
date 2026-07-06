@@ -250,6 +250,11 @@ export function useTerminalSession({ cwd, isActive, onAddSelectionToChat }: UseT
   const termRef = useRef<Terminal | null>(null)
   const webglRef = useRef<WebglAddon | null>(null)
   const sessionIdRef = useRef<string | null>(null)
+  // Bumped once per mount-effect run. Guards terminalApi.start() against a
+  // re-run firing while a previous start() is still in flight (rapid cwd
+  // change, StrictMode double-invoke): the .then() for a stale run disposes
+  // its just-created session instead of wiring it up as if it were current.
+  const startGenerationRef = useRef(0)
   const readerRef = useRef<ReturnType<typeof makeTerminalReader> | null>(null)
   const shellNameRef = useRef('shell')
   const selectionLabelRef = useRef('')
@@ -329,6 +334,11 @@ export function useTerminalSession({ cwd, isActive, onAddSelectionToChat }: UseT
     let disposed = false
     const cleanup: Array<() => void> = []
     let lastSentSize: { cols: number; rows: number } | null = null
+    // This run's generation. Incremented before anything async kicks off, so
+    // the closure below can tell "am I still the latest start attempt?" even
+    // after this effect's own `disposed` flag would say no such thing yet.
+    startGenerationRef.current += 1
+    const generation = startGenerationRef.current
 
     const term = new Terminal({
       allowProposedApi: true,
@@ -563,7 +573,13 @@ export function useTerminalSession({ cwd, isActive, onAddSelectionToChat }: UseT
       void terminalApi
         .start({ cols: term.cols, cwd, rows: term.rows })
         .then(session => {
-          if (disposed) {
+          // Bail before wiring anything up (listeners, sessionIdRef) if either:
+          // this run's own cleanup already fired (disposed), or a later effect
+          // run has since become the current one (stale generation) — e.g. cwd
+          // changed again, or StrictMode double-invoked, while this start() was
+          // in flight. Either way the just-created session is an orphan; dispose
+          // it instead of letting it clobber/race the session that IS current.
+          if (disposed || startGenerationRef.current !== generation) {
             void terminalApi.dispose(session.id)
 
             return
