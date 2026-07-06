@@ -6,6 +6,14 @@ import AudioPlayer from "./AudioPlayer";
 import VideoPlayer from "./VideoPlayer";
 import { IoImageOutline, IoTrashOutline } from "react-icons/io5";
 
+// Per-media upload caps, matching the limits enforced by the sibling
+// Image/Video/Audio Studios for the same media class.
+const MAX_SIZE_BY_TYPE = {
+  image: 10 * 1024 * 1024, // 10MB
+  video: 50 * 1024 * 1024, // 50MB
+  audio: 20 * 1024 * 1024, // 20MB
+};
+
 const UploadNode = ({ id, data, formValues, setFormValues, selectedModel, loading, uploadType, acceptType }) => {
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -46,6 +54,12 @@ const UploadNode = ({ id, data, formValues, setFormValues, selectedModel, loadin
       toast.error(`Please upload a valid ${acceptType} file`);
       return;
     };
+
+    const maxSize = MAX_SIZE_BY_TYPE[acceptType] || MAX_SIZE_BY_TYPE.image;
+    if (file.size > maxSize) {
+      toast.error(`File exceeds ${maxSize / (1024 * 1024)}MB limit`);
+      return;
+    }
 
     setUploading(true);
     axios.get("/api/app/get_file_upload_url", {

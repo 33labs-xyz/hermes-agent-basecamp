@@ -7,6 +7,12 @@ import { toast } from "react-hot-toast";
 import AudioPlayer from "./AudioPlayer";
 import { IoCloudUploadOutline } from "react-icons/io5";
 
+// Per-media upload caps, matching the limits enforced by the sibling
+// Image/Video/Audio Studios for the same media class.
+const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10MB
+const MAX_VIDEO_SIZE = 50 * 1024 * 1024; // 50MB
+const MAX_AUDIO_SIZE = 20 * 1024 * 1024; // 20MB
+
 const RenderField = ({ fieldName, meta, idx, formValues, setFormValues, handleChange, data, modelName }) => {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [dropDown, setDropDown] = useState(-1);
@@ -60,6 +66,12 @@ const RenderField = ({ fieldName, meta, idx, formValues, setFormValues, handleCh
       toast.error("Unsupported file type");
       return;
     };
+
+    const maxSize = isImageField ? MAX_IMAGE_SIZE : isVideoField ? MAX_VIDEO_SIZE : isAudioField ? MAX_AUDIO_SIZE : MAX_IMAGE_SIZE;
+    if (file.size > maxSize) {
+      toast.error(`File exceeds ${maxSize / (1024 * 1024)}MB limit`);
+      return;
+    }
 
     setUploading(true);
     axios.get("/api/app/get_file_upload_url", {

@@ -9,6 +9,12 @@ import { IoCloudUploadOutline } from "react-icons/io5";
 import { Handle, Position } from "reactflow";
 import { TbBoxModel2, TbExternalLink } from "react-icons/tb";
 
+// Per-media upload caps, matching the limits enforced by the sibling
+// Image/Video/Audio Studios for the same media class.
+const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10MB
+const MAX_VIDEO_SIZE = 50 * 1024 * 1024; // 50MB
+const MAX_AUDIO_SIZE = 20 * 1024 * 1024; // 20MB
+
 const RenderApiField = ({ fieldName, meta, idx, formValues, setFormValues, handleChange, hasHandle = false, exposedHandles = [], onToggleHandle }) => {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [dropDown, setDropDown] = useState(-1);
@@ -78,6 +84,12 @@ const RenderApiField = ({ fieldName, meta, idx, formValues, setFormValues, handl
       toast.error("Unsupported file type");
       return;
     };
+
+    const maxSize = isImageField ? MAX_IMAGE_SIZE : isVideoField ? MAX_VIDEO_SIZE : isAudioField ? MAX_AUDIO_SIZE : MAX_IMAGE_SIZE;
+    if (file.size > maxSize) {
+      toast.error(`File exceeds ${maxSize / (1024 * 1024)}MB limit`);
+      return;
+    }
 
     setUploading(true);
     axios.get("/api/app/get_file_upload_url", {
