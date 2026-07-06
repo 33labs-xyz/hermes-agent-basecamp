@@ -602,14 +602,28 @@ export default function CinemaStudio({
       settings.aperture,
     );
 
+    // Snapshot settings/image at click-time — editing camera/lens/aperture/
+    // resolution/prompt while this generation is in flight must not relabel
+    // the saved result with the new values.
+    const snap = {
+      prompt: basePrompt,
+      camera: settings.camera,
+      lens: settings.lens,
+      focal: settings.focal,
+      aperture: settings.aperture,
+      aspect_ratio: settings.aspect_ratio,
+      resolution,
+      uploadedImage,
+    };
+
     try {
       const res = await generateImage(apiKey, {
-        model: uploadedImage ? "nano-banana-pro-edit" : "nano-banana-pro",
+        model: snap.uploadedImage ? "nano-banana-pro-edit" : "nano-banana-pro",
         prompt: finalPrompt,
-        aspect_ratio: settings.aspect_ratio,
-        resolution: resolution.toLowerCase(),
+        aspect_ratio: snap.aspect_ratio,
+        resolution: snap.resolution.toLowerCase(),
         negative_prompt: "blurry, low quality, distortion, bad composition",
-        images_list: uploadedImage ? [uploadedImage] : [],
+        images_list: snap.uploadedImage ? [snap.uploadedImage] : [],
       });
 
       if (res && res.url) {
@@ -617,13 +631,13 @@ export default function CinemaStudio({
           url: res.url,
           timestamp: Date.now(),
           settings: {
-            prompt: basePrompt,
-            camera: settings.camera,
-            lens: settings.lens,
-            focal: settings.focal,
-            aperture: settings.aperture,
-            aspect_ratio: settings.aspect_ratio,
-            resolution,
+            prompt: snap.prompt,
+            camera: snap.camera,
+            lens: snap.lens,
+            focal: snap.focal,
+            aperture: snap.aperture,
+            aspect_ratio: snap.aspect_ratio,
+            resolution: snap.resolution,
           },
         };
 
@@ -638,7 +652,7 @@ export default function CinemaStudio({
           onGenerationComplete({
             url: res.url,
             model: "nano-banana-pro",
-            prompt: basePrompt,
+            prompt: snap.prompt,
             type: "cinema",
           });
         }

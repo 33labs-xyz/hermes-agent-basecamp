@@ -620,10 +620,18 @@ export default function AudioStudio({
     setIsGenerating(true);
     setGenerateError(null);
 
+    // Snapshot params/model at click-time — editing the prompt or params while
+    // this generation is in flight must not relabel the saved result.
+    const snap = {
+      params,
+      modelId: selectedModelId,
+      modelName: selectedModel.name,
+    };
+
     try {
       const audioParams = {
-        ...params,
-        _modelId: selectedModelId,
+        ...snap.params,
+        _modelId: snap.modelId,
       };
 
       // Call generateAudio
@@ -633,13 +641,13 @@ export default function AudioStudio({
         throw new Error("No audio URL returned by the API.");
       }
 
-      const title = params.title || params.prompt || `Generated ${selectedModel.name}`;
+      const title = snap.params.title || snap.params.prompt || `Generated ${snap.modelName}`;
       const entry = {
         id: res.id || Date.now().toString(),
         url: res.url,
         title,
-        prompt: params.prompt || "",
-        model: selectedModelId,
+        prompt: snap.params.prompt || "",
+        model: snap.modelId,
         timestamp: new Date().toISOString(),
       };
 
@@ -653,8 +661,8 @@ export default function AudioStudio({
       if (onGenerationComplete) {
         onGenerationComplete({
           url: res.url,
-          model: selectedModelId,
-          prompt: params.prompt,
+          model: snap.modelId,
+          prompt: snap.params.prompt,
           type: "audio",
         });
       }
