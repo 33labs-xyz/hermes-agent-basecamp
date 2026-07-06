@@ -18,6 +18,7 @@ function renderStrip(overrides: Partial<React.ComponentProps<typeof TerminalTabS
     onClose: vi.fn(),
     onHide: vi.fn(),
     onOpen: vi.fn(),
+    onRename: vi.fn(),
     onSelect: vi.fn(),
     tabs,
     ...overrides
@@ -26,6 +27,8 @@ function renderStrip(overrides: Partial<React.ComponentProps<typeof TerminalTabS
 
   return props
 }
+
+const renameInput = () => screen.getByRole('textbox', { name: 'Rename terminal' }) as HTMLInputElement
 
 describe('TerminalTabStrip', () => {
   it('renders one labelled chip per tab', () => {
@@ -70,5 +73,42 @@ describe('TerminalTabStrip', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Hide terminal' }))
 
     expect(onHide).toHaveBeenCalledTimes(1)
+  })
+
+  it('double-click swaps the label for a rename input seeded with the custom name', () => {
+    renderStrip({ labels: ['build', 'other'], tabs: [{ ...tabs[0], name: 'build' }, tabs[1]] })
+
+    fireEvent.doubleClick(screen.getByText('build'))
+
+    expect(renameInput().value).toBe('build')
+  })
+
+  it('commits a rename on Enter and closes the editor', () => {
+    const { onRename } = renderStrip()
+
+    fireEvent.doubleClick(screen.getByText('project'))
+    const input = renameInput()
+    // Auto-labelled tab has no custom name yet, so the editor starts empty.
+    expect(input.value).toBe('')
+    fireEvent.change(input, { target: { value: 'api' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+
+    expect(onRename).toHaveBeenCalledWith('a', 'api')
+    expect(screen.queryByRole('textbox', { name: 'Rename terminal' })).toBeNull()
+  })
+
+  it('commits on blur and cancels on Escape without renaming', () => {
+    const { onRename } = renderStrip()
+
+    fireEvent.doubleClick(screen.getByText('project'))
+    fireEvent.keyDown(renameInput(), { key: 'Escape' })
+    expect(onRename).not.toHaveBeenCalled()
+    expect(screen.queryByRole('textbox', { name: 'Rename terminal' })).toBeNull()
+
+    fireEvent.doubleClick(screen.getByText('project'))
+    const input = renameInput()
+    fireEvent.change(input, { target: { value: 'db' } })
+    fireEvent.blur(input)
+    expect(onRename).toHaveBeenCalledWith('a', 'db')
   })
 })

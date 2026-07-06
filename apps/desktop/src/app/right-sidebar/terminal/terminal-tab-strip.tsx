@@ -1,3 +1,5 @@
+import { useState } from 'react'
+
 import { Button } from '@/components/ui/button'
 import { Codicon } from '@/components/ui/codicon'
 import { Tip } from '@/components/ui/tooltip'
@@ -14,6 +16,7 @@ interface TerminalTabStripProps {
   onClose: (id: string) => void
   onOpen: () => void
   onHide: () => void
+  onRename: (id: string, name: string) => void
 }
 
 export function TerminalTabStrip({
@@ -23,16 +26,36 @@ export function TerminalTabStrip({
   onClose,
   onHide,
   onOpen,
+  onRename,
   onSelect,
   tabs
 }: TerminalTabStripProps) {
   const { t } = useI18n()
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [draft, setDraft] = useState('')
   const hideLabel = t.rightSidebar.terminalHide
   // i18n-exempt: hardcoded English pending terminal-tab i18n keys
   const newLabel = 'New terminal'
   // i18n-exempt: hardcoded English pending terminal-tab i18n keys
   const closeLabel = 'Close terminal'
+  // i18n-exempt: hardcoded English pending terminal-tab i18n keys
+  const renameLabel = 'Rename terminal'
   const showClose = tabs.length > 1
+
+  // Seed with the custom name only — an empty editor means "auto label", so
+  // committing it blank reverts the tab instead of freezing the derived label.
+  const startRename = (tab: TerminalTabModel) => {
+    setEditingId(tab.id)
+    setDraft(tab.name ?? '')
+  }
+
+  const commitRename = () => {
+    if (editingId) {
+      onRename(editingId, draft)
+    }
+
+    setEditingId(null)
+  }
 
   return (
     <div className="flex h-8 shrink-0 items-center gap-1 px-2">
@@ -49,9 +72,33 @@ export function TerminalTabStrip({
               }`}
               key={tab.id}
             >
-              <button className="max-w-[10rem] truncate" onClick={() => onSelect(tab.id)} type="button">
-                {labels[index]}
-              </button>
+              {tab.id === editingId ? (
+                <input
+                  aria-label={renameLabel}
+                  autoFocus
+                  className="w-24 bg-transparent outline-none"
+                  onBlur={commitRename}
+                  onChange={event => setDraft(event.target.value)}
+                  onKeyDown={event => {
+                    if (event.key === 'Enter') {
+                      commitRename()
+                    } else if (event.key === 'Escape') {
+                      setEditingId(null)
+                    }
+                  }}
+                  placeholder={labels[index]}
+                  value={draft}
+                />
+              ) : (
+                <button
+                  className="max-w-[10rem] truncate"
+                  onClick={() => onSelect(tab.id)}
+                  onDoubleClick={() => startRename(tab)}
+                  type="button"
+                >
+                  {labels[index]}
+                </button>
+              )}
               {showClose && (
                 <Tip label={closeLabel}>
                   <Button

@@ -7,7 +7,8 @@ import {
   computeTabLabels,
   initTabs,
   MAX_TERMINAL_TABS,
-  openTab
+  openTab,
+  renameTab
 } from './terminal-tabs'
 
 // Deterministic id factory so assertions can name ids.
@@ -115,6 +116,50 @@ describe('terminal-tabs model', () => {
     ])
 
     expect(labels).toEqual(['project', 'project 2', 'shell', 'project 3', 'shell 2'])
+  })
+
+  it('renameTab sets a trimmed custom name that computeTabLabels prefers', () => {
+    const make = counter()
+    let state = initTabs('/a/project', make)
+    state = openTab(state, '/b/project', make)
+    const before = state
+    state = renameTab(state, state.tabs[0].id, ' build ')
+
+    expect(state.tabs[0].name).toBe('build')
+    // Immutable: original untouched.
+    expect(before.tabs[0].name).toBeUndefined()
+    // Custom name used verbatim; auto labels number among themselves only.
+    expect(computeTabLabels(state.tabs)).toEqual(['build', 'project'])
+  })
+
+  it('renameTab with a blank name clears back to the auto label', () => {
+    const make = counter()
+    let state = initTabs('/a/project', make)
+    state = renameTab(state, state.tabs[0].id, 'build')
+    state = renameTab(state, state.tabs[0].id, '   ')
+
+    expect(state.tabs[0].name).toBeUndefined()
+    expect(computeTabLabels(state.tabs)).toEqual(['project'])
+  })
+
+  it('renameTab is a no-op for unknown ids and unchanged names', () => {
+    const make = counter()
+    const state = initTabs('/a', make)
+    const renamed = renameTab(state, state.tabs[0].id, 'build')
+
+    expect(renameTab(state, 'nope', 'x')).toBe(state)
+    expect(renameTab(renamed, renamed.tabs[0].id, 'build')).toBe(renamed)
+  })
+
+  it('custom names do not join the duplicate-count pool', () => {
+    const make = counter()
+    let state = initTabs('/x/project', make)
+    state = openTab(state, '/y/project', make)
+    state = openTab(state, '/z/project', make)
+    state = renameTab(state, state.tabs[1].id, 'project')
+
+    // Middle tab is custom "project"; the two autos still number 1..2.
+    expect(computeTabLabels(state.tabs)).toEqual(['project', 'project', 'project 2'])
   })
 
   it('canOpenTab and openTab honor a custom max override', () => {

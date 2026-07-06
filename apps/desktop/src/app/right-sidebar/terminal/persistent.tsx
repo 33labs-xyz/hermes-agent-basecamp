@@ -13,6 +13,7 @@ import {
   computeTabLabels,
   initTabs,
   openTab,
+  renameTab,
   type TerminalTabsState
 } from './terminal-tabs'
 
@@ -131,6 +132,8 @@ export function PersistentTerminal({ cwd, onAddSelectionToChat }: PersistentTerm
     setTabsState(state => (state ? openTab(state, latestCwdRef.current, makeId) : state))
   const handleClose = (id: string) => setTabsState(state => (state ? closeTab(state, id) : state))
   const handleSelect = (id: string) => setTabsState(state => (state ? activateTab(state, id) : state))
+  const handleRename = (id: string, name: string) =>
+    setTabsState(state => (state ? renameTab(state, id, name) : state))
   const handleHide = () => setTerminalTakeover(false)
 
   const visible = Boolean(rect && rect.width > 0 && rect.height > 0)
@@ -166,6 +169,7 @@ export function PersistentTerminal({ cwd, onAddSelectionToChat }: PersistentTerm
             onClose={handleClose}
             onHide={handleHide}
             onOpen={handleOpen}
+            onRename={handleRename}
             onSelect={handleSelect}
             tabs={tabsState.tabs}
           />

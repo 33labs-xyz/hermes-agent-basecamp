@@ -5,6 +5,9 @@
 export interface TerminalTabModel {
   id: string
   cwd: string
+  // User-assigned label (via rename). Wins over the cwd-derived label; absent
+  // means "auto" and the tab falls back to basename(cwd) + dup suffixing.
+  name?: string
 }
 
 export interface TerminalTabsState {
@@ -70,6 +73,28 @@ export function activateTab(state: TerminalTabsState, id: string): TerminalTabsS
   return { ...state, activeId: id }
 }
 
+// A blank name clears the custom label so the tab reverts to its auto label.
+export function renameTab(state: TerminalTabsState, id: string, name: string): TerminalTabsState {
+  const target = state.tabs.find(tab => tab.id === id)
+  const trimmed = name.trim()
+
+  if (!target || trimmed === (target.name ?? '')) {
+    return state
+  }
+
+  const tabs = state.tabs.map(tab => {
+    if (tab.id !== id) {
+      return tab
+    }
+
+    const { name: _cleared, ...bare } = tab
+
+    return trimmed ? { ...bare, name: trimmed } : bare
+  })
+
+  return { ...state, tabs }
+}
+
 function basename(cwd: string): string {
   const parts = cwd.split('/').filter(Boolean)
 
@@ -80,6 +105,12 @@ export function computeTabLabels(tabs: TerminalTabModel[]): string[] {
   const counts = new Map<string, number>()
 
   return tabs.map(tab => {
+    // Custom names render verbatim and stay out of the duplicate-count pool —
+    // only auto labels number among themselves.
+    if (tab.name) {
+      return tab.name
+    }
+
     const base = basename(tab.cwd)
     const n = (counts.get(base) ?? 0) + 1
     counts.set(base, n)
