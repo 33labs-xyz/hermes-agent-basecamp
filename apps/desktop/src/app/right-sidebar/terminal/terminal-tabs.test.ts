@@ -110,9 +110,21 @@ describe('terminal-tabs model', () => {
       { id: '1', cwd: '/Users/me/project' },
       { id: '2', cwd: '/Users/other/project' },
       { id: '3', cwd: '/' },
-      { id: '4', cwd: '/Users/me/project/' }
+      { id: '4', cwd: '/Users/me/project/' },
+      { id: '5', cwd: '' }
     ])
 
-    expect(labels).toEqual(['project', 'project 2', 'shell', 'project 3'])
+    expect(labels).toEqual(['project', 'project 2', 'shell', 'project 3', 'shell 2'])
+  })
+
+  it('canOpenTab and openTab honor a custom max override', () => {
+    const make = counter()
+    let state = initTabs('/a', make)
+    state = openTab(state, '/b', make) // 2 tabs, well under the default cap
+
+    expect(canOpenTab(state, 2)).toBe(false)
+    expect(openTab(state, '/c', make, 2)).toBe(state)
+    expect(canOpenTab(state, 3)).toBe(true)
+    expect(openTab(state, '/c', make, 3).tabs).toHaveLength(3)
   })
 })
