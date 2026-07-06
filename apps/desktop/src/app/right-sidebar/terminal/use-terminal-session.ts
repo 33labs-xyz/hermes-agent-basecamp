@@ -12,7 +12,7 @@ import { useTheme } from '@/themes/context'
 
 import { $terminalInjection } from '../store'
 
-import { makeTerminalReader, setActiveTerminalReader } from './buffer'
+import { clearActiveTerminalReader, makeTerminalReader, setActiveTerminalReader } from './buffer'
 import {
   isAddSelectionShortcut,
   resolveSurfaceColor,
@@ -133,6 +133,7 @@ function stripInitialPromptGap(data: string) {
 
 interface UseTerminalSessionOptions {
   cwd: string
+  isActive: boolean
   onAddSelectionToChat: (text: string, label?: string) => void
 }
 
@@ -232,7 +233,7 @@ function quotePathForShell(path: string, shellName: string): string {
   return `'${path.replace(/'/g, "'\\''")}'`
 }
 
-export function useTerminalSession({ cwd, onAddSelectionToChat }: UseTerminalSessionOptions) {
+export function useTerminalSession({ cwd, isActive, onAddSelectionToChat }: UseTerminalSessionOptions) {
   // Key off renderedMode (the painted surface type), not resolvedMode (the
   // clicked switch) — a skin can keep a light surface in "dark" mode, and we
   // must match the surface or the ANSI palette inverts against it. themeName
@@ -249,6 +250,7 @@ export function useTerminalSession({ cwd, onAddSelectionToChat }: UseTerminalSes
   const termRef = useRef<Terminal | null>(null)
   const webglRef = useRef<WebglAddon | null>(null)
   const sessionIdRef = useRef<string | null>(null)
+  const readerRef = useRef<ReturnType<typeof makeTerminalReader> | null>(null)
   const shellNameRef = useRef('shell')
   const selectionLabelRef = useRef('')
   const selectionRef = useRef('')
@@ -368,9 +370,11 @@ export function useTerminalSession({ cwd, onAddSelectionToChat }: UseTerminalSes
     term.loadAddon(new WebLinksAddon())
     term.unicode.activeVersion = '11'
 
-    // Let the GUI chat agent read this pane via the `read_terminal` tool: the
-    // gateway's terminal.read.request handler serializes the buffer through this.
-    setActiveTerminalReader(makeTerminalReader(term))
+    // Stash this tab's reader; the reader-ownership effect below registers it
+    // globally only while this tab is active, so read_terminal targets the
+    // visible terminal. Registering here (mount time) would let a background
+    // tab hijack the slot.
+    readerRef.current = makeTerminalReader(term)
 
     const onDragOver = (e: DragEvent) => {
       if (!e.dataTransfer || !transferHasDropCandidates(e.dataTransfer)) {
@@ -638,7 +642,7 @@ export function useTerminalSession({ cwd, onAddSelectionToChat }: UseTerminalSes
     return () => {
       disposed = true
       cleanup.forEach(run => run())
-      setActiveTerminalReader(null)
+      readerRef.current = null
 
       const id = sessionIdRef.current
       sessionIdRef.current = null
@@ -655,6 +659,27 @@ export function useTerminalSession({ cwd, onAddSelectionToChat }: UseTerminalSes
       selectionLabelRef.current = ''
     }
   }, [addSelectionToChat, cwd])
+
+  // The active tab owns the shared read_terminal reader slot. Keyed on
+  // isActive + status — NOT the mount effect — so a tab switch re-points the
+  // reader without rebuilding the shell. status transitions on every (re)mount,
+  // so a freshly-created readerRef is always picked up here. The guarded clear
+  // means a backgrounded tab can't null a sibling's slot.
+  useEffect(() => {
+    if (!isActive || status === 'closed') {
+      return
+    }
+
+    const reader = readerRef.current
+
+    if (!reader) {
+      return
+    }
+
+    setActiveTerminalReader(reader)
+
+    return () => clearActiveTerminalReader(reader)
+  }, [isActive, status])
 
   useEffect(() => {
     const term = termRef.current
@@ -682,7 +707,7 @@ export function useTerminalSession({ cwd, onAddSelectionToChat }: UseTerminalSes
   // before this pane mounted runs as soon as the session is ready. Clearing the
   // atom after writing stops a later remount from replaying a stale command.
   useEffect(() => {
-    if (status !== 'open') {
+    if (status !== 'open' || !isActive) {
       return
     }
 
@@ -697,7 +722,7 @@ export function useTerminalSession({ cwd, onAddSelectionToChat }: UseTerminalSes
       $terminalInjection.set(null)
       termRef.current?.focus()
     })
-  }, [status])
+  }, [isActive, status])
 
   return {
     addSelectionToChat,
