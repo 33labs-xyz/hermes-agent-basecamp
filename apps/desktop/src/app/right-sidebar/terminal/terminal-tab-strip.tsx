@@ -28,9 +28,9 @@ export function TerminalTabStrip({
 }: TerminalTabStripProps) {
   const { t } = useI18n()
   const hideLabel = t.rightSidebar.terminalHide
-  // i18n-exempt: tester-only terminal tab control
+  // i18n-exempt: hardcoded English pending terminal-tab i18n keys
   const newLabel = 'New terminal'
-  // i18n-exempt: tester-only terminal tab control
+  // i18n-exempt: hardcoded English pending terminal-tab i18n keys
   const closeLabel = 'Close terminal'
   const showClose = tabs.length > 1
 
