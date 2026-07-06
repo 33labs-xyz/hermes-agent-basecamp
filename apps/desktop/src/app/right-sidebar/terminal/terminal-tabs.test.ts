@@ -6,6 +6,7 @@ import {
   closeTab,
   computeTabLabels,
   initTabs,
+  MAX_TAB_NAME_LENGTH,
   MAX_TERMINAL_TABS,
   openTab,
   renameTab
@@ -149,6 +150,49 @@ describe('terminal-tabs model', () => {
 
     expect(renameTab(state, 'nope', 'x')).toBe(state)
     expect(renameTab(renamed, renamed.tabs[0].id, 'build')).toBe(renamed)
+  })
+
+  it('renameTab caps a stored custom name at MAX_TAB_NAME_LENGTH characters', () => {
+    const make = counter()
+    const state = initTabs('/a', make)
+    const long = 'x'.repeat(MAX_TAB_NAME_LENGTH + 50)
+    const renamed = renameTab(state, state.tabs[0].id, long)
+
+    expect(renamed.tabs[0].name).toBe('x'.repeat(MAX_TAB_NAME_LENGTH))
+    expect(renamed.tabs[0].name).toHaveLength(MAX_TAB_NAME_LENGTH)
+  })
+
+  it('renameTab trims before capping, so surrounding whitespace does not steal from the cap', () => {
+    const make = counter()
+    const state = initTabs('/a', make)
+    const padded = `  ${'y'.repeat(MAX_TAB_NAME_LENGTH)}  `
+    const renamed = renameTab(state, state.tabs[0].id, padded)
+
+    expect(renamed.tabs[0].name).toBe('y'.repeat(MAX_TAB_NAME_LENGTH))
+  })
+
+  it('renameTab is still a no-op (same ref) when the name is unchanged after capping', () => {
+    const make = counter()
+    const state = initTabs('/a', make)
+    const long = 'z'.repeat(MAX_TAB_NAME_LENGTH + 50)
+    const renamed = renameTab(state, state.tabs[0].id, long)
+
+    // Renaming again with a different over-cap string that caps to the same
+    // stored value must be treated as unchanged (same ref), same as the
+    // existing exact-match no-op case above.
+    const again = renameTab(renamed, renamed.tabs[0].id, `${'z'.repeat(MAX_TAB_NAME_LENGTH)}extra-tail-that-gets-cut`)
+
+    expect(again).toBe(renamed)
+  })
+
+  it('renameTab still clears back to the auto label when blank, even after a capped name', () => {
+    const make = counter()
+    const state = initTabs('/a/project', make)
+    const long = renameTab(state, state.tabs[0].id, 'w'.repeat(MAX_TAB_NAME_LENGTH + 50))
+    const cleared = renameTab(long, long.tabs[0].id, '   ')
+
+    expect(cleared.tabs[0].name).toBeUndefined()
+    expect(computeTabLabels(cleared.tabs)).toEqual(['project'])
   })
 
   it('custom names do not join the duplicate-count pool', () => {

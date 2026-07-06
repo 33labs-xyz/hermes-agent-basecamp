@@ -18,6 +18,11 @@ export interface TerminalTabsState {
 // Soft cap on concurrent terminals. The "+" control is disabled at this count.
 export const MAX_TERMINAL_TABS = 8
 
+// Hard cap on a stored custom tab name. Without this the user can paste an
+// arbitrarily long string (e.g. a whole clipboard) and only CSS truncation in
+// the tab strip hides it — the full string still lives in state/persistence.
+export const MAX_TAB_NAME_LENGTH = 64
+
 export function initTabs(cwd: string, makeId: () => string): TerminalTabsState {
   const id = makeId()
 
@@ -76,9 +81,11 @@ export function activateTab(state: TerminalTabsState, id: string): TerminalTabsS
 // A blank name clears the custom label so the tab reverts to its auto label.
 export function renameTab(state: TerminalTabsState, id: string, name: string): TerminalTabsState {
   const target = state.tabs.find(tab => tab.id === id)
-  const trimmed = name.trim()
+  // Trim first, then cap — so surrounding whitespace doesn't eat into the
+  // cap, and pasting a long string can't grow the stored name unbounded.
+  const capped = name.trim().slice(0, MAX_TAB_NAME_LENGTH)
 
-  if (!target || trimmed === (target.name ?? '')) {
+  if (!target || capped === (target.name ?? '')) {
     return state
   }
 
@@ -89,7 +96,7 @@ export function renameTab(state: TerminalTabsState, id: string, name: string): T
 
     const { name: _cleared, ...bare } = tab
 
-    return trimmed ? { ...bare, name: trimmed } : bare
+    return capped ? { ...bare, name: capped } : bare
   })
 
   return { ...state, tabs }
