@@ -2081,6 +2081,7 @@ fi
   }
 
   const child = spawn('/bin/bash', [scriptPath], { detached: true, stdio: 'ignore' })
+  child.on('error', error => rememberLog(`[updates] swap script spawn failed: ${error.message}`))
   child.unref()
   rememberLog(`[updates] launched mac swap+relaunch: ${scriptPath} (${rebuiltApp} -> ${targetApp})`)
 
@@ -3037,6 +3038,11 @@ function fetchLinkTitle(rawUrl) {
   return pending
 }
 
+// Hard ceiling for a single hermes:saveImageFromUrl/copyImageFromUrl download —
+// matches studio.cjs's MAX_BYTES. Without it a huge or slow-streaming URL would
+// buffer unbounded in memory and OOM the main process.
+const RESOURCE_DOWNLOAD_MAX_BYTES = 512 * 1024 * 1024
+
 async function resourceBufferFromUrl(rawUrl) {
   if (!rawUrl) throw new Error('Missing URL')
   if (rawUrl.startsWith('data:')) {
@@ -3063,9 +3069,27 @@ async function resourceBufferFromUrl(rawUrl) {
         return
       }
       const chunks = []
-      res.on('error', reject)
-      res.on('data', chunk => chunks.push(chunk))
+      let bytes = 0
+      let settled = false
+      const fail = error => {
+        if (settled) return
+        settled = true
+        res.destroy()
+        reject(error)
+      }
+      res.on('error', fail)
+      res.on('data', chunk => {
+        if (settled) return
+        bytes += chunk.length
+        if (bytes > RESOURCE_DOWNLOAD_MAX_BYTES) {
+          fail(new Error(`Download exceeds ${RESOURCE_DOWNLOAD_MAX_BYTES} byte limit: ${rawUrl}`))
+          return
+        }
+        chunks.push(chunk)
+      })
       res.on('end', () => {
+        if (settled) return
+        settled = true
         resolve({
           buffer: Buffer.concat(chunks),
           mimeType: res.headers['content-type'] || 'application/octet-stream'
@@ -5062,11 +5086,38 @@ async function startHermes() {
 // security posture: external links open in the OS browser, in-app navigation
 // stays confined to the dev server / packaged file URL, and the preview /
 // devtools / zoom / context-menu affordances behave identically everywhere.
+// webviewTag is enabled so the chat right-rail preview pane can embed one
+// (see preview-pane.tsx, partition 'persist:hermes-preview'), but nothing
+// short of this enforces the attaching <webview>'s webPreferences — a
+// compromised/malicious renderer could otherwise ask for
+// nodeIntegration/no-sandbox/no-isolation, or point `preload` at an arbitrary
+// script. Force the hardened invariants at attach time regardless of what the
+// renderer requested; the legitimate preview webview already asks for exactly
+// these values (and sets no preload), so this is a no-op for it.
+const APP_PRELOAD_PATH = path.join(__dirname, 'preload.cjs')
+
+function enforceWebviewHardening(webContents) {
+  webContents.on('will-attach-webview', (_event, webPreferences, params) => {
+    webPreferences.contextIsolation = true
+    webPreferences.sandbox = true
+    webPreferences.nodeIntegration = false
+    webPreferences.nodeIntegrationInSubFrames = false
+
+    if (webPreferences.preload && webPreferences.preload !== APP_PRELOAD_PATH) {
+      delete webPreferences.preload
+    }
+    if (params && typeof params === 'object' && 'preload' in params && params.preload !== APP_PRELOAD_PATH) {
+      delete params.preload
+    }
+  })
+}
+
 function wireCommonWindowHandlers(win) {
   installPreviewShortcut(win)
   installDevToolsShortcut(win)
   installZoomShortcuts(win)
   installContextMenu(win)
+  enforceWebviewHardening(win.webContents)
   win.webContents.setWindowOpenHandler(details => {
     openExternalUrl(details.url)
 
@@ -6164,15 +6215,32 @@ ipcMain.handle('hermes:terminal:start', async (event, payload = {}) => {
   const cwd = safeTerminalCwd(payload?.cwd)
   const cols = Math.max(2, Number.parseInt(String(payload?.cols || 80), 10) || 80)
   const rows = Math.max(2, Number.parseInt(String(payload?.rows || 24), 10) || 24)
-  const ptyProcess = nodePty.spawn(command, args, {
-    cols,
-    cwd,
-    env: terminalShellEnv(),
-    name: 'xterm-256color',
-    rows
-  })
+  let ptyProcess
+  try {
+    ptyProcess = nodePty.spawn(command, args, {
+      cols,
+      cwd,
+      env: terminalShellEnv(),
+      name: 'xterm-256color',
+      rows
+    })
+  } catch (error) {
+    rememberLog(`[terminal] pty spawn failed: ${error.message}`)
+    throw error
+  }
 
   terminalSessions.set(id, { pty: ptyProcess, webContentsId: event.sender.id })
+
+  // node-pty's IPty is an EventEmitter under the hood even though the public
+  // typings only document onData/onExit. A post-spawn I/O failure on the
+  // underlying socket (e.g. EIO when the child's terminal disappears) is
+  // re-thrown as an unhandled 'error' event unless something is listening
+  // (see node_modules/node-pty/lib/unixTerminal.js), which would crash the
+  // main process. Listening here also lets us clean up the session entry.
+  ptyProcess.on('error', error => {
+    rememberLog(`[terminal] pty ${id} error: ${error.message}`)
+    terminalSessions.delete(id)
+  })
 
   const send = (suffix, payload) => {
     if (event.sender.isDestroyed()) {
@@ -6674,6 +6742,18 @@ app.on('before-quit', () => {
     hermesProcess.kill('SIGTERM')
   }
   stopAllPoolBackends()
+
+  // Quitting with terminal tabs open must not orphan their PTY children.
+  // Guard each kill individually so one already-dead session can't skip the
+  // rest of the sweep.
+  for (const sessionInfo of terminalSessions.values()) {
+    try {
+      sessionInfo.pty.kill()
+    } catch {
+      // Process may already be gone.
+    }
+  }
+  terminalSessions.clear()
 })
 
 app.on('window-all-closed', () => {

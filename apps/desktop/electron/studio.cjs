@@ -90,6 +90,54 @@ function assertSignedUploadUrl(rawUrl) {
   throw new Error(`Refusing upload to unrecognized host: ${host}`)
 }
 
+// Generation result URLs come from varied provider CDNs, so this is a
+// blocklist (not the allowlist the upload guards above use): any https
+// hostname is accepted unless it's a loopback/private/link-local IP literal
+// or 'localhost', which would turn a renderer-supplied URL into an SSRF
+// against the local machine or internal network. DNS rebinding (a hostname
+// that only resolves to a private IP at fetch time) is out of scope.
+const IPV4_OCTETS = '(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})'
+const IPV4_LITERAL_RE = new RegExp(`^${IPV4_OCTETS}$`)
+
+function isPrivateIpv4(octets) {
+  const [a, b] = octets
+  if (a === 127) return true // 127.0.0.0/8 loopback
+  if (a === 10) return true // 10.0.0.0/8 private
+  if (a === 172 && b >= 16 && b <= 31) return true // 172.16.0.0/12 private
+  if (a === 192 && b === 168) return true // 192.168.0.0/16 private
+  if (a === 169 && b === 254) return true // 169.254.0.0/16 link-local
+  return false
+}
+
+function isBlockedDownloadHost(hostname) {
+  const host = hostname.toLowerCase()
+  if (host === 'localhost') return true
+
+  const ipv4Match = host.match(IPV4_LITERAL_RE)
+  if (ipv4Match) {
+    const octets = ipv4Match.slice(1, 5).map(Number)
+    if (octets.some(octet => octet > 255)) return false // not a valid IP literal
+    return isPrivateIpv4(octets)
+  }
+
+  // IPv6 literals arrive from URL.hostname with brackets stripped.
+  const ipv6 = host.replace(/^\[|\]$/g, '')
+  if (ipv6 === '::1') return true // loopback
+  if (/^fe80:/i.test(ipv6)) return true // fe80::/10 link-local
+  return false
+}
+
+function assertDownloadUrl(rawUrl) {
+  const url = new URL(rawUrl)
+  if (url.protocol !== 'https:') {
+    throw new Error(`Refusing non-https download URL: ${rawUrl}`)
+  }
+  if (isBlockedDownloadHost(url.hostname)) {
+    throw new Error(`Refusing download from disallowed host: ${url.hostname}`)
+  }
+  return url
+}
+
 function registerStudioIpc({ ipcMain, app, safeStorage }) {
   const root = path.join(app.getPath('userData'), 'studio')
   const keyPath = path.join(root, 'muapi-key.json')
@@ -227,6 +275,7 @@ function registerStudioIpc({ ipcMain, app, safeStorage }) {
       const buffer = match[2] ? Buffer.from(match[3], 'base64') : Buffer.from(decodeURIComponent(match[3]), 'utf8')
       return { buffer, mime }
     }
+    assertDownloadUrl(sourceUrl)
     const response = await fetch(sourceUrl)
     if (!response.ok) throw new Error(`Download failed: ${response.status}`)
     const buffer = Buffer.from(await response.arrayBuffer())
@@ -330,4 +379,4 @@ function registerStudioIpc({ ipcMain, app, safeStorage }) {
   })
 }
 
-module.exports = { assertSignedUploadUrl, registerStudioIpc }
+module.exports = { assertDownloadUrl, assertSignedUploadUrl, registerStudioIpc }
