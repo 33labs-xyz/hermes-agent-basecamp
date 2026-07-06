@@ -6,9 +6,11 @@ import {
   $desktopOnboarding,
   type DesktopOnboardingState,
   type OnboardingContext,
+  OAUTH_POLL_DEADLINE_MS,
   refreshOnboarding,
   requestDesktopOnboarding,
   saveOnboardingLocalEndpoint,
+  startProviderOAuth,
   submitOnboardingCode
 } from './onboarding'
 
@@ -391,6 +393,73 @@ describe('OAuth onboarding', () => {
     }
 
     expect(calls.some(c => c.path === '/api/model/set')).toBe(true)
+  })
+})
+
+describe('OAuth poll deadline', () => {
+  beforeEach(() => {
+    window.localStorage.clear()
+    $desktopOnboarding.set(baseState())
+    vi.useFakeTimers()
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+    window.localStorage.clear()
+    $desktopOnboarding.set(baseState())
+    vi.restoreAllMocks()
+  })
+
+  it('surfaces a timeout error if the session stays pending past the deadline', async () => {
+    const loopbackProvider = provider('grok', 'xAI Grok')
+
+    const api = vi.fn(async ({ path }: { path: string }) => {
+      if (path === '/api/providers/oauth/grok/start') {
+        return {
+          flow: 'loopback',
+          auth_url: 'https://grok.example/auth',
+          expires_in: 600,
+          session_id: 'loopback-session'
+        }
+      }
+
+      if (path === '/api/providers/oauth/grok/poll/loopback-session') {
+        // Backend never resolves - simulates a stuck/abandoned device flow.
+        return { status: 'pending' }
+      }
+
+      throw new Error(`unexpected api path: ${path}`)
+    })
+
+    installApiMock(api)
+
+    const ctx: OnboardingContext = { requestGateway: async () => ({}) as never }
+
+    await startProviderOAuth(loopbackProvider, ctx)
+    expect($desktopOnboarding.get().flow.status).toBe('awaiting_browser')
+
+    // Advance well past the poll deadline in POLL_MS steps so every
+    // scheduled pollSession tick actually fires (fake timers only run
+    // intervals whose tick boundary is crossed by advanceTimersByTimeAsync).
+    const stepMs = 2000
+    let elapsed = 0
+
+    while (elapsed <= OAUTH_POLL_DEADLINE_MS + stepMs) {
+      await vi.advanceTimersByTimeAsync(stepMs)
+      elapsed += stepMs
+    }
+
+    const { flow } = $desktopOnboarding.get()
+    expect(flow.status).toBe('error')
+
+    if (flow.status === 'error') {
+      expect(flow.message.toLowerCase()).toContain('timed out')
+    }
+
+    // Deadline must actually stop the interval - no more polling afterward.
+    const callsAtTimeout = api.mock.calls.length
+    await vi.advanceTimersByTimeAsync(10_000)
+    expect(api.mock.calls.length).toBe(callsAtTimeout)
   })
 })
 

@@ -98,6 +98,13 @@ export interface OnboardingContext {
 const CONFIGURED_CACHE_KEY = 'hermes-desktop-onboarded-v1'
 const SKIP_CACHE_KEY = 'hermes-onboarding-skipped-v1'
 const POLL_MS = 2000
+// OAuth device/loopback flows otherwise poll forever while the backend session
+// stays 'pending' - unlike every other long-running op in the codebase (which
+// all have a 30-45s ceiling). Device flows are genuinely slow (user has to
+// switch to a browser, sign in, approve), so this ceiling is minutes, not
+// seconds - long enough for a real sign-in, short enough to stop polling a
+// session the user walked away from or that the backend dropped silently.
+export const OAUTH_POLL_DEADLINE_MS = 10 * 60 * 1000
 const COPY_FLASH_MS = 1500
 export const DEFAULT_ONBOARDING_REASON = 'No inference provider is configured.'
 export const DEFAULT_MANUAL_ONBOARDING_REASON = 'Add or switch inference provider.'
@@ -174,6 +181,10 @@ const INITIAL: DesktopOnboardingState = {
 export const $desktopOnboarding = atom<DesktopOnboardingState>(INITIAL)
 
 let pollTimer: number | null = null
+// Wall-clock start of the current poll loop, paired 1:1 with pollTimer - set
+// whenever pollTimer is (re)armed, read by pollSession to decide whether the
+// deadline has elapsed. Not reset independently of pollTimer.
+let pollStartedAt: number | null = null
 let providersRefreshPromise: null | Promise<void> = null
 
 const errMessage = (e: unknown) => (e instanceof Error ? e.message : String(e))
@@ -191,6 +202,16 @@ function clearPoll() {
     window.clearInterval(pollTimer)
     pollTimer = null
   }
+
+  pollStartedAt = null
+}
+
+// Arm the poll interval and record the deadline anchor together so they can
+// never drift apart (a bare `pollTimer = window.setInterval(...)` at either
+// call site would leave pollStartedAt stale from a previous session).
+function armPoll(provider: OAuthProvider, start: DeviceStart | LoopbackStart, ctx: OnboardingContext) {
+  pollStartedAt = Date.now()
+  pollTimer = window.setInterval(() => void pollSession(provider, start, ctx), POLL_MS)
 }
 
 async function checkRuntime(ctx: OnboardingContext): Promise<RuntimeReadinessResult> {
@@ -637,13 +658,13 @@ export async function startProviderOAuth(provider: OAuthProvider, ctx: Onboardin
       // No code to paste: the redirect lands on the backend's loopback
       // listener. Just wait and poll the session until the worker finishes.
       setFlow({ status: 'awaiting_browser', provider, start })
-      pollTimer = window.setInterval(() => void pollSession(provider, start, ctx), POLL_MS)
+      armPoll(provider, start, ctx)
 
       return
     }
 
     setFlow({ status: 'polling', provider, start, copied: false })
-    pollTimer = window.setInterval(() => void pollSession(provider, start, ctx), POLL_MS)
+    armPoll(provider, start, ctx)
   } catch (error) {
     setFlow({ status: 'error', provider, message: `Could not start sign-in: ${errMessage(error)}` })
   }
@@ -653,6 +674,13 @@ export async function startProviderOAuth(provider: OAuthProvider, ctx: Onboardin
 // Both shapes only need the session_id to poll; the start is threaded
 // through to the error flow so the user can retry from the same context.
 async function pollSession(provider: OAuthProvider, start: DeviceStart | LoopbackStart, ctx: OnboardingContext) {
+  if (pollStartedAt !== null && Date.now() - pollStartedAt >= OAUTH_POLL_DEADLINE_MS) {
+    clearPoll()
+    setFlow({ status: 'error', provider, start, message: 'Sign-in timed out. Try again.' })
+
+    return
+  }
+
   try {
     const { error_message, status } = await pollOAuthSession(provider.id, start.session_id)
 
