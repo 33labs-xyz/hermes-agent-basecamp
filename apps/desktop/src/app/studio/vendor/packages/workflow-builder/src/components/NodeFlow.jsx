@@ -42,6 +42,7 @@ import ChatWidget from "./ChatWidget";
 import { AiOutlineAudio } from "react-icons/ai";
 import VideoCombiner from "./VideoCombiner";
 import { useGenerationCost } from "./useGenerationCost";
+import { processWorkflowData, shouldClearRestoreSpinner } from "../lib/process-workflow-data";
 
 const nodeTypes = {
   textNode: TextGeneration,
@@ -159,65 +160,9 @@ const getModelObjStatic = (category, modelId, nodeSchemas) => {
   };
 };
 
-const processWorkflowData = (workflowData, nodeSchemas, id) => {
-  if (!workflowData || !nodeSchemas?.categories) return null;
-
-  const workflow = workflowData?.data;
-  if (!workflow?.nodes) return null;
-
-  const restoredNodes = workflow.nodes.map(n => ({
-    id: n.id,
-    type: n.category === "utility" 
-      ? (n.model === "video-combiner" ? "vidConcatNode" : "concatNode") 
-      : `${n.category}Node`,
-    position: {
-      x: n.position?.x ?? 350,
-      y: n.position?.y ?? 0
-    },
-    data: {
-      nodeSchemas,
-      modelId: n.model,
-      selectedModel: getModelObjStatic(n.category, n.model, nodeSchemas),
-      outputs: n.output_params?.outputs || [],
-      resultUrl: n.output_params?.resultUrl || null,
-      formValues: n.input_params || {},
-      outputHistory: (workflowData.run_history?.[n.id] || [])
-        .sort((a, b) => new Date(a.started_at) - new Date(b.started_at)),
-    }
-  }));
-
-  const restoredEdges = (workflowData.edges || []).map((e) => {
-    const sourceNode = restoredNodes.find(n => n.id === e.source);
-    const targetNode = restoredNodes.find(n => n.id === e.target);
-    let edgeColor = getEdgeColor(e.sourceHandle, e.targetHandle, sourceNode, targetNode);
-
-    return {
-      id: e.id || `${e.source}-${e.target}`,
-      source: e.source,
-      target: e.target,
-      sourceHandle: e.sourceHandle || null,
-      targetHandle: e.targetHandle || null,
-      style: edgeStyles[edgeColor],
-    }
-  });
-
-  return {
-    nodes: restoredNodes,
-    edges: restoredEdges,
-    metadata: {
-      workflowId: id,
-      runId: workflowData?.run_id,
-      workflowName: workflowData.name,
-      interactionMode: workflowData.is_owner,
-      publishWorkflow: workflowData.is_published,
-      template: {
-        showTemplateBtn: workflowData.show_temp_button,
-        isPublishedTemplate: workflowData.is_template,
-      },
-      category: workflowData?.category || "General"
-    }
-  };
-};
+// processWorkflowData and shouldClearRestoreSpinner now live in
+// ../lib/process-workflow-data (imported above) so their restore-decision
+// contract is unit-testable without rendering this reactflow-backed canvas.
 
 const NodeFlow = ({ initialNodeSchemas, initialWorkflowData }) => {
   const params = useParams();
@@ -346,90 +291,24 @@ const NodeFlow = ({ initialNodeSchemas, initialWorkflowData }) => {
     return getModelObjStatic(category, modelId, nodeSchemas);
   }, [nodeSchemas]);
 
-  const restoreWorkflow = useCallback((workflowData) => {
-    const workflow = workflowData?.data;
-    if (!workflow?.nodes) return;
-
-    const restoredNodes = workflow.nodes.map(n => ({
-      id: n.id,
-      type: n.category === "utility" 
-        ? (n.model === "video-combiner" ? "vidConcatNode" : "concatNode") 
-        : `${n.category}Node`,
-      position: {
-        x: n.position?.x ?? 350,
-        y: n.position?.y ?? 0
-      },
-      data: {
-        nodeSchemas,
-        modelId: n.model,
-        selectedModel: getModelObj(n.category, n.model),
-        outputs: n.output_params?.outputs || [],
-        resultUrl: n.output_params?.resultUrl || null,
-        formValues: n.input_params || {},
-        outputHistory: (workflowData.run_history?.[n.id] || [])
-          .sort((a, b) => new Date(a.started_at) - new Date(b.started_at)),
-      }
-    }));
-
-    const restoredEdges = (workflowData.edges || []).map((e) => {
-      const sourceNode = restoredNodes.find(n => n.id === e.source);
-      const targetNode = restoredNodes.find(n => n.id === e.target);
-      let edgeColor = getEdgeColor(e.sourceHandle, e.targetHandle, sourceNode, targetNode);
-
-      return {
-        id: e.id || `${e.source}-${e.target}`,
-        source: e.source,
-        target: e.target,
-        sourceHandle: e.sourceHandle || null,
-        targetHandle: e.targetHandle || null,
-        style: edgeStyles[edgeColor],
-      }
-    });
-
-    setNodes(restoredNodes);
-    setEdges(restoredEdges);
-    setWorkflowId(id);
-    setRunId(workflowData?.run_id);
-    setWorkflowName(workflowData.name);
-    setWorkflowCategory(workflowData?.category || "General");
-    setWorkflowIds(workflowData.workflow_id, workflowData?.run_id);
-    setInteractionMode(workflowData.is_owner);
-    setPublishWorkflow(workflowData.is_published);
-    setTemplate(prev => ({
-      ...prev,
-      showTemplateBtn: workflowData.show_temp_button,
-      isPublishedTemplate: workflowData.is_template,
-    }));
-    setIsRestoring(false);
-  }, [id, nodeSchemas, getModelObj, setNodes, setEdges]);
-
+  // The parent (WorkflowStudio) is the sole fetcher of the workflow
+  // definition and passes it in as initialWorkflowData; initialState (above)
+  // is derived from it via processWorkflowData. If that mapping produced a
+  // populated object, the graph is already restored and isRestoring was
+  // initialized false -- nothing to do here. Otherwise there is nothing to
+  // restore (blank/new workflow, empty def, or a failed fetch that got
+  // coerced into an empty object with no `.data`), so clear the spinner and
+  // let the empty/failed canvas render. Root cause of the "stuck on Loading"
+  // report: this guard used to early-return on ANY truthy initialWorkflowData
+  // object, but the parent always passes a truthy object literal even when
+  // processWorkflowData returns null for it -- so isRestoring never cleared.
+  // NodeFlow does not fetch the definition itself; there is no local
+  // fallback fetch here by design.
   useEffect(() => {
-    if (initialWorkflowData && nodeSchemas?.categories) {
-      return;
-    }
-
-    // Without node-schema categories the palette cannot render and there is
-    // nothing to restore. Clear the restoring flag so the canvas falls back
-    // to its empty state instead of spinning forever. Root cause of the
-    // "stuck on Loading" report: this guard used to bail without clearing
-    // isRestoring when the schema fetch returned no categories.
-    if (!nodeSchemas?.categories) {
+    if (shouldClearRestoreSpinner(initialState)) {
       setIsRestoring(false);
-      return;
     }
-
-    if (!id) return;
-
-    axios.get(`/api/workflow/get-workflow-def/${id}`)
-      .then(res => {
-        restoreWorkflow(res.data);
-      })
-      .catch((error) => {
-        console.log(error);
-        setInteractionMode(false);
-        setIsRestoring(false);
-      });
-  }, [id, nodeSchemas, initialWorkflowData, restoreWorkflow]);
+  }, [initialState]);
 
   useEffect(() => {
     if (isRestoring) return;

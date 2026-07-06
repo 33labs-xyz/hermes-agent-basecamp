@@ -15,6 +15,7 @@ import {
 } from "../muapi.js";
 import { filterFeaturedTemplates } from "./featured-templates";
 import { resolveWorkflowBuilderState } from "../../workflow-builder-state";
+import { shouldShowBuilderLoadError } from "../../builder-load-error";
 import dynamic from "next/dynamic";
 
 // True when the string has no Devanagari (Hindi) block. Used to avoid
@@ -232,14 +233,20 @@ export default function WorkflowStudio({ apiKey, isHeaderVisible = true, onToggl
 
         // Process Builder State
         const nodes = results[1].status === 'fulfilled' ? results[1].value : [];
-        const def = results[2].status === 'fulfilled' ? results[2].value : { nodes: [], edges: [] };
+        // A rejected getWorkflowData must stay null, not a truthy fake
+        // { nodes: [], edges: [] } object -- resolveWorkflowBuilderState treats
+        // non-null workflowDef as "ready" and mounts the canvas, but that empty
+        // shape has no `.data`, so NodeFlow's processWorkflowData can never
+        // restore it. Null correctly resolves to "load-failed" so the existing
+        // Retry UI shows instead of a silently-broken canvas.
+        const def = results[2].status === 'fulfilled' ? results[2].value : null;
 
         setNodeSchemas(nodes);
         setWorkflowDef(def);
 
         if (results[1].status === 'rejected' || results[2].status === 'rejected') {
           console.error("Builder components failed to load:", results[1].reason, results[2].reason);
-          if (!nodes.length && !def.nodes?.length) {
+          if (shouldShowBuilderLoadError(nodes, def)) {
              setError("Failed to load full builder data. Some features may be disabled.");
           }
         }
@@ -247,7 +254,9 @@ export default function WorkflowStudio({ apiKey, isHeaderVisible = true, onToggl
         console.error("Critical error loading pulse details:", err);
         setError("Critical error loading builder: " + err.message);
         setNodeSchemas([]);
-        setWorkflowDef({ nodes: [], edges: [] });
+        // Same reasoning as the allSettled rejected branch above: null (not
+        // the fake empty object) so builderState resolves to "load-failed".
+        setWorkflowDef(null);
       } finally {
         setLoading(false);
       }
