@@ -321,6 +321,12 @@ export default function VideoStudio({
   const videoFileInputRef = useRef(null);
   const resultVideoRef = useRef(null);
   const hasRestored = useRef(false);
+  // Tracks the most-recently-SUBMITTED job id. Up to MAX_CONCURRENT_JOBS jobs
+  // can run at once; an older job resolving after a newer one must not clobber
+  // the canvas. Every job still finishes normally (status, history, and
+  // onGenerationComplete are unconditional) — only the visible canvas write
+  // respects recency.
+  const latestJobIdRef = useRef(null);
 
   // ── derived data ──
   const history = historyItems ?? localHistory;
@@ -932,12 +938,19 @@ export default function VideoStudio({
       if (!res?.url) throw new Error("No video URL returned by API");
 
       const genId = res.id || Date.now().toString();
-      if (snap.tracksExtendId) {
-        setLastGenerationId(genId);
-        setLastGenerationModel(snap.model);
-      } else {
-        setLastGenerationId(null);
-        setLastGenerationModel(null);
+      // Only the latest-SUBMITTED job may write the visible canvas / extend-chain
+      // state — an older job resolving late must not clobber a newer result.
+      // Status, history, and onGenerationComplete stay unconditional below so
+      // every finished job still persists.
+      const isLatestSubmitted = latestJobIdRef.current === jobId;
+      if (isLatestSubmitted) {
+        if (snap.tracksExtendId) {
+          setLastGenerationId(genId);
+          setLastGenerationModel(snap.model);
+        } else {
+          setLastGenerationId(null);
+          setLastGenerationModel(null);
+        }
       }
       const entry = {
         id: genId,
@@ -948,7 +961,9 @@ export default function VideoStudio({
         ...(snap.extraEntry || {}),
       };
       addToLocalHistory(entry);
-      showVideoInCanvas(res.url, snap.model);
+      if (isLatestSubmitted) {
+        showVideoInCanvas(res.url, snap.model);
+      }
       if (onGenerationComplete)
         onGenerationComplete({
           url: res.url,
@@ -1093,6 +1108,7 @@ export default function VideoStudio({
     }
 
     const jobId = `job-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+    latestJobIdRef.current = jobId;
     setActiveJobs((prev) => [
       { id: jobId, prompt: snap.historyPrompt, model: snap.model, status: "running" },
       ...prev,

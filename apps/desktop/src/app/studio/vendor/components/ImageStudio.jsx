@@ -948,6 +948,12 @@ export default function ImageStudio({
   const textareaRef = useRef(null);
   const dropdownRef = useRef(null);
   const uploadPickerResetRef = useRef(null); // not used directly — managed via key
+  // Tracks the most-recently-SUBMITTED job id. Up to MAX_CONCURRENT_JOBS jobs
+  // can run at once (or a batch of them from one click); an older job
+  // resolving after a newer one must not clobber the canvas. Every job still
+  // finishes normally (addToHistory and onGenerationComplete are
+  // unconditional) — only the visible canvas write respects recency.
+  const latestJobIdRef = useRef(null);
 
   // ── Close dropdown on outside click ─────────────────────────────────────
   useEffect(() => {
@@ -1161,13 +1167,19 @@ export default function ImageStudio({
   };
 
   // ── History helpers ──────────────────────────────────────────────────────
+  // History recording is unconditional — every finished job is saved. The
+  // active-selection writes (activeHistoryIdx/currentImageUrl) are the
+  // canvas-facing bit, gated by the caller via isLatestSubmitted so an older
+  // job resolving late can't steal focus from a newer result.
   const addToHistory = useCallback(
-    (entry) => {
+    (entry, isLatestSubmitted = true) => {
       if (!historyItems) {
         setLocalHistory((prev) => [entry, ...prev.slice(0, 49)]);
       }
-      setActiveHistoryIdx(0);
-      setCurrentImageUrl(entry.url);
+      if (isLatestSubmitted) {
+        setActiveHistoryIdx(0);
+        setCurrentImageUrl(entry.url);
+      }
     },
     [historyItems],
   );
@@ -1227,14 +1239,20 @@ export default function ImageStudio({
       }
       if (!res?.url) throw new Error("No image URL returned by API");
 
-      addToHistory({
-        id: res.id || Math.random().toString(36).substring(7),
-        url: res.url,
-        prompt: snap.prompt,
-        model: snap.model,
-        aspect_ratio: snap.aspect_ratio,
-        timestamp: new Date().toISOString(),
-      });
+      // Only the latest-SUBMITTED job may write the visible canvas/selected
+      // result — an older job resolving late must not clobber a newer one.
+      const isLatestSubmitted = latestJobIdRef.current === jobId;
+      addToHistory(
+        {
+          id: res.id || Math.random().toString(36).substring(7),
+          url: res.url,
+          prompt: snap.prompt,
+          model: snap.model,
+          aspect_ratio: snap.aspect_ratio,
+          timestamp: new Date().toISOString(),
+        },
+        isLatestSubmitted,
+      );
       onGenerationComplete?.({
         url: res.url,
         model: snap.model,
@@ -1285,6 +1303,7 @@ export default function ImageStudio({
 
     for (let i = 0; i < batchSize; i++) {
       const jobId = `job-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+      latestJobIdRef.current = jobId;
       setActiveJobs((prev) => [
         {
           id: jobId,
