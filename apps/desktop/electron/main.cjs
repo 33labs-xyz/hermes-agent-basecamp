@@ -3739,6 +3739,13 @@ function isAudioCapturePermission(permission, details) {
 function installMediaPermissions() {
   // Async request handler: the prompt-style path (most platforms).
   session.defaultSession.setPermissionRequestHandler((_webContents, permission, callback, details) => {
+    // HTML element fullscreen (video controls' "Full screen", element.requestFullscreen)
+    // must be granted explicitly: a denied 'fullscreen' permission makes the request
+    // a silent no-op — no rejection, no fullscreenerror (electron/electron#37719).
+    if (permission === 'fullscreen') {
+      callback(true)
+      return
+    }
     callback(isAudioCapturePermission(permission, details))
   })
 
@@ -3747,6 +3754,10 @@ function installMediaPermissions() {
   // the check defaults to false and the mic is denied before the request
   // handler ever runs.
   session.defaultSession.setPermissionCheckHandler((_webContents, permission, _origin, details) => {
+    if (permission === 'fullscreen') {
+      return true
+    }
+
     if (permission === 'media' || permission === 'audioCapture') {
       // details.mediaType is a single string here (not the mediaTypes array).
       const mediaType = details?.mediaType
