@@ -2970,22 +2970,22 @@ HERMES_AGENT_LOGO = """[bold #b6abdf]██████╗  █████╗ �
 [#6f5fae]██████╔╝██║  ██║███████║███████╗╚██████╗██║  ██║██║ ╚═╝ ██║██║     [/]
 [#6f5fae]╚═════╝ ╚═╝  ╚═╝╚══════╝╚══════╝ ╚═════╝╚═╝  ╚═╝╚═╝     ╚═╝╚═╝     [/]"""
 
-# ASCII Art - Hermes Caduceus (compact, fits in left panel)
-HERMES_CADUCEUS = """[#8f82c9]⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣀⡀⠀⣀⣀⠀⢀⣀⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
-[#8f82c9]⠀⠀⠀⠀⠀⠀⢀⣠⣴⣾⣿⣿⣇⠸⣿⣿⠇⣸⣿⣿⣷⣦⣄⡀⠀⠀⠀⠀⠀⠀[/]
-[#9d8fd0]⠀⢀⣠⣴⣶⠿⠋⣩⡿⣿⡿⠻⣿⡇⢠⡄⢸⣿⠟⢿⣿⢿⣍⠙⠿⣶⣦⣄⡀⠀[/]
-[#9d8fd0]⠀⠀⠉⠉⠁⠶⠟⠋⠀⠉⠀⢀⣈⣁⡈⢁⣈⣁⡀⠀⠉⠀⠙⠻⠶⠈⠉⠉⠀⠀[/]
-[#b6abdf]⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣴⣿⡿⠛⢁⡈⠛⢿⣿⣦⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
-[#b6abdf]⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠿⣿⣦⣤⣈⠁⢠⣴⣿⠿⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
-[#9d8fd0]⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠉⠻⢿⣿⣦⡉⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
-[#9d8fd0]⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠘⢷⣦⣈⠛⠃⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
-[#8f82c9]⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢠⣴⠦⠈⠙⠿⣦⡄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
-[#8f82c9]⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠸⣿⣤⡈⠁⢤⣿⠇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
-[#6f5fae]⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠉⠛⠷⠄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
-[#6f5fae]⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣀⠑⢶⣄⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
-[#6f5fae]⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣿⠁⢰⡆⠈⡿⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
-[#6f5fae]⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠳⠈⣡⠞⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
-[#6f5fae]⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]"""
+# ASCII Art - Rocket (compact, fits in left panel)
+HERMES_CADUCEUS = r"""[#b6abdf]        /\        [/]
+[#b6abdf]       /  \       [/]
+[#b6abdf]      /    \      [/]
+[#b6abdf]     /      \     [/]
+[#9d8fd0]     |      |     [/]
+[#9d8fd0]     | (  ) |     [/]
+[#9d8fd0]     |      |     [/]
+[#9d8fd0]     |      |     [/]
+[#8f82c9]    /|      |\    [/]
+[#8f82c9]   / |      | \   [/]
+[#8f82c9]  /  |______|  \  [/]
+[#8f82c9] /__/        \__\ [/]
+[#6f5fae]      (    )      [/]
+[#6f5fae]       (  )       [/]
+[#6f5fae]        \/        [/]"""
 
 
 
@@ -10947,17 +10947,6 @@ class HermesCLI(CLIAgentSetupMixin, CLICommandsMixin):
             _detect_light_mode()
         except Exception:
             pass
-        # Push the entire TUI to the bottom of the terminal so the banner,
-        # responses, and prompt all appear pinned to the bottom — empty
-        # space stays above, not below.  This prints enough blank lines to
-        # scroll the cursor to the last row before any content is rendered.
-        try:
-            _term_lines = shutil.get_terminal_size().lines
-            if _term_lines > 2:
-                print("\n" * (_term_lines - 1), end="", flush=True)
-        except Exception:
-            pass
-
         self.show_banner()
         # Surface any active supply-chain security advisories right after the
         # welcome banner. Quiet/single-query paths call this themselves.
