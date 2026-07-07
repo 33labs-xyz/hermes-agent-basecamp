@@ -2970,22 +2970,23 @@ HERMES_AGENT_LOGO = """[bold #b6abdf]██████╗  █████╗ �
 [#6f5fae]██████╔╝██║  ██║███████║███████╗╚██████╗██║  ██║██║ ╚═╝ ██║██║     [/]
 [#6f5fae]╚═════╝ ╚═╝  ╚═╝╚══════╝╚══════╝ ╚═════╝╚═╝  ╚═╝╚═╝     ╚═╝╚═╝     [/]"""
 
-# ASCII Art - Rocket (compact, fits in left panel)
-HERMES_CADUCEUS = r"""[#b6abdf]        /\        [/]
-[#b6abdf]       /  \       [/]
-[#b6abdf]      /    \      [/]
-[#b6abdf]     /      \     [/]
-[#9d8fd0]     |      |     [/]
-[#9d8fd0]     | (  ) |     [/]
-[#9d8fd0]     |      |     [/]
-[#9d8fd0]     |      |     [/]
-[#8f82c9]    /|      |\    [/]
-[#8f82c9]   / |      | \   [/]
-[#8f82c9]  /  |______|  \  [/]
-[#8f82c9] /__/        \__\ [/]
-[#6f5fae]      (    )      [/]
-[#6f5fae]       (  )       [/]
-[#6f5fae]        \/        [/]"""
+# ASCII Art - Rocket (braille, compact, fits in left panel)
+HERMES_CADUCEUS = """\
+[#b6abdf]        ⣼⣧        [/]
+[#b6abdf]       ⣼⣿⣿⣧       [/]
+[#b6abdf]      ⣼⣿⣿⣿⣿⣧      [/]
+[#b6abdf]     ⣼⣿⣿⣿⣿⣿⣿⣧     [/]
+[#9d8fd0]     ⣿⣿⣿⣿⣿⣿⣿⣿     [/]
+[#9d8fd0]     ⣿⣿⠟⠋⠙⠻⣿⣿     [/]
+[#9d8fd0]     ⣿⣿    ⣿⣿     [/]
+[#9d8fd0]    ⢠⣿⣿⣷⣦⣴⣾⣿⣿⡄    [/]
+[#8f82c9]   ⣰⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣆   [/]
+[#8f82c9]  ⣴⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣦  [/]
+[#8f82c9]⢀⣼⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣧⡀[/]
+[#8f82c9]       ⣿⣿⣿⣿       [/]
+[#6f5fae]                  [/]
+[#6f5fae]      ⠘⣿⣿⣿⡟⠁      [/]
+[#6f5fae]       ⠈⢿⠏        [/]"""
 
 
 
@@ -3020,7 +3021,7 @@ def _build_compact_banner() -> str:
 
     w = min(shutil.get_terminal_size().columns - 2, 88)
     if w < 30:
-        return f"\n[{title_color}]{tiny_line}[/] [dim {dim_color}]- Nous Research[/]\n"
+        return f"\n[{title_color}]{tiny_line}[/]\n"
 
     inner = w - 2  # inside the box border
     bar = "═" * w

@@ -68,21 +68,22 @@ HERMES_AGENT_LOGO = """[bold #b6abdf]██████╗  █████╗ �
 [#6f5fae]██████╔╝██║  ██║███████║███████╗╚██████╗██║  ██║██║ ╚═╝ ██║██║     [/]
 [#6f5fae]╚═════╝ ╚═╝  ╚═╝╚══════╝╚══════╝ ╚═════╝╚═╝  ╚═╝╚═╝     ╚═╝╚═╝     [/]"""
 
-HERMES_CADUCEUS = r"""[#b6abdf]        /\        [/]
-[#b6abdf]       /  \       [/]
-[#b6abdf]      /    \      [/]
-[#b6abdf]     /      \     [/]
-[#9d8fd0]     |      |     [/]
-[#9d8fd0]     | (  ) |     [/]
-[#9d8fd0]     |      |     [/]
-[#9d8fd0]     |      |     [/]
-[#8f82c9]    /|      |\    [/]
-[#8f82c9]   / |      | \   [/]
-[#8f82c9]  /  |______|  \  [/]
-[#8f82c9] /__/        \__\ [/]
-[#6f5fae]      (    )      [/]
-[#6f5fae]       (  )       [/]
-[#6f5fae]        \/        [/]"""
+HERMES_CADUCEUS = """\
+[#b6abdf]        ⣼⣧        [/]
+[#b6abdf]       ⣼⣿⣿⣧       [/]
+[#b6abdf]      ⣼⣿⣿⣿⣿⣧      [/]
+[#b6abdf]     ⣼⣿⣿⣿⣿⣿⣿⣧     [/]
+[#9d8fd0]     ⣿⣿⣿⣿⣿⣿⣿⣿     [/]
+[#9d8fd0]     ⣿⣿⠟⠋⠙⠻⣿⣿     [/]
+[#9d8fd0]     ⣿⣿    ⣿⣿     [/]
+[#9d8fd0]    ⢠⣿⣿⣷⣦⣴⣾⣿⣿⡄    [/]
+[#8f82c9]   ⣰⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣆   [/]
+[#8f82c9]  ⣴⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣦  [/]
+[#8f82c9]⢀⣼⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣧⡀[/]
+[#8f82c9]       ⣿⣿⣿⣿       [/]
+[#6f5fae]                  [/]
+[#6f5fae]      ⠘⣿⣿⣿⡟⠁      [/]
+[#6f5fae]       ⠈⢿⠏        [/]"""
 
 
 
@@ -614,7 +615,7 @@ def build_welcome_banner(console: "Console", model: str, cwd: str,
     if len(model_short) > 28:
         model_short = model_short[:25] + "..."
     ctx_str = f" [dim {dim}]·[/] [dim {dim}]{_format_context_length(context_length)} context[/]" if context_length else ""
-    left_lines.append(f"[{accent}]{model_short}[/]{ctx_str} [dim {dim}]·[/] [dim {dim}]Nous Research[/]")
+    left_lines.append(f"[{accent}]{model_short}[/]{ctx_str}")
 
     if os.getenv("HERMES_YOLO_MODE"):
         left_lines.append(f"[bold red]⚠ YOLO mode[/] [dim {dim}]— all approval prompts bypassed[/]")
