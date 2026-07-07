@@ -1,6 +1,6 @@
 {
   "name": "hermes-tui",
-  "version": "0.0.1",
+  "version": "0.16.25",
   "private": true,
   "type": "module",
   "scripts": {
