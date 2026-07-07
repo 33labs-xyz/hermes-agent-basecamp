@@ -2,6 +2,7 @@ import { useState } from 'react'
 
 import { Button } from '@/components/ui/button'
 import { Codicon } from '@/components/ui/codicon'
+import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from '@/components/ui/context-menu'
 import { Tip } from '@/components/ui/tooltip'
 import { useI18n } from '@/i18n'
 
@@ -49,6 +50,14 @@ export function TerminalTabStrip({
     setDraft(tab.name ?? '')
   }
 
+  // From the context menu, defer to the next frame: Radix moves focus while it
+  // dismisses, so opening the editor inline would mount the autofocused input
+  // straight into that churn and blur it shut. One frame later the DOM is
+  // settled and the input keeps focus.
+  const startRenameAfterMenu = (tab: TerminalTabModel) => {
+    requestAnimationFrame(() => startRename(tab))
+  }
+
   const commitRename = () => {
     if (editingId) {
       onRename(editingId, draft)
@@ -64,56 +73,69 @@ export function TerminalTabStrip({
           const active = tab.id === activeId
 
           return (
-            <div
-              className={`group flex h-6 shrink-0 items-center gap-1 rounded-md pl-2 pr-1 text-[0.72rem] ${
-                active
-                  ? 'bg-(--ui-editor-surface-background) text-(--ui-text-primary)'
-                  : 'text-(--ui-text-secondary) hover:text-(--ui-text-primary)'
-              }`}
-              key={tab.id}
-            >
-              {tab.id === editingId ? (
-                <input
-                  aria-label={renameLabel}
-                  autoFocus
-                  className="w-24 bg-transparent outline-none"
-                  onBlur={commitRename}
-                  onChange={event => setDraft(event.target.value)}
-                  onKeyDown={event => {
-                    if (event.key === 'Enter') {
-                      commitRename()
-                    } else if (event.key === 'Escape') {
-                      setEditingId(null)
-                    }
-                  }}
-                  placeholder={labels[index]}
-                  value={draft}
-                />
-              ) : (
-                <button
-                  className="max-w-[10rem] truncate"
-                  onClick={() => onSelect(tab.id)}
-                  onDoubleClick={() => startRename(tab)}
-                  type="button"
+            <ContextMenu key={tab.id}>
+              <ContextMenuTrigger asChild>
+                <div
+                  className={`group flex h-6 shrink-0 items-center gap-1 rounded-md pl-2 pr-1 text-[0.72rem] ${
+                    active
+                      ? 'bg-(--ui-editor-surface-background) text-(--ui-text-primary)'
+                      : 'text-(--ui-text-secondary) hover:text-(--ui-text-primary)'
+                  }`}
                 >
-                  {labels[index]}
-                </button>
-              )}
-              {showClose && (
-                <Tip label={closeLabel}>
-                  <Button
-                    aria-label={closeLabel}
-                    className="size-4 rounded text-(--ui-text-tertiary)! opacity-0 group-hover:opacity-100"
-                    onClick={() => onClose(tab.id)}
-                    size="icon"
-                    type="button"
-                    variant="ghost"
-                  >
-                    <Codicon name="close" size="0.7rem" />
-                  </Button>
-                </Tip>
-              )}
-            </div>
+                  {tab.id === editingId ? (
+                    <input
+                      aria-label={renameLabel}
+                      autoFocus
+                      className="w-24 bg-transparent outline-none"
+                      onBlur={commitRename}
+                      onChange={event => setDraft(event.target.value)}
+                      onKeyDown={event => {
+                        if (event.key === 'Enter') {
+                          commitRename()
+                        } else if (event.key === 'Escape') {
+                          setEditingId(null)
+                        }
+                      }}
+                      placeholder={labels[index]}
+                      value={draft}
+                    />
+                  ) : (
+                    <button
+                      className="max-w-[10rem] truncate"
+                      onClick={() => onSelect(tab.id)}
+                      onDoubleClick={() => startRename(tab)}
+                      type="button"
+                    >
+                      {labels[index]}
+                    </button>
+                  )}
+                  {showClose && (
+                    <Tip label={closeLabel}>
+                      <Button
+                        aria-label={closeLabel}
+                        className="size-4 rounded text-(--ui-text-tertiary)! opacity-0 group-hover:opacity-100"
+                        onClick={() => onClose(tab.id)}
+                        size="icon"
+                        type="button"
+                        variant="ghost"
+                      >
+                        <Codicon name="close" size="0.7rem" />
+                      </Button>
+                    </Tip>
+                  )}
+                </div>
+              </ContextMenuTrigger>
+              {/* Keep focus on the autofocused rename input instead of letting
+                  Radix return it to the trigger when the menu closes. */}
+              <ContextMenuContent onCloseAutoFocus={event => event.preventDefault()}>
+                <ContextMenuItem onSelect={() => startRenameAfterMenu(tab)}>{renameLabel}</ContextMenuItem>
+                {showClose && (
+                  <ContextMenuItem onSelect={() => onClose(tab.id)} variant="destructive">
+                    {closeLabel}
+                  </ContextMenuItem>
+                )}
+              </ContextMenuContent>
+            </ContextMenu>
           )
         })}
         <Tip label={newLabel}>

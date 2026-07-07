@@ -1,7 +1,24 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 
 import { TerminalTabStrip } from './terminal-tab-strip'
+
+// Radix's ContextMenu touches pointer-capture + scrollIntoView, which jsdom
+// doesn't implement; stub them so the right-click menu can open in tests.
+beforeAll(() => {
+  const proto = window.HTMLElement.prototype as unknown as Record<string, () => unknown>
+
+  const stubs: Record<string, () => unknown> = {
+    hasPointerCapture: () => false,
+    releasePointerCapture: () => undefined,
+    scrollIntoView: () => undefined,
+    setPointerCapture: () => undefined
+  }
+
+  for (const [name, fn] of Object.entries(stubs)) {
+    proto[name] ??= fn
+  }
+})
 
 afterEach(cleanup)
 
@@ -110,5 +127,44 @@ describe('TerminalTabStrip', () => {
     fireEvent.change(input, { target: { value: 'db' } })
     fireEvent.blur(input)
     expect(onRename).toHaveBeenCalledWith('a', 'db')
+  })
+
+  // Double-click is undiscoverable, so a right-click menu is the primary
+  // rename affordance. These lock the discoverable path in.
+  it('offers Rename and Close in a right-click menu on a tab', async () => {
+    renderStrip()
+
+    fireEvent.contextMenu(screen.getByText('project'))
+
+    expect(await screen.findByRole('menuitem', { name: 'Rename terminal' })).toBeTruthy()
+    expect(screen.getByRole('menuitem', { name: 'Close terminal' })).toBeTruthy()
+  })
+
+  it('opens the rename editor when Rename is chosen from the menu', async () => {
+    renderStrip()
+
+    fireEvent.contextMenu(screen.getByText('project'))
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Rename terminal' }))
+
+    const input = (await screen.findByRole('textbox', { name: 'Rename terminal' })) as HTMLInputElement
+    expect(input.value).toBe('')
+  })
+
+  it('closes a tab when Close is chosen from the menu', async () => {
+    const { onClose } = renderStrip()
+
+    fireEvent.contextMenu(screen.getByText('other'))
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Close terminal' }))
+
+    expect(onClose).toHaveBeenCalledWith('b')
+  })
+
+  it('omits Close from the menu when only one tab is open', async () => {
+    renderStrip({ labels: ['project'], tabs: [tabs[0]] })
+
+    fireEvent.contextMenu(screen.getByText('project'))
+
+    expect(await screen.findByRole('menuitem', { name: 'Rename terminal' })).toBeTruthy()
+    expect(screen.queryByRole('menuitem', { name: 'Close terminal' })).toBeNull()
   })
 })
