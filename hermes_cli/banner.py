@@ -69,21 +69,21 @@ HERMES_AGENT_LOGO = """[bold #b6abdf]██████╗  █████╗ �
 [#6f5fae]╚═════╝ ╚═╝  ╚═╝╚══════╝╚══════╝ ╚═════╝╚═╝  ╚═╝╚═╝     ╚═╝╚═╝     [/]"""
 
 HERMES_CADUCEUS = """\
-[#b6abdf]        ⣼⣧        [/]
-[#b6abdf]       ⣼⣿⣿⣧       [/]
-[#b6abdf]      ⣼⣿⣿⣿⣿⣧      [/]
-[#b6abdf]     ⣼⣿⣿⣿⣿⣿⣿⣧     [/]
-[#9d8fd0]     ⣿⣿⣿⣿⣿⣿⣿⣿     [/]
-[#9d8fd0]     ⣿⣿⠟⠋⠙⠻⣿⣿     [/]
-[#9d8fd0]     ⣿⣿    ⣿⣿     [/]
-[#9d8fd0]    ⢠⣿⣿⣷⣦⣴⣾⣿⣿⡄    [/]
-[#8f82c9]   ⣰⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣆   [/]
-[#8f82c9]  ⣴⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣦  [/]
+[#b6abdf]⠀⠀⠀⠀⠀⠀⠀⠀⣼⣧⠀⠀⠀⠀⠀⠀⠀⠀[/]
+[#b6abdf]⠀⠀⠀⠀⠀⠀⠀⣼⣿⣿⣧⠀⠀⠀⠀⠀⠀⠀[/]
+[#b6abdf]⠀⠀⠀⠀⠀⠀⣼⣿⣿⣿⣿⣧⠀⠀⠀⠀⠀⠀[/]
+[#b6abdf]⠀⠀⠀⠀⠀⣼⣿⣿⣿⣿⣿⣿⣧⠀⠀⠀⠀⠀[/]
+[#9d8fd0]⠀⠀⠀⠀⠀⣿⣿⣿⣿⣿⣿⣿⣿⠀⠀⠀⠀⠀[/]
+[#9d8fd0]⠀⠀⠀⠀⠀⣿⣿⠟⠋⠙⠻⣿⣿⠀⠀⠀⠀⠀[/]
+[#9d8fd0]⠀⠀⠀⠀⠀⣿⣿⠀⠀⠀⠀⣿⣿⠀⠀⠀⠀⠀[/]
+[#9d8fd0]⠀⠀⠀⠀⢠⣿⣿⣷⣦⣴⣾⣿⣿⡄⠀⠀⠀⠀[/]
+[#8f82c9]⠀⠀⠀⣰⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣆⠀⠀⠀[/]
+[#8f82c9]⠀⠀⣴⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣦⠀⠀[/]
 [#8f82c9]⢀⣼⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣧⡀[/]
-[#8f82c9]       ⣿⣿⣿⣿       [/]
-[#6f5fae]                  [/]
-[#6f5fae]      ⠘⣿⣿⣿⡟⠁      [/]
-[#6f5fae]       ⠈⢿⠏        [/]"""
+[#8f82c9]⠀⠀⠀⠀⠀⠀⠀⣿⣿⣿⣿⠀⠀⠀⠀⠀⠀⠀[/]
+[#6f5fae]⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
+[#6f5fae]⠀⠀⠀⠀⠀⠀⠘⣿⣿⣿⡟⠁⠀⠀⠀⠀⠀⠀[/]
+[#6f5fae]⠀⠀⠀⠀⠀⠀⠀⠈⢿⠏⠀⠀⠀⠀⠀⠀⠀⠀[/]"""
 
 
 
@@ -575,21 +575,6 @@ def build_welcome_banner(console: "Console", model: str, cwd: str,
     tools = tools or []
     enabled_toolsets = enabled_toolsets or []
 
-    _, unavailable_toolsets = check_tool_availability(quiet=True)
-    disabled_tools = set()
-    # Tools whose toolset has a check_fn are lazy-initialized (e.g. honcho,
-    # homeassistant) — they show as unavailable at banner time because the
-    # check hasn't run yet, but they aren't misconfigured.
-    lazy_tools = set()
-    for item in unavailable_toolsets:
-        toolset_name = item.get("name", "")
-        ts_req = TOOLSET_REQUIREMENTS.get(toolset_name, {})
-        tools_in_ts = item.get("tools", [])
-        if ts_req.get("check_fn"):
-            lazy_tools.update(tools_in_ts)
-        else:
-            disabled_tools.update(tools_in_ts)
-
     layout_table = Table.grid(padding=(0, 2))
     layout_table.add_column("left", justify="center")
     layout_table.add_column("right", justify="left")
@@ -624,128 +609,37 @@ def build_welcome_banner(console: "Console", model: str, cwd: str,
         left_lines.append(f"[dim {session_color}]Session: {session_id}[/]")
     left_content = "\n".join(left_lines)
 
-    right_lines = [f"[bold {accent}]Available Tools[/]"]
-    toolsets_dict: Dict[str, list] = {}
+    # Quick slash-command reference — tool/skill/MCP inventories are one
+    # command away instead of dumped into the banner.
+    quick_commands = [
+        ("/help", "all commands"),
+        ("/model", "switch model"),
+        ("/tools", "list & manage tools"),
+        ("/skills", "browse & install skills"),
+        ("/sessions", "resume a session"),
+        ("/new", "fresh session"),
+        ("/status", "session & token info"),
+        ("/skin", "change theme"),
+        ("/quit", "exit"),
+    ]
+    cmd_width = max(len(cmd) for cmd, _ in quick_commands)
+    right_lines = [f"[bold {accent}]Commands[/]"]
+    for cmd, desc in quick_commands:
+        right_lines.append(f"[{accent}]{cmd.ljust(cmd_width)}[/]  [dim {dim}]{desc}[/]")
 
-    for tool in tools:
-        tool_name = tool["function"]["name"]
-        toolset = _display_toolset_name(get_toolset_for_tool(tool_name) or "other")
-        toolsets_dict.setdefault(toolset, []).append(tool_name)
-
-    for item in unavailable_toolsets:
-        toolset_id = item.get("id", item.get("name", "unknown"))
-        display_name = _display_toolset_name(toolset_id)
-        if display_name not in toolsets_dict:
-            toolsets_dict[display_name] = []
-        for tool_name in item.get("tools", []):
-            if tool_name not in toolsets_dict[display_name]:
-                toolsets_dict[display_name].append(tool_name)
-
-    sorted_toolsets = sorted(toolsets_dict.keys())
-    display_toolsets = sorted_toolsets[:8]
-    remaining_toolsets = len(sorted_toolsets) - 8
-
-    for toolset in display_toolsets:
-        tool_names = toolsets_dict[toolset]
-        colored_names = []
-        for name in sorted(tool_names):
-            if name in disabled_tools:
-                colored_names.append(f"[red]{name}[/]")
-            elif name in lazy_tools:
-                colored_names.append(f"[yellow]{name}[/]")
-            else:
-                colored_names.append(f"[{text}]{name}[/]")
-
-        tools_str = ", ".join(colored_names)
-        if len(", ".join(sorted(tool_names))) > 45:
-            short_names = []
-            length = 0
-            for name in sorted(tool_names):
-                if length + len(name) + 2 > 42:
-                    short_names.append("...")
-                    break
-                short_names.append(name)
-                length += len(name) + 2
-            colored_names = []
-            for name in short_names:
-                if name == "...":
-                    colored_names.append("[dim]...[/]")
-                elif name in disabled_tools:
-                    colored_names.append(f"[red]{name}[/]")
-                elif name in lazy_tools:
-                    colored_names.append(f"[yellow]{name}[/]")
-                else:
-                    colored_names.append(f"[{text}]{name}[/]")
-            tools_str = ", ".join(colored_names)
-
-        right_lines.append(f"[dim {dim}]{toolset}:[/] {tools_str}")
-
-    if remaining_toolsets > 0:
-        right_lines.append(f"[dim {dim}](and {remaining_toolsets} more toolsets...)[/]")
-
-    # MCP Servers section (only if configured)
+    # Inventory counts for the summary line
     try:
         from tools.mcp_tool import get_mcp_status
         mcp_status = get_mcp_status()
     except Exception:
         mcp_status = []
-
-    if mcp_status:
-        right_lines.append("")
-        right_lines.append(f"[bold {accent}]MCP Servers[/]")
-        for srv in mcp_status:
-            status = srv.get("status")
-            if srv["connected"]:
-                right_lines.append(
-                    f"[dim {dim}]{srv['name']}[/] [{text}]({srv['transport']})[/] "
-                    f"[dim {dim}]—[/] [{text}]{srv['tools']} tool(s)[/]"
-                )
-            elif srv.get("disabled") or status == "disabled":
-                right_lines.append(
-                    f"[dim {dim}]{srv['name']}[/] [dim]({srv['transport']})[/] "
-                    f"[dim {dim}]— disabled[/]"
-                )
-            elif status == "connecting":
-                right_lines.append(
-                    f"[dim {dim}]{srv['name']}[/] [dim]({srv['transport']})[/] "
-                    f"[yellow]— connecting[/]"
-                )
-            elif status == "configured":
-                right_lines.append(
-                    f"[dim {dim}]{srv['name']}[/] [dim]({srv['transport']})[/] "
-                    f"[dim {dim}]— configured[/]"
-                )
-            else:
-                right_lines.append(
-                    f"[red]{srv['name']}[/] [dim]({srv['transport']})[/] "
-                    f"[red]— failed[/]"
-                )
-
-    right_lines.append("")
-    right_lines.append(f"[bold {accent}]Available Skills[/]")
-    skills_by_category = get_available_skills()
-    total_skills = sum(len(s) for s in skills_by_category.values())
-
-    if skills_by_category:
-        for category in sorted(skills_by_category.keys()):
-            skill_names = sorted(skills_by_category[category])
-            if len(skill_names) > 8:
-                display_names = skill_names[:8]
-                skills_str = ", ".join(display_names) + f" +{len(skill_names) - 8} more"
-            else:
-                skills_str = ", ".join(skill_names)
-            if len(skills_str) > 50:
-                skills_str = skills_str[:47] + "..."
-            right_lines.append(f"[dim {dim}]{category}:[/] [{text}]{skills_str}[/]")
-    else:
-        right_lines.append(f"[dim {dim}]No skills installed[/]")
+    total_skills = sum(len(s) for s in get_available_skills().values())
 
     right_lines.append("")
     mcp_connected = sum(1 for s in mcp_status if s["connected"]) if mcp_status else 0
     summary_parts = [f"{len(tools)} tools", f"{total_skills} skills"]
     if mcp_connected:
         summary_parts.append(f"{mcp_connected} MCP servers")
-    summary_parts.append("/help for commands")
     # Indicate when the codex_app_server runtime is active so users
     # understand why tool counts may not match what's actually reachable
     # (codex builds its own tool list inside the spawned subprocess).
