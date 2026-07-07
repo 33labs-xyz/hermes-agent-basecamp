@@ -1,6 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { createSkill, getSessionMessages, listAllProfileSessions, listSessions, setApiRequestProfile } from './hermes'
+import { queryClient } from '@/lib/query-client'
+
+import { createSkill, deleteEnvVar, getSessionMessages, listAllProfileSessions, listSessions, setApiRequestProfile, setEnvVar } from './hermes'
+
+vi.mock('@/lib/query-client', () => ({ queryClient: { invalidateQueries: vi.fn() } }))
 
 const emptySessionsResponse = {
   limit: 0,
@@ -111,5 +115,40 @@ describe('createSkill', () => {
       path: '/api/skills',
       profile: 'xiaoxuxu'
     })
+  })
+})
+
+describe('env var writes bust the env-vars cache', () => {
+  let api: ReturnType<typeof vi.fn>
+
+  beforeEach(() => {
+    api = vi.fn().mockResolvedValue({ ok: true })
+    Object.defineProperty(window, 'hermesDesktop', {
+      configurable: true,
+      value: { api }
+    })
+    vi.mocked(queryClient.invalidateQueries).mockClear()
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+    Reflect.deleteProperty(window, 'hermesDesktop')
+  })
+
+  // A saved provider key must immediately reach the model picker's env gate.
+  // The picker, the titlebar balances chip and the model menu all read the
+  // ['env-vars'] query and nothing else invalidates it, so the write path must.
+  // Otherwise a stale is_set:false startup snapshot hides the just-connected
+  // provider and the onboarding picker renders "No models found."
+  it('invalidates the env-vars query after setEnvVar resolves', async () => {
+    await setEnvVar('OPENROUTER_API_KEY', 'sk-or-v1-test')
+
+    expect(queryClient.invalidateQueries).toHaveBeenCalledWith({ queryKey: ['env-vars'] })
+  })
+
+  it('invalidates the env-vars query after deleteEnvVar resolves', async () => {
+    await deleteEnvVar('OPENROUTER_API_KEY')
+
+    expect(queryClient.invalidateQueries).toHaveBeenCalledWith({ queryKey: ['env-vars'] })
   })
 })

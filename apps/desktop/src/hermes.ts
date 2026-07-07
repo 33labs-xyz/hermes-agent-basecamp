@@ -1,5 +1,7 @@
 import { JsonRpcGatewayClient } from '@hermes/shared'
 
+import { queryClient } from '@/lib/query-client'
+
 import type {
   ActionResponse,
   ActionStatusResponse,
@@ -348,13 +350,20 @@ export function getEnvVars(): Promise<Record<string, EnvVarInfo>> {
   })
 }
 
-export function setEnvVar(key: string, value: string): Promise<{ ok: boolean }> {
-  return window.hermesDesktop.api<{ ok: boolean }>({
+export async function setEnvVar(key: string, value: string): Promise<{ ok: boolean }> {
+  const result = await window.hermesDesktop.api<{ ok: boolean }>({
     ...profileScoped(),
     path: '/api/env',
     method: 'PUT',
     body: { key, value }
   })
+  // Every env write must bust the ['env-vars'] cache. The model picker's env
+  // gate, the titlebar balances chip and the model menu all read that query,
+  // and nothing else invalidates it; a stale is_set:false startup snapshot
+  // would otherwise hide a provider the user just connected (the onboarding
+  // picker renders "No models found."). Invalidate after the write persists.
+  void queryClient.invalidateQueries({ queryKey: ['env-vars'] })
+  return result
 }
 
 export function validateProviderCredential(
@@ -370,13 +379,16 @@ export function validateProviderCredential(
   })
 }
 
-export function deleteEnvVar(key: string): Promise<{ ok: boolean }> {
-  return window.hermesDesktop.api<{ ok: boolean }>({
+export async function deleteEnvVar(key: string): Promise<{ ok: boolean }> {
+  const result = await window.hermesDesktop.api<{ ok: boolean }>({
     ...profileScoped(),
     path: '/api/env',
     method: 'DELETE',
     body: { key }
   })
+  // Same cache-bust as setEnvVar: a removed key must disappear from the gate.
+  void queryClient.invalidateQueries({ queryKey: ['env-vars'] })
+  return result
 }
 
 export function revealEnvVar(key: string): Promise<{ key: string; value: string }> {
