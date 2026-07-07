@@ -98,7 +98,7 @@ USAGE
 BUILT-IN SKINS
 ==============
 
-- ``default`` — Classic Hermes gold/kawaii (the current look)
+- ``default`` — Basecamp violet midnight (the current look)
 - ``ares``    — Crimson/bronze war-god theme with custom spinner wings
 - ``mono``    — Clean grayscale monochrome
 - ``slate``   — Cool blue developer-focused theme
@@ -164,33 +164,33 @@ class SkinConfig:
 _BUILTIN_SKINS: Dict[str, Dict[str, Any]] = {
     "default": {
         "name": "default",
-        "description": "Classic Hermes — gold and kawaii",
+        "description": "Basecamp — violet midnight",
         "colors": {
-            "banner_border": "#CD7F32",
-            "banner_title": "#FFD700",
-            "banner_accent": "#FFBF00",
-            "banner_dim": "#B8860B",
-            "banner_text": "#FFF8DC",
-            "ui_accent": "#FFBF00",
-            "ui_label": "#DAA520",
+            "banner_border": "#8f82c9",
+            "banner_title": "#b6abdf",
+            "banner_accent": "#b6abdf",
+            "banner_dim": "#6f5fae",
+            "banner_text": "#ece9f6",
+            "ui_accent": "#b6abdf",
+            "ui_label": "#8f82c9",
             "ui_ok": "#4caf50",
             "ui_error": "#ef5350",
             "ui_warn": "#ffa726",
-            "prompt": "#FFF8DC",
-            "input_rule": "#CD7F32",
-            "response_border": "#FFD700",
-            "status_bar_bg": "#1a1a2e",
-            "session_label": "#DAA520",
-            "session_border": "#8B8682",
+            "prompt": "#ece9f6",
+            "input_rule": "#8f82c9",
+            "response_border": "#b6abdf",
+            "status_bar_bg": "#1b1830",
+            "session_label": "#8f82c9",
+            "session_border": "#6a6287",
         },
         "spinner": {
             # Empty = use hardcoded defaults in display.py
         },
         "branding": {
-            "agent_name": "Hermes Agent",
-            "welcome": "Welcome to Hermes Agent! Type your message or /help for commands.",
-            "goodbye": "Goodbye! ⚕",
-            "response_label": " ⚕ Hermes ",
+            "agent_name": "Basecamp",
+            "welcome": "Welcome to Basecamp! Type your message or /help for commands.",
+            "goodbye": "Goodbye! ▲",
+            "response_label": " ▲ Basecamp ",
             "prompt_symbol": "❯",
             "help_header": "(^_^)? Available Commands",
         },
