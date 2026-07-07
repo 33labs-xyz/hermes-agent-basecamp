@@ -477,3 +477,51 @@ class TestManifestMatchesInRepoLists:
             "Run: python scripts/build_model_catalog.py && "
             "git add website/static/api/model-catalog.json"
         )
+
+
+class TestUnavailableModelFilter:
+    """The hosted manifest can lag the repo's own availability decisions.
+
+    Regression: ``anthropic/claude-fable-5`` was removed from the curated
+    OpenRouter + Nous fallback lists (unavailable on those routes), but the
+    published model-catalog.json kept serving it at index 0. Every manifest
+    consumer then recommended a model the runtime cannot resolve - onboarding
+    showed "fable" as the default while chat silently fell back to another
+    model. The curated getters must drop ids those routes cannot serve.
+    """
+
+    def _manifest_with_fable(self) -> dict:
+        m = _valid_manifest()
+        m["providers"]["openrouter"]["models"].insert(
+            0, {"id": "anthropic/claude-fable-5", "description": ""}
+        )
+        m["providers"]["nous"]["models"].insert(
+            0, {"id": "anthropic/claude-fable-5"}
+        )
+        return m
+
+    def test_openrouter_models_drop_unavailable_ids(self, isolated_home):
+        from hermes_cli import model_catalog
+        with patch.object(
+            model_catalog, "_fetch_manifest", return_value=self._manifest_with_fable()
+        ):
+            model_catalog.get_catalog(force_refresh=True)
+            models = model_catalog.get_curated_openrouter_models()
+
+        assert models is not None
+        ids = [mid for mid, _ in models]
+        assert "anthropic/claude-fable-5" not in ids
+        # The first usable model becomes the recommended default downstream.
+        assert ids[0] == "anthropic/claude-opus-4.7"
+
+    def test_nous_models_drop_unavailable_ids(self, isolated_home):
+        from hermes_cli import model_catalog
+        with patch.object(
+            model_catalog, "_fetch_manifest", return_value=self._manifest_with_fable()
+        ):
+            model_catalog.get_catalog(force_refresh=True)
+            models = model_catalog.get_curated_nous_models()
+
+        assert models is not None
+        assert "anthropic/claude-fable-5" not in models
+        assert models[0] == "anthropic/claude-opus-4.7"

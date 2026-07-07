@@ -14,6 +14,7 @@ import {
 } from '@/hermes'
 import { evaluateRuntimeReadiness, type RuntimeReadinessResult } from '@/lib/runtime-readiness'
 import { notify, notifyError } from '@/store/notifications'
+import { setCurrentModel, setCurrentProvider } from '@/store/session'
 import type { ModelOptionProvider, OAuthProvider, OAuthStartResponse } from '@/types/hermes'
 
 type PkceStart = Extract<OAuthStartResponse, { flow: 'pkce' }>
@@ -304,13 +305,7 @@ async function fetchProviderDefaultModel(
   try {
     const recommended = await getRecommendedDefaultModel(String(matched.slug))
 
-    if (recommended.model && models.map(String).includes(recommended.model)) {
-      defaultModel = recommended.model
-    } else if (recommended.model) {
-      // Recommended model isn't in the curated options list (e.g. a Portal
-      // free-recommendation the picker list didn't include); trust it anyway.
-      defaultModel = recommended.model
-    }
+    defaultModel = resolveOnboardingDefaultModel(models.map(String), recommended.model, String(matched.slug))
   } catch {
     // Endpoint unavailable - keep models[0]. Non-fatal: the confirm card still
     // shows and the user can change it.
@@ -320,6 +315,31 @@ async function fetchProviderDefaultModel(
     providerSlug: String(matched.slug),
     defaultModel
   }
+}
+
+// Decide the default model shown on the confirm card. The backend's
+// recommendation wins only when the provider's own options list contains it
+// - a recommendation outside that list means the two sources disagree (e.g.
+// a lagging hosted catalog recommending a model the route cannot serve) and
+// the options list is what the picker will actually offer. Nous Portal is
+// the one deliberate exception: its tier-aware recommendation (a free-tier
+// model for free users) is valid even when the curated list omits it.
+export function resolveOnboardingDefaultModel(
+  models: string[],
+  recommendedModel: null | string | undefined,
+  providerSlug: string
+): string {
+  const fallback = String(models[0])
+
+  if (!recommendedModel) {
+    return fallback
+  }
+
+  if (models.includes(recommendedModel)) {
+    return recommendedModel
+  }
+
+  return providerSlug.toLowerCase() === 'nous' ? recommendedModel : fallback
 }
 
 // After OAuth/API-key success: reload the backend env, verify runtime,
@@ -986,6 +1006,13 @@ export function confirmOnboardingModel(ctx: OnboardingContext) {
   if (flow.status !== 'confirming_model') {
     return
   }
+
+  // Seed the composer stores with the confirmed choice so the chat model
+  // pill matches this screen immediately. Without this the pill keeps
+  // showing whatever the last session.info reported until a new session
+  // starts - the user confirms model X and the chat bar claims model Y.
+  setCurrentModel(flow.currentModel)
+  setCurrentProvider(flow.providerSlug)
 
   // No success toast here: the confirm-model screen already showed "<provider>
   // connected." notifyReady is reserved for completion paths that SKIP this

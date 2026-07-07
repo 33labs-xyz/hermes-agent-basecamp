@@ -77,6 +77,13 @@ DEFAULT_TTL_HOURS = 1
 DEFAULT_FETCH_TIMEOUT = 8.0
 SUPPORTED_SCHEMA_VERSION = 1
 
+# Ids the OpenRouter/Nous routes cannot serve even when the hosted manifest
+# still lists them. The curated fallback lists dropped claude-fable-5 as
+# unavailable on those routes, but the published model-catalog.json lagged
+# and kept recommending it - onboarding then defaulted to a model the
+# runtime cannot resolve. Sanitize manifest rows at read time.
+UNAVAILABLE_CATALOG_MODEL_IDS = frozenset({"anthropic/claude-fable-5"})
+
 _HERMES_USER_AGENT = f"hermes-cli/{_HERMES_VERSION}"
 
 # In-process cache to avoid repeated disk + parse work across multiple
@@ -333,7 +340,7 @@ def get_curated_openrouter_models() -> list[tuple[str, str]] | None:
     out: list[tuple[str, str]] = []
     for m in block.get("models", []):
         mid = str(m.get("id") or "").strip()
-        if not mid:
+        if not mid or mid in UNAVAILABLE_CATALOG_MODEL_IDS:
             continue
         desc = str(m.get("description") or "")
         out.append((mid, desc))
@@ -351,7 +358,7 @@ def get_curated_nous_models() -> list[str] | None:
     out: list[str] = []
     for m in block.get("models", []):
         mid = str(m.get("id") or "").strip()
-        if mid:
+        if mid and mid not in UNAVAILABLE_CATALOG_MODEL_IDS:
             out.append(mid)
     return out or None
 
