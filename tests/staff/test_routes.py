@@ -387,7 +387,11 @@ def test_connect_known_toolkit_returns_manual_path(client):
 
 
 def _fake_composio(monkeypatch, *, configured=True, link=None, active=False):
-    from hermes_cli.staff import composio
+    # Patch the module object the routes actually hold a reference to. Other
+    # test modules in the suite pop hermes_cli.* entries from sys.modules, so a
+    # fresh `from hermes_cli.staff import composio` here can yield a different
+    # module object than the one routes.py imported at load time.
+    composio = staff_routes.composio
 
     monkeypatch.setattr(composio, "is_configured", lambda: configured)
     if isinstance(link, Exception):
@@ -414,9 +418,7 @@ def test_connect_with_composio_key_returns_link(client, monkeypatch):
 
 
 def test_connect_composio_failure_is_502(client, monkeypatch):
-    from hermes_cli.staff import composio
-
-    _fake_composio(monkeypatch, link=composio.ComposioError("api down"))
+    _fake_composio(monkeypatch, link=staff_routes.composio.ComposioError("api down"))
     resp = client.post("/api/staff/connect", json={"toolkit": "gmail"})
     assert resp.status_code == 502
     assert resp.json()["error_code"] == "composio_error"
@@ -449,9 +451,7 @@ def test_connect_status_composio_active_persists_to_state(client, monkeypatch):
 
 
 def test_connect_status_composio_failure_is_502(client, monkeypatch):
-    from hermes_cli.staff import composio
-
-    _fake_composio(monkeypatch, active=composio.ComposioError("api down"))
+    _fake_composio(monkeypatch, active=staff_routes.composio.ComposioError("api down"))
     resp = client.get("/api/staff/connect/status", params={"toolkit": "gmail"})
     assert resp.status_code == 502
     assert resp.json()["error_code"] == "composio_error"
