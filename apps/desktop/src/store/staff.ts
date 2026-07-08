@@ -6,6 +6,7 @@ import {
   getStaffCatalog,
   getStaffState,
   hireStaffAgent,
+  runStaffAgent,
   scheduleStaffAgent,
   setStaffLicense,
   type StaffCatalogEntry,
@@ -132,6 +133,58 @@ export async function scheduleAgent(key: string, time?: string): Promise<void> {
   }
 }
 
+// A manual run is a triggered one-shot cron job: the desktop backend ticks the
+// scheduler every 60s and the agent run itself takes minutes, so the result
+// arrives long after the POST returns. Poll state while the row reports
+// `running` so the card flips to its report without a manual refresh.
+const RUN_POLL_INTERVAL_MS = 15_000
+const RUN_POLL_MAX_TICKS = 20 // ~5 minutes
+
+const runPollTimers = new Map<string, ReturnType<typeof setTimeout>>()
+
+function stopRunPoll(key: string): void {
+  const timer = runPollTimers.get(key)
+
+  if (timer !== undefined) {
+    clearTimeout(timer)
+    runPollTimers.delete(key)
+  }
+}
+
+function scheduleRunPoll(key: string, ticksLeft: number): void {
+  stopRunPoll(key)
+
+  if (ticksLeft <= 0) {return}
+
+  const timer = setTimeout(() => {
+    runPollTimers.delete(key)
+
+    void refreshStaffState()
+      .catch(() => undefined)
+      .then(() => {
+        const row = $staffState.get()?.roster.find(entry => entry.key === key)
+
+        if (row?.running) {
+          scheduleRunPoll(key, ticksLeft - 1)
+        }
+      })
+  }, RUN_POLL_INTERVAL_MS)
+
+  runPollTimers.set(key, timer)
+}
+
+export async function runAgent(key: string): Promise<void> {
+  setBusy(key, true)
+
+  try {
+    await runStaffAgent(key)
+    await refreshStaffState()
+    scheduleRunPoll(key, RUN_POLL_MAX_TICKS)
+  } finally {
+    setBusy(key, false)
+  }
+}
+
 export async function unscheduleAgent(key: string): Promise<void> {
   setBusy(key, true)
 
@@ -164,6 +217,11 @@ export function connectToolkit(slug: string): Promise<StaffConnectResult> {
 // Test-only: reset module state between cases.
 export function resetStaffForTests(): void {
   loadStarted = false
+
+  for (const key of runPollTimers.keys()) {
+    stopRunPoll(key)
+  }
+
   $staffCatalog.set([])
   $staffState.set(null)
   $staffCatalogLoading.set(false)

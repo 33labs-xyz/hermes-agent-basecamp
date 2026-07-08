@@ -21,9 +21,11 @@ PRO_AGENTS = [a.key for a in CATALOG if a.tier == "pro"]
 
 
 class FakeCron:
-    def __init__(self):
+    def __init__(self, output_root):
         self.jobs = {}
         self.removed = []
+        self.triggered = []
+        self.output_root = output_root
         self._n = 0
 
     def __call__(self, func_name, *args, **kwargs):
@@ -37,12 +39,24 @@ class FakeCron:
         if func_name == "remove_job":
             self.removed.append(args[0])
             return self.jobs.pop(args[0], None) is not None
+        if func_name == "trigger_job":
+            self.triggered.append(args[0])
+            return self.jobs.get(args[0])
+        if func_name == "_job_output_dir":
+            return self.output_root / args[0]
         raise AssertionError(f"unexpected cron call {func_name}")
+
+    def finish_run(self, job_id, output):
+        """Simulate the scheduler completing a one-shot run: output written, job gone."""
+        out_dir = self.output_root / job_id
+        out_dir.mkdir(parents=True, exist_ok=True)
+        (out_dir / "2026-07-09_09-00-00.md").write_text(output, encoding="utf-8")
+        self.jobs.pop(job_id, None)
 
 
 @pytest.fixture
-def cron():
-    return FakeCron()
+def cron(tmp_path):
+    return FakeCron(tmp_path / "cron-output")
 
 
 @pytest.fixture
@@ -244,6 +258,85 @@ def test_fire_removes_scheduled_job(client, cron):
     _go_pro(client)
     _hire(client, STANDARD_AGENTS[0])
     job_id = client.post("/api/staff/schedule", json={"key": STANDARD_AGENTS[0]}).json()["job_id"]
+    client.post("/api/staff/fire", json={"key": STANDARD_AGENTS[0]})
+    assert job_id in cron.removed
+
+
+# -- run now ---------------------------------------------------------------
+
+def test_run_requires_hire(client):
+    resp = client.post("/api/staff/run", json={"key": STANDARD_AGENTS[0]})
+    assert resp.status_code == 404
+
+
+def test_run_creates_triggered_one_shot_bound_to_group(client, cron):
+    from hermes_cli.staff.catalog import get_agent
+
+    agent = get_agent(STANDARD_AGENTS[0])
+    group_id = _hire(client, agent.key).json()["group_id"]
+    resp = client.post("/api/staff/run", json={"key": agent.key})
+    assert resp.status_code == 200
+    job_id = resp.json()["job_id"]
+    assert resp.json()["status"] == "queued"
+
+    job = cron.jobs[job_id]
+    assert job["group_id"] == group_id
+    assert agent.instructions.strip()[:60] in job["prompt"]
+    assert agent.run_prompt in job["prompt"]
+    assert job_id in cron.triggered
+
+    entry = client.get("/api/staff/state").json()["roster"][0]
+    assert entry["run_job_id"] == job_id
+    assert entry["running"] is True
+
+
+def test_run_works_on_free_tier(client):
+    _hire(client, STANDARD_AGENTS[0])
+    assert client.post("/api/staff/run", json={"key": STANDARD_AGENTS[0]}).status_code == 200
+
+
+def test_run_while_pending_is_409(client):
+    _hire(client, STANDARD_AGENTS[0])
+    client.post("/api/staff/run", json={"key": STANDARD_AGENTS[0]})
+    resp = client.post("/api/staff/run", json={"key": STANDARD_AGENTS[0]})
+    assert resp.status_code == 409
+    assert resp.json()["error_code"] == "run_in_progress"
+
+
+def test_run_again_after_completion_is_allowed(client, cron):
+    _hire(client, STANDARD_AGENTS[0])
+    first = client.post("/api/staff/run", json={"key": STANDARD_AGENTS[0]}).json()["job_id"]
+    cron.finish_run(first, "Report: inbox swept.")
+    assert client.post("/api/staff/run", json={"key": STANDARD_AGENTS[0]}).status_code == 200
+
+
+def test_state_exposes_last_report_after_run(client, cron):
+    _hire(client, STANDARD_AGENTS[0])
+    job_id = client.post("/api/staff/run", json={"key": STANDARD_AGENTS[0]}).json()["job_id"]
+    cron.finish_run(job_id, "Report: 3 invoices chased, 1 reply drafted.")
+
+    entry = client.get("/api/staff/state").json()["roster"][0]
+    assert entry["running"] is False
+    assert entry["last_report"]["source"] == "manual"
+    assert "3 invoices chased" in entry["last_report"]["excerpt"]
+    assert entry["last_report"]["at"] > 0
+
+
+def test_schedule_prompt_includes_instructions(client, cron):
+    from hermes_cli.staff.catalog import get_agent
+
+    agent = get_agent(STANDARD_AGENTS[0])
+    _go_pro(client)
+    _hire(client, agent.key)
+    job_id = client.post("/api/staff/schedule", json={"key": agent.key}).json()["job_id"]
+    prompt = cron.jobs[job_id]["prompt"]
+    assert agent.instructions.strip()[:60] in prompt
+    assert agent.run_prompt in prompt
+
+
+def test_fire_removes_pending_run_job(client, cron):
+    _hire(client, STANDARD_AGENTS[0])
+    job_id = client.post("/api/staff/run", json={"key": STANDARD_AGENTS[0]}).json()["job_id"]
     client.post("/api/staff/fire", json={"key": STANDARD_AGENTS[0]})
     assert job_id in cron.removed
 

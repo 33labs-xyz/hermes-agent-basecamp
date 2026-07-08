@@ -20,12 +20,23 @@ import type { StaffCatalogEntry, StaffRosterEntry } from '@/hermes'
 import { Lock, MoreHorizontal, Trash2 } from '@/lib/icons'
 import { cn } from '@/lib/utils'
 
+// Report timestamps are file mtimes in epoch seconds from the backend.
+function formatReportTime(atSeconds: number): string {
+  return new Date(atSeconds * 1000).toLocaleString(undefined, {
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    month: 'short'
+  })
+}
+
 interface StaffRosterSectionProps {
   busyKeys: ReadonlySet<string>
   catalogByKey: ReadonlyMap<string, StaffCatalogEntry>
   onFire: (key: string) => Promise<void>
   onLicenseNeeded: () => void
   onOpenChat: (groupId: string) => void
+  onRunNow: (key: string) => Promise<void>
   onToggleSchedule: (row: StaffRosterEntry, defaultTime: string) => Promise<void>
   roster: StaffRosterEntry[]
   schedulesAllowed: boolean
@@ -39,6 +50,7 @@ export function StaffRosterSection({
   onFire,
   onLicenseNeeded,
   onOpenChat,
+  onRunNow,
   onToggleSchedule,
   roster,
   schedulesAllowed
@@ -57,6 +69,7 @@ export function StaffRosterSection({
           onFire={onFire}
           onLicenseNeeded={onLicenseNeeded}
           onOpenChat={onOpenChat}
+          onRunNow={onRunNow}
           onToggleSchedule={onToggleSchedule}
           row={row}
           schedulesAllowed={schedulesAllowed}
@@ -72,6 +85,7 @@ function StaffRosterCard({
   onFire,
   onLicenseNeeded,
   onOpenChat,
+  onRunNow,
   onToggleSchedule,
   row,
   schedulesAllowed
@@ -81,6 +95,7 @@ function StaffRosterCard({
   onFire: (key: string) => Promise<void>
   onLicenseNeeded: () => void
   onOpenChat: (groupId: string) => void
+  onRunNow: (key: string) => Promise<void>
   onToggleSchedule: (row: StaffRosterEntry, defaultTime: string) => Promise<void>
   row: StaffRosterEntry
   schedulesAllowed: boolean
@@ -147,7 +162,11 @@ function StaffRosterCard({
 
       {row.last_report && (
         <div className="rounded-lg bg-(--ui-control-background) px-3 py-2 text-[0.75rem] leading-snug text-(--ui-text-secondary)">
-          {row.last_report}
+          <p className="mb-1 text-[0.66rem] font-medium tracking-wide text-(--ui-text-tertiary) uppercase">
+            {row.last_report.source === 'scheduled' ? 'Scheduled report' : 'Manual run'} ·{' '}
+            {formatReportTime(row.last_report.at)}
+          </p>
+          <p className="line-clamp-4 whitespace-pre-line">{row.last_report.excerpt}</p>
         </div>
       )}
 
@@ -156,8 +175,8 @@ function StaffRosterCard({
           <Button className="flex-1" onClick={() => onOpenChat(row.group_id)} size="sm" variant="secondary">
             Open chat
           </Button>
-          <Button onClick={() => onOpenChat(row.group_id)} size="sm" variant="ghost">
-            Run now
+          <Button disabled={busy || row.running} onClick={() => void onRunNow(row.key)} size="sm" variant="ghost">
+            {row.running ? 'Running…' : 'Run now'}
           </Button>
         </div>
         {schedulesAllowed ? (

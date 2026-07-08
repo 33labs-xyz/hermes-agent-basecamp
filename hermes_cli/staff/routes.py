@@ -64,6 +64,10 @@ class ConnectBody(BaseModel):
     toolkit: str
 
 
+class RunBody(BaseModel):
+    key: str
+
+
 def _err(status: int, code: str, message: str) -> JSONResponse:
     return JSONResponse(status_code=status, content={"error_code": code, "message": message})
 
@@ -200,6 +204,60 @@ def _remove_job_quietly(job_id: Optional[str]) -> None:
         pass  # job already gone; roster stays consistent regardless
 
 
+def _staff_job_prompt(agent) -> str:
+    """Self-contained cron prompt: the scheduler runs jobs without any chat
+    group context, so the agent's standing instructions ride along with the
+    task instead of relying on group instruction injection."""
+    return (
+        f"You are {agent.name}, a hired staff agent working for the user.\n\n"
+        f"## Standing instructions\n{agent.instructions.strip()}\n\n"
+        f"## Task\n{agent.run_prompt.strip()}"
+    )
+
+
+def _job_pending(job_id: Optional[str]) -> bool:
+    """A one-shot run job exists until the scheduler completes it (auto-removed
+    by mark_job_run when its repeat limit hits)."""
+    if not job_id:
+        return False
+    try:
+        return _cron_call("get_job", job_id) is not None
+    except Exception:
+        return False
+
+
+_REPORT_EXCERPT_CHARS = 400
+
+
+def _latest_report(entry: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """Newest cron output across the entry's schedule + manual-run jobs.
+
+    Output directories outlive their jobs (one-shots are auto-removed after
+    running), so reports stay readable after completion."""
+    candidates = []
+    for source, job_id in (("scheduled", entry.get("job_id")), ("manual", entry.get("run_job_id"))):
+        if not job_id:
+            continue
+        try:
+            out_dir = Path(_cron_call("_job_output_dir", job_id))
+            files = sorted(out_dir.glob("*.md"), key=lambda f: f.stat().st_mtime, reverse=True)
+        except Exception:
+            continue
+        if files:
+            candidates.append((files[0].stat().st_mtime, source, files[0]))
+    if not candidates:
+        return None
+    mtime, source, latest = max(candidates, key=lambda c: c[0])
+    try:
+        text = latest.read_text(encoding="utf-8").strip()
+    except OSError:
+        return None
+    if not text:
+        return None
+    excerpt = text[:_REPORT_EXCERPT_CHARS] + ("…" if len(text) > _REPORT_EXCERPT_CHARS else "")
+    return {"at": mtime, "source": source, "excerpt": excerpt}
+
+
 def _default_db_factory():
     from hermes_cli.web_server import _open_session_db_for_profile
 
@@ -228,9 +286,11 @@ def register_staff_routes(app: FastAPI, db_factory: Optional[Callable] = None) -
             for entry in state["roster"]:
                 item = dict(entry)
                 item.setdefault("job_id", None)
+                item.setdefault("run_job_id", None)
                 item.setdefault("scheduled", False)
                 item.setdefault("schedule_time", None)
-                item.setdefault("last_report", None)
+                item["last_report"] = _latest_report(item)
+                item["running"] = _job_pending(item.get("run_job_id"))
                 item["next_run"] = None
                 if item.get("job_id"):
                     try:
@@ -291,10 +351,10 @@ def register_staff_routes(app: FastAPI, db_factory: Optional[Callable] = None) -
             "key": agent.key,
             "group_id": group["id"],
             "job_id": None,
+            "run_job_id": None,
             "hired_at": time.time(),
             "scheduled": False,
             "schedule_time": None,
-            "last_report": None,
         }
         try:
             _save_state({**state, "roster": [*roster, entry]})
@@ -310,6 +370,7 @@ def register_staff_routes(app: FastAPI, db_factory: Optional[Callable] = None) -
         if entry is None:
             return _err(404, "not_found", "agent is not on your staff")
         _remove_job_quietly(entry.get("job_id"))
+        _remove_job_quietly(entry.get("run_job_id"))
         remaining = [e for e in roster if e.get("key") != body.key]
         try:
             _save_state({**state, "roster": remaining})
@@ -341,7 +402,7 @@ def register_staff_routes(app: FastAPI, db_factory: Optional[Callable] = None) -
         try:
             job = _cron_call(
                 "create_job",
-                prompt=agent.run_prompt,
+                prompt=_staff_job_prompt(agent),
                 schedule=schedule,
                 name=f"Staff: {agent.name}",
                 group_id=entry["group_id"],
@@ -377,6 +438,45 @@ def register_staff_routes(app: FastAPI, db_factory: Optional[Callable] = None) -
         except Exception:
             return _internal_err()
         return {"ok": True}
+
+    @app.post("/api/staff/run", response_model=None)
+    async def staff_run(body: RunBody):
+        """Manual run (free tier included): a triggered one-shot cron job.
+
+        The desktop backend ticks the scheduler every 60s, so the run starts
+        within a minute. One-shots auto-delete after running; their output dir
+        survives and feeds ``last_report``.
+        """
+        agent = get_agent(body.key or "")
+        if agent is None:
+            return _err(404, "not_found", "unknown agent")
+        state = _load_state()
+        roster: List[Dict[str, Any]] = state["roster"]
+        entry = next((e for e in roster if e.get("key") == agent.key), None)
+        if entry is None:
+            return _err(404, "not_found", "hire this agent before running it")
+        if _job_pending(entry.get("run_job_id")):
+            return _err(409, "run_in_progress", f"{agent.name} is already running")
+        try:
+            job = _cron_call(
+                "create_job",
+                prompt=_staff_job_prompt(agent),
+                schedule="5m",
+                name=f"Staff run: {agent.name}",
+                repeat=1,
+                group_id=entry["group_id"],
+            )
+            _cron_call("trigger_job", job.get("id"))
+        except Exception:
+            return _err(500, "internal", "could not start the run")
+        updated = {**entry, "run_job_id": job.get("id")}
+        new_roster = [updated if e.get("key") == agent.key else e for e in roster]
+        try:
+            _save_state({**state, "roster": new_roster})
+        except Exception:
+            _remove_job_quietly(job.get("id"))
+            return _internal_err()
+        return {"job_id": job.get("id"), "status": "queued"}
 
     @app.post("/api/staff/connect", response_model=None)
     async def staff_connect(body: ConnectBody):

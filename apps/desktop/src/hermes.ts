@@ -938,14 +938,22 @@ export interface StaffCatalogEntry {
   proof: string
 }
 
+export interface StaffLastReport {
+  at: number
+  source: 'scheduled' | 'manual'
+  excerpt: string
+}
+
 export interface StaffRosterEntry {
   key: string
   group_id: string
   job_id: string | null
+  run_job_id: string | null
   hired_at: number
   scheduled: boolean
   schedule_time: string | null
-  last_report: string | null
+  last_report: StaffLastReport | null
+  running: boolean
   next_run: number | null
 }
 
@@ -1029,6 +1037,14 @@ export function unscheduleStaffAgent(key: string): Promise<{ ok: boolean }> {
   return window.hermesDesktop.api<{ ok: boolean }>({
     path: `/api/staff/schedule?key=${encodeURIComponent(key)}`,
     method: 'DELETE'
+  })
+}
+
+export function runStaffAgent(key: string): Promise<{ job_id: string; status: string }> {
+  return window.hermesDesktop.api<{ job_id: string; status: string }>({
+    path: '/api/staff/run',
+    method: 'POST',
+    body: { key }
   })
 }
 

@@ -18,6 +18,7 @@ import {
   ensureStaffLoaded,
   fireAgent,
   hireAgent,
+  runAgent,
   scheduleAgent,
   unscheduleAgent
 } from '@/store/staff'
@@ -96,6 +97,27 @@ export function StaffView({ setStatusbarItemGroup }: StaffViewProps) {
     }
   }
 
+  async function handleRunNow(key: string) {
+    const name = catalogByKey.get(key)?.name ?? 'Agent'
+
+    try {
+      await runAgent(key)
+      notify({
+        durationMs: 4_000,
+        kind: 'success',
+        message: `${name} is on it — the report lands here in a few minutes.`
+      })
+    } catch (err) {
+      if (staffErrorCode(err) === 'run_in_progress') {
+        notify({ durationMs: 3_000, kind: 'info', message: `${name} is already running.` })
+
+        return
+      }
+
+      notifyError(err, staffFriendlyError(err, `Could not start ${name}.`))
+    }
+  }
+
   async function handleToggleSchedule(row: StaffRosterEntry, defaultTime: string) {
     try {
       if (row.scheduled) {
@@ -152,6 +174,7 @@ export function StaffView({ setStatusbarItemGroup }: StaffViewProps) {
                   onFire={handleFire}
                   onLicenseNeeded={() => setLicenseOpen(true)}
                   onOpenChat={handleOpenChat}
+                  onRunNow={handleRunNow}
                   onToggleSchedule={handleToggleSchedule}
                   roster={roster}
                   schedulesAllowed={Boolean(entitlement?.schedules)}
