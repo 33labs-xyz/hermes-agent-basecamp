@@ -122,6 +122,7 @@ export type SidebarNavId =
   | 'projects'
   | 'settings'
   | 'skills'
+  | 'staff'
   | 'studio'
 
 export interface SidebarNavItem {

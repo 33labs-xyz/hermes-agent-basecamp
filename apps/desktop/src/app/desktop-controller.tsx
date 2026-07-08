@@ -136,6 +136,7 @@ const ProfilesView = lazy(async () => ({ default: (await import('./profiles')).P
 const ProjectsView = lazy(async () => ({ default: (await import('./projects')).ProjectsView }))
 const SettingsView = lazy(async () => ({ default: (await import('./settings')).SettingsView }))
 const SkillsView = lazy(async () => ({ default: (await import('./skills')).SkillsView }))
+const StaffView = lazy(async () => ({ default: (await import('./staff')).StaffView }))
 const StudioView = lazy(async () => ({ default: (await import('./studio')).StudioView }))
 
 // Latest cron-job sessions surfaced in the collapsed "Cron jobs" section. The
@@ -1141,6 +1142,14 @@ export function DesktopController() {
               </Suspense>
             }
             path="studio"
+          />
+          <Route
+            element={
+              <Suspense fallback={null}>
+                <StaffView setStatusbarItemGroup={setStatusbarItemGroup} />
+              </Suspense>
+            }
+            path="staff"
           />
           <Route
             element={

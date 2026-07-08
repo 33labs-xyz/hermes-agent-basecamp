@@ -12,6 +12,9 @@ export const AGENTS_ROUTE = '/agents'
 // Projects are a full-page (non-overlay) view keyed by group id:
 // `/projects/:groupId`. The base path below is the route prefix.
 export const PROJECTS_ROUTE = '/projects'
+// Staff (hired agent marketplace) is a full-page (non-overlay) view, same
+// shape as Projects/Studio — always reachable from the sidebar rail.
+export const STAFF_ROUTE = '/staff'
 
 export type AppView =
   | 'agents'
@@ -24,6 +27,7 @@ export type AppView =
   | 'projects'
   | 'settings'
   | 'skills'
+  | 'staff'
   | 'studio'
 
 export type AppRouteId =
@@ -36,6 +40,7 @@ export type AppRouteId =
   | 'profiles'
   | 'settings'
   | 'skills'
+  | 'staff'
   | 'studio'
 
 export interface AppRoute {
@@ -52,6 +57,7 @@ export const APP_ROUTES = [
   { id: 'messaging', path: MESSAGING_ROUTE, view: 'messaging' },
   { id: 'artifacts', path: ARTIFACTS_ROUTE, view: 'artifacts' },
   { id: 'studio', path: STUDIO_ROUTE, view: 'studio' },
+  { id: 'staff', path: STAFF_ROUTE, view: 'staff' },
   { id: 'cron', path: CRON_ROUTE, view: 'cron' },
   { id: 'profiles', path: PROFILES_ROUTE, view: 'profiles' },
   { id: 'agents', path: AGENTS_ROUTE, view: 'agents' }

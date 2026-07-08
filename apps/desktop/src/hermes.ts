@@ -919,3 +919,123 @@ export function deleteMemoryEntry(groupId: string, entryId: string): Promise<{ o
     method: 'DELETE'
   })
 }
+
+// Staff: a marketplace of hireable background agents, each backed by a chat
+// group (project) and, once scheduled, a cron job. The catalog is static
+// per-backend metadata; state is the user's live roster + entitlement +
+// connected-toolkit status.
+export interface StaffCatalogEntry {
+  key: string
+  name: string
+  tagline: string
+  description: string
+  icon: string
+  category: string
+  requires: string[]
+  schedule_template: string
+  default_time: string
+  tier: 'standard' | 'pro'
+  proof: string
+}
+
+export interface StaffRosterEntry {
+  key: string
+  group_id: string
+  job_id: string | null
+  hired_at: number
+  scheduled: boolean
+  schedule_time: string | null
+  last_report: string | null
+  next_run: number | null
+}
+
+export interface StaffEntitlement {
+  tier: 'free' | 'pro'
+  slots: number
+  schedules: boolean
+}
+
+export interface StaffConnectionStatus {
+  slug: string
+  connected: boolean
+  source: 'mcp' | 'composio' | null
+}
+
+export interface StaffState {
+  entitlement: StaffEntitlement
+  roster: StaffRosterEntry[]
+  connections: StaffConnectionStatus[]
+}
+
+export interface StaffLicenseResult {
+  tier: 'free' | 'pro'
+  slots: number
+  schedules: boolean
+}
+
+export interface StaffConnectResult {
+  connect_url: string | null
+  manual: boolean
+  message: string
+}
+
+export async function getStaffCatalog(): Promise<StaffCatalogEntry[]> {
+  const { agents } = await window.hermesDesktop.api<{ agents: StaffCatalogEntry[] }>({
+    path: '/api/staff/catalog'
+  })
+
+  return agents ?? []
+}
+
+export function getStaffState(): Promise<StaffState> {
+  return window.hermesDesktop.api<StaffState>({
+    path: '/api/staff/state'
+  })
+}
+
+export function setStaffLicense(key: string): Promise<StaffLicenseResult> {
+  return window.hermesDesktop.api<StaffLicenseResult>({
+    path: '/api/staff/license',
+    method: 'POST',
+    body: { key }
+  })
+}
+
+export function hireStaffAgent(key: string): Promise<{ group_id: string }> {
+  return window.hermesDesktop.api<{ group_id: string }>({
+    path: '/api/staff/hire',
+    method: 'POST',
+    body: { key }
+  })
+}
+
+export function fireStaffAgent(key: string): Promise<{ ok: boolean }> {
+  return window.hermesDesktop.api<{ ok: boolean }>({
+    path: '/api/staff/fire',
+    method: 'POST',
+    body: { key }
+  })
+}
+
+export function scheduleStaffAgent(key: string, time?: string): Promise<{ job_id: string; next_run: number }> {
+  return window.hermesDesktop.api<{ job_id: string; next_run: number }>({
+    path: '/api/staff/schedule',
+    method: 'POST',
+    body: time ? { key, time } : { key }
+  })
+}
+
+export function unscheduleStaffAgent(key: string): Promise<{ ok: boolean }> {
+  return window.hermesDesktop.api<{ ok: boolean }>({
+    path: `/api/staff/schedule?key=${encodeURIComponent(key)}`,
+    method: 'DELETE'
+  })
+}
+
+export function connectStaffToolkit(toolkit: string): Promise<StaffConnectResult> {
+  return window.hermesDesktop.api<StaffConnectResult>({
+    path: '/api/staff/connect',
+    method: 'POST',
+    body: { toolkit }
+  })
+}

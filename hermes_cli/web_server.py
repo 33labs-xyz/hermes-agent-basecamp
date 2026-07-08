@@ -12018,6 +12018,11 @@ app.include_router(_dashboard_auth_router)
 from hermes_cli.chat_groups.routes import register_chat_group_routes  # noqa: E402
 register_chat_group_routes(app)
 
+# Staff marketplace: /api/staff/* catalog, roster, hire/fire, schedules,
+# entitlement. Same placement reason as the chat-group routes above.
+from hermes_cli.staff.routes import register_staff_routes  # noqa: E402
+register_staff_routes(app)
+
 mount_spa(app)
 
 
