@@ -987,6 +987,11 @@ export interface StaffConnectResult {
   message: string
 }
 
+export interface StaffConnectStatusResult {
+  connected: boolean
+  source: 'mcp' | 'composio' | null
+}
+
 export async function getStaffCatalog(): Promise<StaffCatalogEntry[]> {
   const { agents } = await window.hermesDesktop.api<{ agents: StaffCatalogEntry[] }>({
     path: '/api/staff/catalog'
@@ -1053,5 +1058,11 @@ export function connectStaffToolkit(toolkit: string): Promise<StaffConnectResult
     path: '/api/staff/connect',
     method: 'POST',
     body: { toolkit }
+  })
+}
+
+export function getStaffConnectStatus(toolkit: string): Promise<StaffConnectStatusResult> {
+  return window.hermesDesktop.api<StaffConnectStatusResult>({
+    path: `/api/staff/connect/status?toolkit=${encodeURIComponent(toolkit)}`
   })
 }

@@ -26,6 +26,7 @@ from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
+from hermes_cli.staff import composio
 from hermes_cli.staff.catalog import CATALOG, catalog_entry, get_agent
 
 _LICENSE_RE = re.compile(r"^BCPRO(-[A-Z0-9]{4}){3}$")
@@ -95,16 +96,20 @@ def _load_state() -> Dict[str, Any]:
     try:
         raw = json.loads(path.read_text(encoding="utf-8"))
     except FileNotFoundError:
-        return {"version": 1, "license": "", "roster": []}
+        return {"version": 1, "license": "", "roster": [], "composio_connected": []}
     except Exception:
-        return {"version": 1, "license": "", "roster": []}
+        return {"version": 1, "license": "", "roster": [], "composio_connected": []}
     if not isinstance(raw, dict):
-        return {"version": 1, "license": "", "roster": []}
+        return {"version": 1, "license": "", "roster": [], "composio_connected": []}
     roster = raw.get("roster")
+    composio_connected = raw.get("composio_connected")
     return {
         "version": 1,
         "license": raw.get("license") if isinstance(raw.get("license"), str) else "",
         "roster": roster if isinstance(roster, list) else [],
+        "composio_connected": [
+            str(slug) for slug in composio_connected if isinstance(slug, str)
+        ] if isinstance(composio_connected, list) else [],
     }
 
 
@@ -172,7 +177,7 @@ def _all_toolkits() -> List[str]:
     return seen
 
 
-def _connections() -> List[Dict[str, Any]]:
+def _mcp_connected(slug: str) -> bool:
     try:
         from hermes_cli.mcp_config import _get_mcp_servers
 
@@ -180,15 +185,24 @@ def _connections() -> List[Dict[str, Any]]:
     except Exception:
         servers = {}
     normalized = [re.sub(r"[^a-z0-9]", "", str(name).lower()) for name in servers]
+    needles = (slug, *(_TOOLKIT_ALIASES.get(slug, ())))
+    return any(needle in name for name in normalized for needle in needles)
 
-    def is_connected(slug: str) -> bool:
-        needles = (slug, *(_TOOLKIT_ALIASES.get(slug, ())))
-        return any(needle in name for name in normalized for needle in needles)
 
-    return [
-        {"slug": slug, "connected": is_connected(slug), "source": "mcp" if is_connected(slug) else None}
-        for slug in _all_toolkits()
-    ]
+def _connection_source(slug: str, state: Dict[str, Any]) -> Optional[str]:
+    if _mcp_connected(slug):
+        return "mcp"
+    if slug in (state.get("composio_connected") or []):
+        return "composio"
+    return None
+
+
+def _connections(state: Dict[str, Any]) -> List[Dict[str, Any]]:
+    results = []
+    for slug in _all_toolkits():
+        source = _connection_source(slug, state)
+        results.append({"slug": slug, "connected": source is not None, "source": source})
+    return results
 
 
 # ---------------------------------------------------------------------------
@@ -309,7 +323,7 @@ def register_staff_routes(app: FastAPI, db_factory: Optional[Callable] = None) -
             return {
                 "entitlement": _entitlement(state),
                 "roster": roster,
-                "connections": _connections(),
+                "connections": _connections(state),
             }
         except Exception:
             return _internal_err()
@@ -490,13 +504,57 @@ def register_staff_routes(app: FastAPI, db_factory: Optional[Callable] = None) -
         toolkit = (body.toolkit or "").strip().lower()
         if toolkit not in _all_toolkits():
             return _err(404, "not_found", "unknown toolkit")
-        # v1: connections come from configured MCP servers. One-click Composio
-        # connect links land here later (COMPOSIO_API_KEY, server-side only).
+        if not composio.is_configured():
+            # No COMPOSIO_API_KEY on the backend: fall back to the manual MCP
+            # path. Connections added there are picked up automatically.
+            return {
+                "connect_url": None,
+                "manual": True,
+                "message": (
+                    f"Add a {toolkit} connection under Settings > Connections, "
+                    "then come back here — the chip turns on automatically."
+                ),
+            }
+        try:
+            url = composio.connect_link(toolkit)
+        except composio.ComposioError:
+            return _err(
+                502,
+                "composio_error",
+                "could not reach Composio — check COMPOSIO_API_KEY, "
+                "or connect manually under Settings > Connections",
+            )
         return {
-            "connect_url": None,
-            "manual": True,
-            "message": (
-                f"Add a {toolkit} connection under Settings > Connections, "
-                "then come back here — the chip turns on automatically."
-            ),
+            "connect_url": url,
+            "manual": False,
+            "message": f"Finish connecting {toolkit} in your browser, then come back here.",
         }
+
+    @app.get("/api/staff/connect/status", response_model=None)
+    async def staff_connect_status(toolkit: str):
+        slug = (toolkit or "").strip().lower()
+        if slug not in _all_toolkits():
+            return _err(404, "not_found", "unknown toolkit")
+        state = _load_state()
+        source = _connection_source(slug, state)
+        if source is not None:
+            return {"connected": True, "source": source}
+        if not composio.is_configured():
+            return {"connected": False, "source": None}
+        try:
+            active = composio.connection_active(slug)
+        except composio.ComposioError:
+            return _err(
+                502,
+                "composio_error",
+                "could not reach Composio — check COMPOSIO_API_KEY",
+            )
+        if not active:
+            return {"connected": False, "source": None}
+        # Persist so future state reads answer from disk instead of the network.
+        connected = state.get("composio_connected") or []
+        try:
+            _save_state({**state, "composio_connected": [*connected, slug]})
+        except Exception:
+            return _internal_err()
+        return {"connected": True, "source": "composio"}

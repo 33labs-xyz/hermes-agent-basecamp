@@ -75,9 +75,9 @@ function StaffDirectoryCard({
 
       if (result.connect_url) {
         openExternalLink(result.connect_url)
-      } else {
-        setConnectMessage(result.message)
       }
+
+      setConnectMessage(result.message)
     } catch {
       setConnectMessage('Could not start the connection. Try again.')
     } finally {

@@ -4,6 +4,7 @@ import {
   connectStaffToolkit,
   fireStaffAgent,
   getStaffCatalog,
+  getStaffConnectStatus,
   getStaffState,
   hireStaffAgent,
   runStaffAgent,
@@ -210,8 +211,53 @@ export async function saveLicense(key: string): Promise<void> {
   }
 }
 
-export function connectToolkit(slug: string): Promise<StaffConnectResult> {
-  return connectStaffToolkit(slug)
+// After a Composio connect link opens in the browser, the OAuth dance happens
+// outside the app. Poll the status endpoint until the connection turns active
+// (the backend persists it), then refresh state so the toolkit chip flips on.
+const CONNECT_POLL_INTERVAL_MS = 5_000
+const CONNECT_POLL_MAX_TICKS = 60 // ~5 minutes
+
+const connectPollTimers = new Map<string, ReturnType<typeof setTimeout>>()
+
+function stopConnectPoll(slug: string): void {
+  const timer = connectPollTimers.get(slug)
+
+  if (timer !== undefined) {
+    clearTimeout(timer)
+    connectPollTimers.delete(slug)
+  }
+}
+
+function scheduleConnectPoll(slug: string, ticksLeft: number): void {
+  stopConnectPoll(slug)
+
+  if (ticksLeft <= 0) {return}
+
+  const timer = setTimeout(() => {
+    connectPollTimers.delete(slug)
+
+    getStaffConnectStatus(slug)
+      .then(status => {
+        if (status.connected) {
+          void refreshStaffState()
+        } else {
+          scheduleConnectPoll(slug, ticksLeft - 1)
+        }
+      })
+      .catch(() => scheduleConnectPoll(slug, ticksLeft - 1))
+  }, CONNECT_POLL_INTERVAL_MS)
+
+  connectPollTimers.set(slug, timer)
+}
+
+export async function connectToolkit(slug: string): Promise<StaffConnectResult> {
+  const result = await connectStaffToolkit(slug)
+
+  if (result.connect_url) {
+    scheduleConnectPoll(slug, CONNECT_POLL_MAX_TICKS)
+  }
+
+  return result
 }
 
 // Test-only: reset module state between cases.
@@ -220,6 +266,10 @@ export function resetStaffForTests(): void {
 
   for (const key of runPollTimers.keys()) {
     stopRunPoll(key)
+  }
+
+  for (const slug of connectPollTimers.keys()) {
+    stopConnectPoll(slug)
   }
 
   $staffCatalog.set([])

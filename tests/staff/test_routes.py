@@ -363,3 +363,74 @@ def test_connect_known_toolkit_returns_manual_path(client):
     payload = resp.json()
     assert payload["manual"] is True
     assert "gmail" in payload["message"]
+
+
+def _fake_composio(monkeypatch, *, configured=True, link=None, active=False):
+    from hermes_cli.staff import composio
+
+    monkeypatch.setattr(composio, "is_configured", lambda: configured)
+    if isinstance(link, Exception):
+        def _raise(_toolkit):
+            raise link
+        monkeypatch.setattr(composio, "connect_link", _raise)
+    else:
+        monkeypatch.setattr(composio, "connect_link", lambda _toolkit: link)
+    if isinstance(active, Exception):
+        def _raise_active(_toolkit):
+            raise active
+        monkeypatch.setattr(composio, "connection_active", _raise_active)
+    else:
+        monkeypatch.setattr(composio, "connection_active", lambda _toolkit: active)
+
+
+def test_connect_with_composio_key_returns_link(client, monkeypatch):
+    _fake_composio(monkeypatch, link="https://connect.composio.dev/session/abc")
+    resp = client.post("/api/staff/connect", json={"toolkit": "gmail"})
+    assert resp.status_code == 200
+    payload = resp.json()
+    assert payload["manual"] is False
+    assert payload["connect_url"] == "https://connect.composio.dev/session/abc"
+
+
+def test_connect_composio_failure_is_502(client, monkeypatch):
+    from hermes_cli.staff import composio
+
+    _fake_composio(monkeypatch, link=composio.ComposioError("api down"))
+    resp = client.post("/api/staff/connect", json={"toolkit": "gmail"})
+    assert resp.status_code == 502
+    assert resp.json()["error_code"] == "composio_error"
+
+
+# -- connect status ----------------------------------------------------------
+
+def test_connect_status_unknown_toolkit_is_404(client):
+    assert client.get("/api/staff/connect/status", params={"toolkit": "faxmachine"}).status_code == 404
+
+
+def test_connect_status_not_connected(client):
+    resp = client.get("/api/staff/connect/status", params={"toolkit": "gmail"})
+    assert resp.status_code == 200
+    assert resp.json() == {"connected": False, "source": None}
+
+
+def test_connect_status_composio_active_persists_to_state(client, monkeypatch):
+    _fake_composio(monkeypatch, active=True)
+    resp = client.get("/api/staff/connect/status", params={"toolkit": "gmail"})
+    assert resp.status_code == 200
+    assert resp.json() == {"connected": True, "source": "composio"}
+
+    # Persisted: /api/staff/state reports it without another Composio call,
+    # even after the fake starts saying "not configured".
+    _fake_composio(monkeypatch, configured=False, active=False)
+    connections = {c["slug"]: c for c in client.get("/api/staff/state").json()["connections"]}
+    assert connections["gmail"]["connected"] is True
+    assert connections["gmail"]["source"] == "composio"
+
+
+def test_connect_status_composio_failure_is_502(client, monkeypatch):
+    from hermes_cli.staff import composio
+
+    _fake_composio(monkeypatch, active=composio.ComposioError("api down"))
+    resp = client.get("/api/staff/connect/status", params={"toolkit": "gmail"})
+    assert resp.status_code == 502
+    assert resp.json()["error_code"] == "composio_error"
