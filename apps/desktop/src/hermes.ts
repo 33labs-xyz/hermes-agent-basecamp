@@ -942,6 +942,7 @@ export interface StaffLastReport {
   at: number
   source: 'scheduled' | 'manual'
   excerpt: string
+  ok: boolean
 }
 
 export interface StaffRosterEntry {
@@ -961,6 +962,7 @@ export interface StaffEntitlement {
   tier: 'free' | 'pro'
   slots: number
   schedules: boolean
+  purchase_url: string | null
 }
 
 export interface StaffConnectionStatus {
@@ -979,6 +981,7 @@ export interface StaffLicenseResult {
   tier: 'free' | 'pro'
   slots: number
   schedules: boolean
+  purchase_url: string | null
 }
 
 export interface StaffConnectResult {

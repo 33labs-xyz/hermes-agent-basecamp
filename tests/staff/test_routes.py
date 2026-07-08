@@ -64,6 +64,8 @@ def client(tmp_path, monkeypatch, cron):
     from hermes_state import SessionDB
 
     monkeypatch.delenv("BASECAMP_STAFF_PRO", raising=False)
+    monkeypatch.delenv("BASECAMP_STAFF_PURCHASE_URL", raising=False)
+    monkeypatch.delenv("COMPOSIO_API_KEY", raising=False)
     monkeypatch.setattr(staff_routes, "_state_path", lambda: tmp_path / "staff" / "state.json")
     monkeypatch.setattr(staff_routes, "_cron_call", cron)
 
@@ -123,9 +125,15 @@ def test_default_state_is_free_and_empty(client):
     resp = client.get("/api/staff/state")
     assert resp.status_code == 200
     payload = resp.json()
-    assert payload["entitlement"] == {"tier": "free", "slots": 1, "schedules": False}
+    assert payload["entitlement"] == {"tier": "free", "slots": 1, "schedules": False, "purchase_url": None}
     assert payload["roster"] == []
     assert all({"slug", "connected", "source"} <= set(c) for c in payload["connections"])
+
+
+def test_entitlement_purchase_url_from_env(client, monkeypatch):
+    monkeypatch.setenv("BASECAMP_STAFF_PURCHASE_URL", "https://33labs.xyz/basecamp-pro")
+    payload = client.get("/api/staff/state").json()
+    assert payload["entitlement"]["purchase_url"] == "https://33labs.xyz/basecamp-pro"
 
 
 # -- hire / fire -----------------------------------------------------------
@@ -330,6 +338,19 @@ def test_state_exposes_last_report_after_run(client, cron):
     assert entry["last_report"]["source"] == "manual"
     assert "3 invoices chased" in entry["last_report"]["excerpt"]
     assert entry["last_report"]["at"] > 0
+    assert entry["last_report"]["ok"] is True
+
+
+def test_last_report_flags_failed_runs(client, cron):
+    _hire(client, STANDARD_AGENTS[0])
+    job_id = client.post("/api/staff/run", json={"key": STANDARD_AGENTS[0]}).json()["job_id"]
+    cron.finish_run(
+        job_id,
+        "# Cron Job: Staff run: Inbox manager (FAILED)\n\n## Error\n\nRuntimeError: no provider",
+    )
+
+    entry = client.get("/api/staff/state").json()["roster"][0]
+    assert entry["last_report"]["ok"] is False
 
 
 def test_schedule_prompt_includes_instructions(client, cron):

@@ -156,12 +156,21 @@ def generate_license(seed: str) -> str:
     raise RuntimeError("license generation failed")  # unreachable: alphabet covers all residues
 
 
+def _purchase_url() -> Optional[str]:
+    """Where "Get a key" points. Env-configured so the Stripe checkout page
+    can slot in without touching license validation or shipping a new UI."""
+    url = os.environ.get("BASECAMP_STAFF_PURCHASE_URL", "").strip()
+    return url or None
+
+
 def _entitlement(state: Dict[str, Any]) -> Dict[str, Any]:
     if os.environ.get("BASECAMP_STAFF_PRO") == "1":
-        return dict(_PRO_ENTITLEMENT)
-    if license_is_valid(state.get("license", "")):
-        return dict(_PRO_ENTITLEMENT)
-    return dict(_FREE_ENTITLEMENT)
+        base = dict(_PRO_ENTITLEMENT)
+    elif license_is_valid(state.get("license", "")):
+        base = dict(_PRO_ENTITLEMENT)
+    else:
+        base = dict(_FREE_ENTITLEMENT)
+    return {**base, "purchase_url": _purchase_url()}
 
 
 # ---------------------------------------------------------------------------
@@ -275,7 +284,9 @@ def _latest_report(entry: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     if not text:
         return None
     excerpt = text[:_REPORT_EXCERPT_CHARS] + ("…" if len(text) > _REPORT_EXCERPT_CHARS else "")
-    return {"at": mtime, "source": source, "excerpt": excerpt}
+    # The scheduler titles failed runs "# Cron Job: <name> (FAILED)".
+    first_line = text.splitlines()[0]
+    return {"at": mtime, "source": source, "excerpt": excerpt, "ok": "(FAILED)" not in first_line}
 
 
 def _default_db_factory():

@@ -200,7 +200,11 @@ export function StaffView({ setStatusbarItemGroup }: StaffViewProps) {
         </div>
 
         {licenseOpen && (
-          <StaffLicenseModal currentTier={entitlement?.tier ?? 'free'} onClose={() => setLicenseOpen(false)} />
+          <StaffLicenseModal
+            currentTier={entitlement?.tier ?? 'free'}
+            onClose={() => setLicenseOpen(false)}
+            purchaseUrl={entitlement?.purchase_url ?? null}
+          />
         )}
       </div>
     </div>

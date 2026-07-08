@@ -165,6 +165,7 @@ function StaffRosterCard({
           <p className="mb-1 text-[0.66rem] font-medium tracking-wide text-(--ui-text-tertiary) uppercase">
             {row.last_report.source === 'scheduled' ? 'Scheduled report' : 'Manual run'} ·{' '}
             {formatReportTime(row.last_report.at)}
+            {!row.last_report.ok && <span className="text-destructive"> · Failed</span>}
           </p>
           <p className="line-clamp-4 whitespace-pre-line">{row.last_report.excerpt}</p>
         </div>

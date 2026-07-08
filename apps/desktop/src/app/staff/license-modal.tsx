@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Codicon } from '@/components/ui/codicon'
 import { Input } from '@/components/ui/input'
+import { openExternalLink } from '@/lib/external-link'
 import { cn } from '@/lib/utils'
 import { saveLicense } from '@/store/staff'
 
@@ -12,6 +13,7 @@ import { staffErrorCode } from './errors'
 
 interface StaffLicenseModalProps {
   currentTier: 'free' | 'pro'
+  purchaseUrl: string | null
   onClose: () => void
 }
 
@@ -19,7 +21,7 @@ interface StaffLicenseModalProps {
 // (src/app/studio/index.tsx) — click-outside/Escape to dismiss, card stops
 // propagation. Swapped for the Staff entitlement contract
 // (POST /api/staff/license) instead of the Muapi key.
-export function StaffLicenseModal({ currentTier, onClose }: StaffLicenseModalProps) {
+export function StaffLicenseModal({ currentTier, onClose, purchaseUrl }: StaffLicenseModalProps) {
   return (
     <div
       className="absolute inset-0 z-20 flex items-center justify-center bg-black/50"
@@ -41,7 +43,7 @@ export function StaffLicenseModal({ currentTier, onClose }: StaffLicenseModalPro
         >
           <Codicon name="close" size={14} />
         </button>
-        <StaffLicenseGate currentTier={currentTier} onDone={onClose} />
+        <StaffLicenseGate currentTier={currentTier} onDone={onClose} purchaseUrl={purchaseUrl} />
       </div>
     </div>
   )
@@ -49,7 +51,15 @@ export function StaffLicenseModal({ currentTier, onClose }: StaffLicenseModalPro
 
 // Exported standalone (mirrors StudioKeyGate) in case a future entry point
 // wants the form without the overlay chrome.
-export function StaffLicenseGate({ currentTier, onDone }: { currentTier: 'free' | 'pro'; onDone: () => void }) {
+export function StaffLicenseGate({
+  currentTier,
+  onDone,
+  purchaseUrl
+}: {
+  currentTier: 'free' | 'pro'
+  onDone: () => void
+  purchaseUrl: string | null
+}) {
   const [draft, setDraft] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -102,6 +112,11 @@ export function StaffLicenseGate({ currentTier, onDone }: { currentTier: 'free' 
         </Button>
       </div>
       {error && <p className="text-xs text-destructive">{error}</p>}
+      {purchaseUrl && currentTier !== 'pro' && (
+        <Button disabled={busy} onClick={() => openExternalLink(purchaseUrl)} size="sm" variant="textStrong">
+          Get a key
+        </Button>
+      )}
       {currentTier === 'pro' && (
         <Button disabled={busy} onClick={() => void submit('')} size="sm" variant="ghost">
           Clear license (revert to Free)
