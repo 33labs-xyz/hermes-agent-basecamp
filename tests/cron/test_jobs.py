@@ -709,6 +709,54 @@ class TestGetDueJobs:
         due = get_due_jobs()
         assert len(due) == 0
 
+    def test_catch_up_grace_override_keeps_late_job_due(self, tmp_cron_dir):
+        """A job-level catch_up_grace_seconds widens the stale window.
+
+        A daily job missed by 5 hours is normally fast-forwarded (default
+        grace caps at 2h), but with a 20h override it must still fire — this
+        is the desktop catch-up-on-wake behaviour for staff schedules.
+        """
+        job = create_job(
+            prompt="Sweep inbox",
+            schedule="0 9 * * *",
+            catch_up_grace_seconds=72_000,
+        )
+        jobs = load_jobs()
+        jobs[0]["next_run_at"] = (datetime.now() - timedelta(hours=5)).isoformat()
+        save_jobs(jobs)
+
+        due = get_due_jobs()
+        assert len(due) == 1
+        assert due[0]["id"] == job["id"]
+
+    def test_catch_up_grace_override_expired_fast_forwards(self, tmp_cron_dir):
+        """Beyond the override window the job is still fast-forwarded, not fired."""
+        job = create_job(
+            prompt="Sweep inbox",
+            schedule="0 9 * * *",
+            catch_up_grace_seconds=72_000,
+        )
+        jobs = load_jobs()
+        jobs[0]["next_run_at"] = (datetime.now() - timedelta(hours=21)).isoformat()
+        save_jobs(jobs)
+
+        due = get_due_jobs()
+        assert len(due) == 0
+        updated = get_job(job["id"])
+        from cron.jobs import _ensure_aware, _hermes_now
+        next_dt = _ensure_aware(datetime.fromisoformat(updated["next_run_at"]))
+        assert next_dt > _hermes_now()
+
+    def test_catch_up_grace_omitted_keeps_default_behaviour(self, tmp_cron_dir):
+        """Without the override, a daily job missed by 5 hours is skipped (2h cap)."""
+        create_job(prompt="Sweep inbox", schedule="0 9 * * *")
+        jobs = load_jobs()
+        jobs[0]["next_run_at"] = (datetime.now() - timedelta(hours=5)).isoformat()
+        save_jobs(jobs)
+
+        due = get_due_jobs()
+        assert len(due) == 0
+
     def test_disabled_not_returned(self, tmp_cron_dir):
         job = create_job(prompt="Disabled", schedule="every 1h")
         jobs = load_jobs()
@@ -853,6 +901,14 @@ class TestEnabledToolsets:
     def test_enabled_toolsets_stored(self, tmp_cron_dir):
         job = create_job(prompt="monitor", schedule="every 1h", enabled_toolsets=["web", "terminal"])
         assert job["enabled_toolsets"] == ["web", "terminal"]
+
+    def test_catch_up_grace_seconds_persisted(self, tmp_cron_dir):
+        job = create_job(prompt="p", schedule="0 9 * * *", catch_up_grace_seconds=72_000)
+        assert get_job(job["id"])["catch_up_grace_seconds"] == 72_000
+
+    def test_catch_up_grace_seconds_none_when_omitted(self, tmp_cron_dir):
+        job = create_job(prompt="p", schedule="0 9 * * *")
+        assert get_job(job["id"]).get("catch_up_grace_seconds") is None
 
     def test_enabled_toolsets_persisted(self, tmp_cron_dir):
         job = create_job(prompt="monitor", schedule="every 1h", enabled_toolsets=["web", "file"])

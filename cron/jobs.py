@@ -630,6 +630,7 @@ def create_job(
     workdir: Optional[str] = None,
     no_agent: bool = False,
     group_id: Optional[str] = None,
+    catch_up_grace_seconds: Optional[int] = None,
 ) -> Dict[str, Any]:
     """
     Create a new cron job.
@@ -674,6 +675,12 @@ def create_job(
                 and deliver its stdout directly. Empty stdout = silent (no
                 delivery). Requires ``script`` to be set. Ideal for classic
                 watchdogs and periodic alerts that don't need LLM reasoning.
+        catch_up_grace_seconds: Optional per-job override for the missed-run
+                catch-up window. Recurring jobs whose scheduled time was missed
+                (scheduler not running) still fire if they are within this many
+                seconds of the missed time; beyond it they fast-forward to the
+                next occurrence. When omitted, the default grace is derived
+                from the schedule period (half the period, clamped 2m-2h).
 
     Returns:
         The created job dict
@@ -710,6 +717,13 @@ def create_job(
     normalized_no_agent = bool(no_agent)
     normalized_group_id = str(group_id).strip() if isinstance(group_id, str) else None
     normalized_group_id = normalized_group_id or None
+    normalized_catch_up_grace = (
+        int(catch_up_grace_seconds)
+        if isinstance(catch_up_grace_seconds, int)
+        and not isinstance(catch_up_grace_seconds, bool)
+        and catch_up_grace_seconds > 0
+        else None
+    )
 
     # no_agent jobs are meaningless without a script — the script IS the job.
     # Surface this as a clear ValueError at create time so bad configs never
@@ -767,6 +781,7 @@ def create_job(
         # not scoped to any project. Lets the desktop Projects view list a
         # project's scheduled tasks without a per-job migration.
         "group_id": normalized_group_id,
+        "catch_up_grace_seconds": normalized_catch_up_grace,
     }
 
     with _jobs_lock():
@@ -1139,7 +1154,9 @@ def _get_due_jobs_locked() -> List[Dict[str, Any]]:
             # For recurring jobs, check if the scheduled time is stale
             # (gateway was down and missed the window). Fast-forward to
             # the next future occurrence instead of firing a stale run.
-            grace = _compute_grace_seconds(schedule)
+            # Jobs may opt into a longer catch-up window (e.g. staff jobs
+            # that should still run when the app opens hours later).
+            grace = job.get("catch_up_grace_seconds") or _compute_grace_seconds(schedule)
             if kind in {"cron", "interval"} and (now - next_run_dt).total_seconds() > grace:
                 # Job is past its catch-up grace window — this is a stale missed run.
                 # Grace scales with schedule period: daily=2h, hourly=30m, 10min=5m.

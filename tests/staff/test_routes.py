@@ -222,6 +222,16 @@ def test_schedule_creates_cron_job_bound_to_group(client, cron):
     assert entry["next_run"]
 
 
+def test_schedule_sets_catch_up_grace_for_wake_runs(client, cron):
+    _go_pro(client)
+    _hire(client, STANDARD_AGENTS[0])
+    resp = client.post("/api/staff/schedule", json={"key": STANDARD_AGENTS[0], "time": "09:00"})
+    assert resp.status_code == 200
+    job = cron.jobs[resp.json()["job_id"]]
+    assert job["catch_up_grace_seconds"] == staff_routes._SCHEDULE_CATCH_UP_SECONDS
+    assert job["catch_up_grace_seconds"] == 72_000
+
+
 def test_schedule_requires_hire_first(client):
     _go_pro(client)
     assert client.post("/api/staff/schedule", json={"key": STANDARD_AGENTS[0]}).status_code == 404

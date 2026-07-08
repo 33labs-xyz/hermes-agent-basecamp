@@ -35,6 +35,12 @@ _TIME_RE = re.compile(r"^([01]?\d|2[0-3]):([0-5]\d)$")
 _FREE_ENTITLEMENT = {"tier": "free", "slots": 1, "schedules": False}
 _PRO_ENTITLEMENT = {"tier": "pro", "slots": 5, "schedules": True}
 
+# Staff schedules promise "runs while you're away", but the desktop scheduler
+# only ticks while the app is open. A 20h catch-up window means a missed 9am
+# run still fires when the laptop opens later that day, instead of the default
+# grace (max 2h) silently skipping it.
+_SCHEDULE_CATCH_UP_SECONDS = 72_000
+
 # Toolkit slugs whose MCP server names don't contain the slug verbatim.
 _TOOLKIT_ALIASES: Dict[str, tuple] = {
     "googlecalendar": ("calendar", "gcal"),
@@ -406,6 +412,7 @@ def register_staff_routes(app: FastAPI, db_factory: Optional[Callable] = None) -
                 schedule=schedule,
                 name=f"Staff: {agent.name}",
                 group_id=entry["group_id"],
+                catch_up_grace_seconds=_SCHEDULE_CATCH_UP_SECONDS,
             )
         except Exception:
             return _err(500, "internal", "could not create the schedule")
