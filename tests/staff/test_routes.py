@@ -353,6 +353,40 @@ def test_last_report_flags_failed_runs(client, cron):
     assert entry["last_report"]["ok"] is False
 
 
+def test_last_report_excerpt_skips_prompt_boilerplate(client, cron):
+    """Real scheduler output files start with a header + the full prompt; the
+    excerpt must show the agent's response, not that boilerplate."""
+    _hire(client, STANDARD_AGENTS[0])
+    job_id = client.post("/api/staff/run", json={"key": STANDARD_AGENTS[0]}).json()["job_id"]
+    cron.finish_run(
+        job_id,
+        "# Cron Job: Staff run: Inbox manager\n\n"
+        "**Job ID:** abc123\n**Run Time:** 2026-07-09 09:00:00\n\n"
+        "## Prompt\n\n" + ("standing instructions " * 40) + "\n\n"
+        "## Response\n\nSwept 12 messages: 2 need a reply today.",
+    )
+
+    excerpt = client.get("/api/staff/state").json()["roster"][0]["last_report"]["excerpt"]
+    assert "Swept 12 messages" in excerpt
+    assert "standing instructions" not in excerpt
+
+
+def test_last_report_excerpt_shows_error_for_failed_runs(client, cron):
+    _hire(client, STANDARD_AGENTS[0])
+    job_id = client.post("/api/staff/run", json={"key": STANDARD_AGENTS[0]}).json()["job_id"]
+    cron.finish_run(
+        job_id,
+        "# Cron Job: Staff run: Inbox manager (FAILED)\n\n"
+        "## Prompt\n\n" + ("standing instructions " * 40) + "\n\n"
+        "## Error\n\n```\nRuntimeError: no provider\n```",
+    )
+
+    report = client.get("/api/staff/state").json()["roster"][0]["last_report"]
+    assert report["ok"] is False
+    assert "RuntimeError: no provider" in report["excerpt"]
+    assert "standing instructions" not in report["excerpt"]
+
+
 def test_schedule_prompt_includes_instructions(client, cron):
     from hermes_cli.staff.catalog import get_agent
 

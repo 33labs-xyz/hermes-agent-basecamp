@@ -283,7 +283,15 @@ def _latest_report(entry: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         return None
     if not text:
         return None
-    excerpt = text[:_REPORT_EXCERPT_CHARS] + ("…" if len(text) > _REPORT_EXCERPT_CHARS else "")
+    # Scheduler output files repeat the full prompt before the useful part
+    # ("## Response" or, on failure, "## Error") — excerpt from there.
+    body = text
+    for marker in ("\n## Response\n", "\n## Error\n"):
+        idx = text.find(marker)
+        if idx != -1:
+            body = text[idx + len(marker):].strip()
+            break
+    excerpt = body[:_REPORT_EXCERPT_CHARS] + ("…" if len(body) > _REPORT_EXCERPT_CHARS else "")
     # The scheduler titles failed runs "# Cron Job: <name> (FAILED)".
     first_line = text.splitlines()[0]
     return {"at": mtime, "source": source, "excerpt": excerpt, "ok": "(FAILED)" not in first_line}
