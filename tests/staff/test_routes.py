@@ -59,6 +59,33 @@ def cron(tmp_path):
     return FakeCron(tmp_path / "cron-output")
 
 
+class FakeMcpServers:
+    """In-memory stand-in for ``hermes_cli.mcp_config``'s server registry, so
+    MCP-registration tests don't touch the real ``~/.hermes/config.yaml``."""
+
+    def __init__(self):
+        self.servers: dict = {}
+        self.save_calls: list = []
+
+    def get(self, config=None):
+        return dict(self.servers)
+
+    def save(self, name, server_config):
+        self.save_calls.append((name, server_config))
+        self.servers[name] = server_config
+        return True
+
+
+@pytest.fixture
+def fake_mcp(monkeypatch):
+    import hermes_cli.mcp_config as mcp_config
+
+    fake = FakeMcpServers()
+    monkeypatch.setattr(mcp_config, "_get_mcp_servers", fake.get)
+    monkeypatch.setattr(mcp_config, "_save_mcp_server", fake.save)
+    return fake
+
+
 @pytest.fixture
 def client(tmp_path, monkeypatch, cron):
     from hermes_state import SessionDB
@@ -66,6 +93,7 @@ def client(tmp_path, monkeypatch, cron):
     monkeypatch.delenv("BASECAMP_STAFF_PRO", raising=False)
     monkeypatch.delenv("BASECAMP_STAFF_PURCHASE_URL", raising=False)
     monkeypatch.delenv("COMPOSIO_API_KEY", raising=False)
+    monkeypatch.delenv("BASECAMP_RELAY_URL", raising=False)
     monkeypatch.setattr(staff_routes, "_state_path", lambda: tmp_path / "staff" / "state.json")
     monkeypatch.setattr(staff_routes, "_cron_call", cron)
 
@@ -489,3 +517,97 @@ def test_connect_status_composio_failure_is_502(client, monkeypatch):
     resp = client.get("/api/staff/connect/status", params={"toolkit": "gmail"})
     assert resp.status_code == 502
     assert resp.json()["error_code"] == "composio_error"
+
+
+# -- connect status: MCP runtime registration --------------------------------
+#
+# An ACTIVE Composio connection alone gives the agent runtime no tools --
+# nothing else registers an MCP server for it (tools/mcp_tool.py only loads
+# url-based servers already present in config.yaml). The transition to
+# ACTIVE must also register one.
+
+def test_connect_status_active_registers_mcp_server(client, monkeypatch, fake_mcp):
+    _fake_composio(monkeypatch, active=True)
+    monkeypatch.setattr(
+        staff_routes.composio,
+        "mcp_url",
+        lambda toolkit: f"https://backend.composio.dev/v3/mcp/{toolkit}?user_id=default",
+    )
+
+    resp = client.get("/api/staff/connect/status", params={"toolkit": "gmail"})
+
+    assert resp.status_code == 200
+    assert resp.json() == {"connected": True, "source": "composio"}
+    assert fake_mcp.servers == {
+        "composio_gmail": {"url": "https://backend.composio.dev/v3/mcp/gmail?user_id=default"}
+    }
+    assert len(fake_mcp.save_calls) == 1
+
+
+def test_connect_status_active_registration_idempotent_on_second_call(client, monkeypatch, fake_mcp):
+    _fake_composio(monkeypatch, active=True)
+    monkeypatch.setattr(staff_routes.composio, "mcp_url", lambda _toolkit: "https://relay.example.com/mcp/1")
+
+    first = client.get("/api/staff/connect/status", params={"toolkit": "gmail"})
+    second = client.get("/api/staff/connect/status", params={"toolkit": "gmail"})
+
+    assert first.status_code == second.status_code == 200
+    assert first.json() == {"connected": True, "source": "composio"}
+    # The registered "composio_gmail" server now makes _mcp_connected("gmail")
+    # true too, so the second read reports source "mcp" -- still connected,
+    # and crucially the registration itself only ran once.
+    assert second.json() == {"connected": True, "source": "mcp"}
+    assert len(fake_mcp.save_calls) == 1
+
+
+def test_register_composio_mcp_server_skips_existing(monkeypatch, fake_mcp):
+    # Unit-level: registering "composio_gmail" makes _mcp_connected("gmail")
+    # true from then on (its normalized name contains the "gmail" needle), so
+    # the routes-level ACTIVE branch is unreachable a second time via HTTP --
+    # the internal idempotency check in _register_composio_mcp_server is the
+    # only place this "already registered" path is actually exercised.
+    fake_mcp.servers["composio_gmail"] = {"url": "https://already-there"}
+
+    def _fail_if_called(_toolkit):
+        raise AssertionError("mcp_url should not be called when a server is already registered")
+
+    monkeypatch.setattr(staff_routes.composio, "mcp_url", _fail_if_called)
+
+    staff_routes._register_composio_mcp_server("gmail")
+
+    assert fake_mcp.save_calls == []
+
+
+def test_connect_status_active_registration_failure_does_not_break_response(client, monkeypatch, fake_mcp):
+    _fake_composio(monkeypatch, active=True)
+
+    def _raise(_toolkit):
+        raise staff_routes.composio.ComposioError("mcp registration failed")
+
+    monkeypatch.setattr(staff_routes.composio, "mcp_url", _raise)
+
+    resp = client.get("/api/staff/connect/status", params={"toolkit": "gmail"})
+
+    assert resp.status_code == 200
+    assert resp.json() == {"connected": True, "source": "composio"}
+    assert fake_mcp.save_calls == []
+
+
+# -- purchase_url fallback chain ----------------------------------------------
+
+def test_purchase_url_env_wins_over_relay(client, monkeypatch):
+    monkeypatch.setenv("BASECAMP_STAFF_PURCHASE_URL", "https://33labs.xyz/basecamp-pro")
+    monkeypatch.setenv("BASECAMP_RELAY_URL", "https://relay.example.com")
+    payload = client.get("/api/staff/state").json()
+    assert payload["entitlement"]["purchase_url"] == "https://33labs.xyz/basecamp-pro"
+
+
+def test_purchase_url_falls_back_to_relay_checkout(client, monkeypatch):
+    monkeypatch.setenv("BASECAMP_RELAY_URL", "https://relay.example.com/")
+    payload = client.get("/api/staff/state").json()
+    assert payload["entitlement"]["purchase_url"] == "https://relay.example.com/api/v1/checkout"
+
+
+def test_purchase_url_none_when_neither_set(client):
+    payload = client.get("/api/staff/state").json()
+    assert payload["entitlement"]["purchase_url"] is None

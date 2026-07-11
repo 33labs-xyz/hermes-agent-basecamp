@@ -16,6 +16,7 @@ standing instructions; scheduling (pro) creates a cron job bound to that group.
 from __future__ import annotations
 
 import json
+import logging
 import os
 import re
 import time
@@ -28,6 +29,8 @@ from pydantic import BaseModel
 
 from hermes_cli.staff import composio
 from hermes_cli.staff.catalog import CATALOG, catalog_entry, get_agent
+
+logger = logging.getLogger(__name__)
 
 _LICENSE_RE = re.compile(r"^BCPRO(-[A-Z0-9]{4}){3}$")
 _LICENSE_CHECKSUM_MOD = 7
@@ -158,9 +161,18 @@ def generate_license(seed: str) -> str:
 
 def _purchase_url() -> Optional[str]:
     """Where "Get a key" points. Env-configured so the Stripe checkout page
-    can slot in without touching license validation or shipping a new UI."""
+    can slot in without touching license validation or shipping a new UI.
+
+    Falls back to the relay's hosted checkout when no explicit purchase URL
+    is set but the app is talking to the relay anyway (``BASECAMP_RELAY_URL``).
+    """
     url = os.environ.get("BASECAMP_STAFF_PURCHASE_URL", "").strip()
-    return url or None
+    if url:
+        return url
+    relay_base = composio.relay_base_url()
+    if relay_base:
+        return f"{relay_base}/api/v1/checkout"
+    return None
 
 
 def _entitlement(state: Dict[str, Any]) -> Dict[str, Any]:
@@ -212,6 +224,26 @@ def _connections(state: Dict[str, Any]) -> List[Dict[str, Any]]:
         source = _connection_source(slug, state)
         results.append({"slug": slug, "connected": source is not None, "source": source})
     return results
+
+
+def _register_composio_mcp_server(toolkit: str) -> None:
+    """Give the agent runtime tools for a newly-active Composio connection.
+
+    An ACTIVE connected account only proves OAuth succeeded -- nothing else
+    registers an MCP server for it, so without this the agent runtime never
+    sees the toolkit's tools (``tools/mcp_tool.py`` loads url-based servers
+    straight out of ``config.yaml``). Idempotent: a no-op once the server
+    exists. Callers must swallow any exception this raises -- a failed
+    registration must not turn an otherwise-successful connect-status
+    response into an error.
+    """
+    from hermes_cli.mcp_config import _get_mcp_servers, _save_mcp_server
+
+    server_name = f"composio_{toolkit}"
+    if server_name in _get_mcp_servers():
+        return
+    url = composio.mcp_url(toolkit)
+    _save_mcp_server(server_name, {"url": url})
 
 
 # ---------------------------------------------------------------------------
@@ -570,6 +602,10 @@ def register_staff_routes(app: FastAPI, db_factory: Optional[Callable] = None) -
             )
         if not active:
             return {"connected": False, "source": None}
+        try:
+            _register_composio_mcp_server(slug)
+        except Exception:
+            logger.warning("could not register MCP server for %s", slug, exc_info=True)
         # Persist so future state reads answer from disk instead of the network.
         connected = state.get("composio_connected") or []
         try:
