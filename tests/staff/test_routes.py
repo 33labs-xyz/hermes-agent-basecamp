@@ -7,17 +7,47 @@ cron bridge are monkeypatched so nothing touches ``~/.hermes`` or a scheduler.
 
 from __future__ import annotations
 
+import base64
+
 import pytest
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from hermes_cli.staff import routes as staff_routes
 from hermes_cli.staff.catalog import CATALOG
-from hermes_cli.staff.routes import generate_license, license_is_valid
+from hermes_cli.staff.routes import license_is_valid
 
-PRO_KEY = generate_license("test-suite")
 STANDARD_AGENTS = [a.key for a in CATALOG if a.tier == "standard"]
 PRO_AGENTS = [a.key for a in CATALOG if a.tier == "pro"]
+
+# Real reference vector: issued by the relay's private key for Stripe session
+# ``cs_test_reference_0001``. Must validate against the real baked-in public
+# key with no monkeypatching, guarding against format drift between the
+# relay's signer and this app's verifier.
+REFERENCE_PRO_KEY = (
+    "BCPRO-KKQ54T3C-F5DXJGN2-Y5OJVAWZ-ZLJD6OIX-SJKL223B-EPOUIZYR-LVHKCMQD-"
+    "KJGMA777-LGTCDL3Y-2WL37KOW-CI52J3CE-M5GEFH2E-GCX2IOKC-RUOCIFDW-FQEQ"
+)
+
+
+def _make_signed_license(private_key: Ed25519PrivateKey, nonce: bytes = b"\x01" * 8) -> str:
+    """Build a ``BCPRO-...`` key the same way the relay's signer does, using
+    an ephemeral test keypair (never the app's real public key's private half,
+    which this app never has)."""
+    signature = private_key.sign(b"BCPRO1" + nonce)
+    body = base64.b32encode(nonce + signature).decode("ascii").rstrip("=")
+    groups = [body[i : i + 8] for i in range(0, len(body), 8)]
+    return "BCPRO-" + "-".join(groups)
+
+
+# Ephemeral keypair for the whole test module: signs PRO_KEY below, and every
+# test that goes through the ``client`` fixture has the app's cached public
+# key swapped to this pair's public half so PRO_KEY verifies as if it had
+# come from the real relay.
+_TEST_PRIVATE_KEY = Ed25519PrivateKey.generate()
+_TEST_PUBLIC_KEY = _TEST_PRIVATE_KEY.public_key()
+PRO_KEY = _make_signed_license(_TEST_PRIVATE_KEY)
 
 
 class FakeCron:
@@ -96,6 +126,7 @@ def client(tmp_path, monkeypatch, cron):
     monkeypatch.delenv("BASECAMP_RELAY_URL", raising=False)
     monkeypatch.setattr(staff_routes, "_state_path", lambda: tmp_path / "staff" / "state.json")
     monkeypatch.setattr(staff_routes, "_cron_call", cron)
+    monkeypatch.setattr(staff_routes, "_license_public_key", lambda: _TEST_PUBLIC_KEY)
 
     db_path = tmp_path / "routes_state.db"
     app = FastAPI()
@@ -117,13 +148,36 @@ def _hire(client, key):
 
 # -- license ---------------------------------------------------------------
 
-def test_generated_license_validates():
+def test_generated_license_validates(monkeypatch):
+    monkeypatch.setattr(staff_routes, "_license_public_key", lambda: _TEST_PUBLIC_KEY)
     assert license_is_valid(PRO_KEY)
 
 
-def test_tampered_license_fails():
-    tampered = PRO_KEY[:-1] + ("A" if PRO_KEY[-1] != "A" else "B")
+def test_tampered_license_fails(monkeypatch):
+    monkeypatch.setattr(staff_routes, "_license_public_key", lambda: _TEST_PUBLIC_KEY)
+    # Flip a character in the middle of the signature body, not the very last
+    # character of the key: base32's final char carries a few unused padding
+    # bits that decode identically either way, so tampering only there
+    # wouldn't actually change the decoded payload.
+    mid = len(PRO_KEY) // 2
+    flipped = "A" if PRO_KEY[mid] != "A" else "B"
+    tampered = PRO_KEY[:mid] + flipped + PRO_KEY[mid + 1 :]
     assert not license_is_valid(tampered)
+
+
+def test_garbage_license_fails(monkeypatch):
+    monkeypatch.setattr(staff_routes, "_license_public_key", lambda: _TEST_PUBLIC_KEY)
+    assert not license_is_valid("not-a-license-key-at-all")
+    assert not license_is_valid("BCPRO-")
+    assert not license_is_valid("BCPRO-TOOSHORT")
+    assert not license_is_valid("")
+
+
+def test_reference_vector_validates_against_real_public_key():
+    """Real key issued by the relay's private key, verified against the real
+    baked-in public key baked into routes.py -- no monkeypatching. Guards
+    against wire-format drift between the relay's signer and this verifier."""
+    assert license_is_valid(REFERENCE_PRO_KEY)
 
 
 def test_bad_license_is_400(client):

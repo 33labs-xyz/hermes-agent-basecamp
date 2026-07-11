@@ -15,14 +15,17 @@ standing instructions; scheduling (pro) creates a cron job bound to that group.
 
 from __future__ import annotations
 
+import base64
 import json
 import logging
 import os
 import re
 import time
+from functools import lru_cache
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
@@ -32,8 +35,12 @@ from hermes_cli.staff.catalog import CATALOG, catalog_entry, get_agent
 
 logger = logging.getLogger(__name__)
 
-_LICENSE_RE = re.compile(r"^BCPRO(-[A-Z0-9]{4}){3}$")
-_LICENSE_CHECKSUM_MOD = 7
+# Offline Ed25519 license verification: the relay signs keys with the private
+# half of this pair; only the public half ships here, so a key cannot be
+# forged without relay access. See ``license_is_valid`` for the wire format.
+_LICENSE_PREFIX = "BCPRO-"
+_LICENSE_MESSAGE_PREFIX = b"BCPRO1"
+_LICENSE_PUBLIC_KEY_HEX = "41614277faaebf00e77cbe91ccacf61ead810170565003ca0a4e4fdf2265cea1"
 _TIME_RE = re.compile(r"^([01]?\d|2[0-3]):([0-5]\d)$")
 
 _FREE_ENTITLEMENT = {"tier": "free", "slots": 1, "schedules": False}
@@ -132,31 +139,39 @@ def _save_state(state: Dict[str, Any]) -> None:
 # Entitlement (license-key placeholder; swap for Stripe/Supabase later)
 # ---------------------------------------------------------------------------
 
+@lru_cache(maxsize=1)
+def _license_public_key() -> Ed25519PublicKey:
+    return Ed25519PublicKey.from_public_bytes(bytes.fromhex(_LICENSE_PUBLIC_KEY_HEX))
+
+
+def _decode_license_payload(key: str) -> bytes:
+    """Parse ``BCPRO-XXXXXXXX-...`` into its raw 72-byte nonce+signature."""
+    if not key.startswith(_LICENSE_PREFIX):
+        raise ValueError("missing BCPRO- prefix")
+    body = key[len(_LICENSE_PREFIX):].replace("-", "").upper()
+    padded = body + "=" * (-len(body) % 8)
+    payload = base64.b32decode(padded)
+    if len(payload) != 72:
+        raise ValueError("unexpected payload length")
+    return payload
+
+
 def license_is_valid(key: str) -> bool:
-    """Format + checksum gate for hand-issued pro keys.
+    """Offline Ed25519 signature check for relay-issued pro keys.
 
-    A key is valid when it matches ``BCPRO-XXXX-XXXX-XXXX`` (A-Z0-9) and the
-    sum of its alphanumeric character codes is divisible by
-    ``_LICENSE_CHECKSUM_MOD``. ``generate_license`` produces matching keys.
+    A key encodes an 8-byte nonce and a 64-byte Ed25519 signature over
+    ``b"BCPRO1" + nonce``, base32-encoded (RFC 4648) and dash-grouped for
+    readability. The relay holds the private key; this app only ever verifies
+    against the baked-in public half, so a key can't be guessed or forged.
+    Any parse or verification failure is treated as an invalid key.
     """
-    if not _LICENSE_RE.match(key):
+    try:
+        payload = _decode_license_payload(key)
+        nonce, signature = payload[:8], payload[8:]
+        _license_public_key().verify(signature, _LICENSE_MESSAGE_PREFIX + nonce)
+        return True
+    except Exception:
         return False
-    total = sum(ord(c) for c in key if c.isalnum())
-    return total % _LICENSE_CHECKSUM_MOD == 0
-
-
-def generate_license(seed: str) -> str:
-    """Derive a valid pro key from any seed string (issuing helper, CLI use)."""
-    import hashlib
-
-    alphabet = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
-    digest = hashlib.sha256(seed.encode("utf-8")).hexdigest().upper()
-    chars = [alphabet[int(digest[i : i + 2], 16) % len(alphabet)] for i in range(0, 22, 2)]
-    for candidate in alphabet:
-        key = "BCPRO-" + "".join(chars[0:4]) + "-" + "".join(chars[4:8]) + "-" + "".join(chars[8:11]) + candidate
-        if license_is_valid(key):
-            return key
-    raise RuntimeError("license generation failed")  # unreachable: alphabet covers all residues
 
 
 def _purchase_url() -> Optional[str]:
