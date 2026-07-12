@@ -1,10 +1,13 @@
 import os
 from pathlib import Path
 import pytest
-from agent.claude_cli_client import build_command, resolve_cli_path, ClaudeCliTurn
+from agent.claude_cli_client import (
+    build_command, resolve_cli_path, ClaudeCliTurn, CliTurnResult,
+)
 
 FAKE = str(Path(__file__).parent / "fixtures" / "fake_claude.sh")
 FAKE_AUTH_ERROR = str(Path(__file__).parent / "fixtures" / "fake_claude_auth_error.sh")
+FAKE_NOISY_STDERR = str(Path(__file__).parent / "fixtures" / "fake_claude_noisy_stderr.sh")
 
 class TestBuildCommand:
     def test_includes_isolation_flags(self):
@@ -55,6 +58,16 @@ class TestResolveCliPath:
         monkeypatch.setenv("PATH", "/nonexistent")
         assert resolve_cli_path() is None
 
+    def test_falls_back_to_path_lookup(self, monkeypatch):
+        # No CLAUDE_CLI_PATH override: resolve_cli_path() must fall through
+        # to shutil.which("claude") on PATH.
+        monkeypatch.delenv("CLAUDE_CLI_PATH", raising=False)
+        monkeypatch.setattr(
+            "agent.claude_cli_client.shutil.which",
+            lambda name: "/sentinel/path/claude",
+        )
+        assert resolve_cli_path() == "/sentinel/path/claude"
+
 class TestClaudeCliTurn:
     def test_parses_stream(self, monkeypatch):
         monkeypatch.setenv("CLAUDE_CLI_PATH", FAKE)
@@ -84,4 +97,35 @@ class TestClaudeCliTurn:
         result = turn.run(timeout=10.0)
         assert result.error is not None
         assert "Not logged in" in result.error
+        assert result.text == ""
+
+    def test_large_stderr_does_not_deadlock(self, monkeypatch):
+        # Regression test: --verbose is mandated on every spawn, so
+        # non-trivial stderr volume is realistic. If stdout and stderr are
+        # not drained concurrently, a child that writes a large chunk to
+        # stderr before finishing stdout fills the OS pipe buffer and
+        # deadlocks both sides until the timer's kill() fires. 30s is
+        # generous but finite: with a working concurrent drain this finishes
+        # almost immediately; without one, this test would only "pass" by
+        # being killed (empty text, error set) after the full 30s.
+        monkeypatch.setenv("CLAUDE_CLI_PATH", FAKE_NOISY_STDERR)
+        turn = ClaudeCliTurn(prompt="hi", model="sonnet")
+        result = turn.run(timeout=30.0)
+        assert result.text == "Hello world"
+        assert result.error is None
+
+    def test_is_error_with_no_detail_yields_clear_message(self):
+        # Regression test: the real CLI leaves "subtype":"success" even on
+        # is_error:true, so an is_error result with no "result" text must
+        # not produce the confusing "CLI turn failed: success" message.
+        turn = ClaudeCliTurn(prompt="hi", model="sonnet")
+        result = CliTurnResult()
+        event = {
+            "type": "result",
+            "subtype": "success",
+            "is_error": True,
+            "session_id": "44444444-4444-4444-4444-444444444444",
+        }
+        turn._handle_event(event, result)
+        assert result.error == "CLI turn failed (is_error, no detail from CLI)"
         assert result.text == ""

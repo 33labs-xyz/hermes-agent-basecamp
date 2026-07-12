@@ -26,6 +26,7 @@ from typing import Callable
 
 DEFAULT_TIMEOUT_SECONDS = 300.0
 _KILL_GRACE_SECONDS = 5.0
+_STDERR_JOIN_GRACE_SECONDS = 5.0
 
 
 def resolve_cli_path() -> str | None:
@@ -112,6 +113,27 @@ class ClaudeCliTurn:
                 start_new_session=True,
             )
         result = CliTurnResult()
+        stderr_chunks: list[str] = []
+
+        def _drain_stderr() -> None:
+            # Runs on its own thread, started before the stdout loop below.
+            # --verbose is mandated on every spawn, so the child can produce
+            # enough stderr volume to fill the OS pipe buffer (~64KB). If
+            # stderr were only read after stdout reaches EOF, a child that
+            # blocks writing a full stderr buffer while it still has stdout
+            # left to produce would deadlock against this same read loop:
+            # neither side can proceed until the timer's kill() intervenes.
+            stream = self._proc.stderr
+            if stream is None:
+                return
+            try:
+                for chunk in stream:
+                    stderr_chunks.append(chunk)
+            except (ValueError, OSError):
+                pass  # stream closed by kill(); nothing more to read
+
+        stderr_thread = threading.Thread(target=_drain_stderr, daemon=True)
+        stderr_thread.start()
         timer = threading.Timer(timeout, self.kill)
         timer.start()
         try:
@@ -126,7 +148,8 @@ class ClaudeCliTurn:
                     continue
                 self._handle_event(event, result)
             self._proc.wait()
-            stderr_tail = (self._proc.stderr.read() or "")[-2000:] if self._proc.stderr else ""
+            stderr_thread.join(timeout=_STDERR_JOIN_GRACE_SECONDS)
+            stderr_tail = ("".join(stderr_chunks))[-2000:]
             # Only fall back to a generic stderr-based message when the result
             # event itself did not already report a specific failure (e.g. the
             # CLI's own "Not logged in" text from an is_error result).
@@ -154,7 +177,16 @@ class ClaudeCliTurn:
             result.session_id = event.get("session_id") or result.session_id
             result.usage = event.get("usage")
             if event.get("is_error") or event.get("subtype") not in (None, "success"):
-                result.error = event.get("result") or f"CLI turn failed: {event.get('subtype')}"
+                # The real CLI leaves "subtype":"success" even on is_error,
+                # so an is_error result with no detail must not read as the
+                # confusing "CLI turn failed: success".
+                detail = event.get("result")
+                if detail:
+                    result.error = detail
+                elif event.get("is_error"):
+                    result.error = "CLI turn failed (is_error, no detail from CLI)"
+                else:
+                    result.error = f"CLI turn failed: {event.get('subtype')}"
             else:
                 result.text = event.get("result") or result.text
 
