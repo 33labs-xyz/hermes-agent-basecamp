@@ -67,6 +67,7 @@ from gateway.status import (
     get_runtime_status_running_pid,
     read_runtime_status,
 )
+from model_tools import handle_function_call
 from utils import env_var_enabled
 
 try:
@@ -3810,6 +3811,64 @@ async def validate_provider_credential(body: EnvVarUpdate, request: Request):
         # 429 = key is valid but rate-limited; success = valid.
         return {"ok": True, "reachable": True, "message": ""}
     return {"ok": False, "reachable": True, "message": f"Provider returned HTTP {resp.status_code} for this key."}
+
+
+class InternalToolCall(BaseModel):
+    session_id: str
+    tool_name: str
+    arguments: Dict[str, Any] = {}
+    bridge_token: str
+
+
+def _emit_bridge_tool_event(
+    session_id: str,
+    tool_name: str,
+    arguments: Dict[str, Any],
+    result_text: str,
+    ok: bool,
+) -> None:
+    """Best-effort tool.start/tool.complete so bridge tool calls render UI cards.
+    Never raises: a missing gateway session must not fail the tool call."""
+    try:
+        import uuid
+
+        from tui_gateway import server as _gw
+
+        tool_id = "bridge_" + uuid.uuid4().hex
+        _gw._on_tool_start(session_id, tool_id, tool_name, arguments)
+        _gw._on_tool_complete(session_id, tool_id, tool_name, arguments, result_text)
+    except Exception:
+        pass
+
+
+@app.post("/api/internal/tool-call")
+async def internal_tool_call(body: InternalToolCall, request: Request):
+    # Localhost-only + per-session bridge token. Either failure -> 403, and the
+    # message never reveals which check failed.
+    from hermes_cli.bridge_tokens import verify_bridge_token
+
+    if not _local_dashboard_request(request):
+        raise HTTPException(status_code=403, detail="Forbidden")
+    if not verify_bridge_token(body.session_id, body.bridge_token):
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    raw = handle_function_call(
+        body.tool_name, body.arguments or {}, session_id=body.session_id
+    )
+
+    ok = True
+    error: Optional[str] = None
+    try:
+        parsed = json.loads(raw)
+    except (ValueError, TypeError):
+        parsed = None
+    if isinstance(parsed, dict) and "error" in parsed:
+        ok = False
+        error = str(parsed.get("error"))
+
+    _emit_bridge_tool_event(body.session_id, body.tool_name, body.arguments or {}, raw, ok)
+
+    return {"ok": ok, "result": raw, "error": error}
 
 
 @app.delete("/api/env")
