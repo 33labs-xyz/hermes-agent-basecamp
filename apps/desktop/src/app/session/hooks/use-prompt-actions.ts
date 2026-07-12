@@ -119,6 +119,17 @@ function isSessionNotFoundError(error: unknown): boolean {
   return /session not found/i.test(message)
 }
 
+// A rewind's truncate_before_user_ordinal can overshoot when some OTHER turn
+// in the session failed (its optimistic user message never reached the
+// backend's history), inflating the UI's visible-user-message count past what
+// the backend recorded. The backend rejects that stale ordinal with 4018 -
+// shared by restoreToMessage and editMessage so both retry the same way.
+function isStaleTargetError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error)
+
+  return /no longer in session history|not in session history/i.test(message)
+}
+
 // The gateway refuses prompt.submit while a turn is running (4009 "session
 // busy"). It's a transient concurrency guard, never a user-facing error: a
 // submit racing the settle edge (or a rewind interrupting mid-turn) just waits
@@ -1612,7 +1623,12 @@ export function usePromptActions({
       }
 
       const wasRunning = $busy.get()
-      const truncateBeforeUserOrdinal = visibleUserOrdinal(messages, sourceIndex)
+
+      // Failed turn: optimistic user msg never reached the gateway, so truncating
+      // by ordinal would 422. Submit as a plain resend instead.
+      const nextMessage = messages[sourceIndex + 1]
+      const isFailedTurn = nextMessage?.role === 'assistant' && Boolean(nextMessage.error)
+      const truncateBeforeUserOrdinal = isFailedTurn ? undefined : visibleUserOrdinal(messages, sourceIndex)
 
       // The turns we're discarding may have spawned todos and background
       // processes; they belong to the abandoned timeline, so wipe their status
@@ -1637,6 +1653,21 @@ export function usePromptActions({
       try {
         await submitRewindPrompt(sessionId, text, truncateBeforeUserOrdinal, wasRunning)
       } catch (err) {
+        if (!isFailedTurn && isStaleTargetError(err)) {
+          try {
+            // Already interrupted on the first attempt - submit as a plain resend.
+            await submitRewindPrompt(sessionId, text, undefined, false)
+
+            return
+          } catch (retryErr) {
+            setMutableRef(busyRef, false)
+            setBusy(false)
+            setAwaitingResponse(false)
+            updateSessionState(sessionId, state => ({ ...state, busy: false, awaitingResponse: false }))
+            throw retryErr
+          }
+        }
+
         setMutableRef(busyRef, false)
         setBusy(false)
         setAwaitingResponse(false)
@@ -1695,9 +1726,6 @@ export function usePromptActions({
         interrupted: false,
         messages: [...state.messages.slice(0, sourceIndex), editedMessage]
       }))
-
-      const isStaleTargetError = (err: unknown) =>
-        /no longer in session history|not in session history/i.test(err instanceof Error ? err.message : String(err))
 
       try {
         await submitRewindPrompt(sessionId, text, isFailedTurn ? undefined : visibleUserOrdinal(messages, sourceIndex), wasRunning)

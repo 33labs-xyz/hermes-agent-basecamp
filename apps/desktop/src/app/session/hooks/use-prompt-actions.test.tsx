@@ -617,6 +617,86 @@ describe('usePromptActions restoreToMessage', () => {
 
     expect(requestGateway).not.toHaveBeenCalled()
   })
+
+  it('omits truncate_before_user_ordinal when the target turn itself failed', async () => {
+    // The optimistic user message for a failed turn never reached the backend's
+    // session history, so truncating by ordinal would overshoot past what the
+    // backend actually recorded. restoreToMessage must fall back to a plain
+    // resend (no ordinal) here - same as editMessage's isFailedTurn guard.
+    $messages.set([
+      { id: 'u1', role: 'user', parts: [textPart('first prompt')] },
+      { id: 'a1-failed', role: 'assistant', parts: [], error: 'boom' },
+      { id: 'u2', role: 'user', parts: [textPart('second prompt')] },
+      { id: 'a2', role: 'assistant', parts: [textPart('second answer')] }
+    ])
+
+    const requestGateway = vi.fn(async () => ({}) as never)
+
+    let handle: HarnessHandle | null = null
+    render(
+      <Harness
+        onReady={h => (handle = h)}
+        refreshSessions={async () => undefined}
+        requestGateway={requestGateway}
+        seedMessages={$messages.get()}
+      />
+    )
+
+    await handle!.restoreToMessage('u1')
+
+    expect(requestGateway).toHaveBeenCalledWith('prompt.submit', {
+      session_id: RUNTIME_SESSION_ID,
+      text: 'first prompt'
+    })
+  })
+
+  it('retries once without the ordinal when prompt.submit rejects with a stale-target error', async () => {
+    // A different, earlier turn's failure can inflate the visible-user-message
+    // count past what the backend recorded, so the ordinal-bearing first attempt
+    // 4018s even though this target's own next turn succeeded. One ordinal-less
+    // retry recovers instead of surfacing the error to the confirmation dialog.
+    let submitAttempts = 0
+    const calls: { method: string; params?: Record<string, unknown> }[] = []
+
+    const requestGateway = vi.fn(async (method: string, params?: Record<string, unknown>) => {
+      calls.push({ method, params })
+
+      if (method === 'prompt.submit') {
+        submitAttempts += 1
+
+        if (submitAttempts === 1) {
+          throw new Error('4018: target user message is no longer in session history')
+        }
+      }
+
+      return {} as never
+    })
+
+    let handle: HarnessHandle | null = null
+    render(
+      <Harness
+        onReady={h => (handle = h)}
+        refreshSessions={async () => undefined}
+        requestGateway={requestGateway}
+        seedMessages={$messages.get()}
+      />
+    )
+
+    await handle!.restoreToMessage('u1')
+
+    expect(submitAttempts).toBe(2)
+
+    const submitCalls = calls.filter(call => call.method === 'prompt.submit')
+    expect(submitCalls[0]?.params).toEqual({
+      session_id: RUNTIME_SESSION_ID,
+      text: 'first prompt',
+      truncate_before_user_ordinal: 0
+    })
+    expect(submitCalls[1]?.params).toEqual({
+      session_id: RUNTIME_SESSION_ID,
+      text: 'first prompt'
+    })
+  })
 })
 
 describe('usePromptActions file attachment sync', () => {
