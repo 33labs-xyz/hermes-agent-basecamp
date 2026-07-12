@@ -4,6 +4,14 @@ Protocol (verified against CLI 2.1.202): one JSON object per stdout line.
   {"type":"system","subtype":"init","session_id":...}
   {"type":"stream_event","event":{"type":"content_block_delta","delta":{"type":"text_delta","text":...}}}
   {"type":"result","subtype":"success","result":<full text>,"session_id":...,"usage":{...}}
+
+Gotcha (verified live against CLI 2.1.202): an auth/exec failure still reports
+"subtype":"success" but sets "is_error":true, with the failure text in "result".
+  {"type":"result","subtype":"success","is_error":true,"result":<failure text>,...}
+Also, "--tools <tools...>" is a variadic option and greedily swallows any bare
+token after it, including a trailing positional prompt with no flag in between.
+A literal "--" sentinel is inserted before the prompt in build_command() so the
+prompt always parses as a positional operand.
 """
 from __future__ import annotations
 
@@ -54,7 +62,9 @@ def build_command(
         cmd += ["--append-system-prompt", system_prompt]
     if session_id:
         cmd += (["--resume", session_id] if resume else ["--session-id", session_id])
-    cmd.append(prompt)
+    # "--" ends flag parsing so the prompt is always a positional operand, never
+    # absorbed by a preceding variadic option such as --tools <tools...>.
+    cmd += ["--", prompt]
     return cmd
 
 
@@ -117,7 +127,10 @@ class ClaudeCliTurn:
                 self._handle_event(event, result)
             self._proc.wait()
             stderr_tail = (self._proc.stderr.read() or "")[-2000:] if self._proc.stderr else ""
-            if self._proc.returncode != 0 and not result.text:
+            # Only fall back to a generic stderr-based message when the result
+            # event itself did not already report a specific failure (e.g. the
+            # CLI's own "Not logged in" text from an is_error result).
+            if self._proc.returncode != 0 and not result.text and result.error is None:
                 result.error = _friendly_error(self._proc.returncode, stderr_tail)
         finally:
             timer.cancel()
@@ -138,11 +151,12 @@ class ClaudeCliTurn:
         elif etype in ("assistant", "user") and self.on_tool_event:
             self.on_tool_event(event)
         elif etype == "result":
-            result.text = event.get("result") or result.text
             result.session_id = event.get("session_id") or result.session_id
             result.usage = event.get("usage")
-            if event.get("subtype") not in (None, "success"):
+            if event.get("is_error") or event.get("subtype") not in (None, "success"):
                 result.error = event.get("result") or f"CLI turn failed: {event.get('subtype')}"
+            else:
+                result.text = event.get("result") or result.text
 
     def kill(self) -> None:
         with self._lock:
