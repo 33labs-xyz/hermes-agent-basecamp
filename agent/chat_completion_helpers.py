@@ -516,6 +516,9 @@ def interruptible_api_call(agent, api_kwargs: dict):
                 if agent.api_mode == "anthropic_messages":
                     agent._anthropic_client.close()
                     agent._rebuild_anthropic_client()
+                elif agent.api_mode == "claude_cli":
+                    from agent.transports.claude_cli import interrupt_turn
+                    interrupt_turn(str(api_kwargs.get("hermes_session_id") or ""))
                 else:
                     _close_request_client_once("stale_call_kill")
             except Exception:
@@ -525,6 +528,15 @@ def interruptible_api_call(agent, api_kwargs: dict):
             )
             # Wait briefly for the thread to notice the closed connection.
             t.join(timeout=2.0)
+            if agent.api_mode == "claude_cli":
+                # Unlike an httpx close (which makes the worker raise,
+                # leaving result["response"] None so the guard below fires
+                # naturally), run_claude_cli_turn() RETURNS a
+                # NormalizedResponse even after interrupt_turn() kills its
+                # subprocess group. Null it out so the killed turn surfaces
+                # a TimeoutError like every other provider's stale path,
+                # instead of looking like a silent empty/partial success.
+                result["response"] = None
             if result["error"] is None and result["response"] is None:
                 if _silent_hint:
                     result["error"] = TimeoutError(

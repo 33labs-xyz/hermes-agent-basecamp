@@ -2,6 +2,8 @@ import threading
 import time
 from pathlib import Path
 
+import pytest
+
 from agent.chat_completion_helpers import build_api_kwargs, interruptible_api_call
 from agent.transports.claude_cli import (
     ClaudeCliTransport,
@@ -190,3 +192,35 @@ class TestDispatchWiring:
         )
         assert "error" in outcome
         assert isinstance(outcome["error"], InterruptedError)
+
+    def test_stale_watchdog_kills_inflight_cli_subprocess(self, monkeypatch):
+        # Important-finding regression guard: interruptible_api_call has TWO
+        # force-stop blocks - the interrupt handler above (already correct)
+        # and the stale-call watchdog (this one). Before this fix the
+        # watchdog's try block had no claude_cli branch, so
+        # _close_request_client_once() was a no-op for claude_cli (no OpenAI
+        # request_client is ever set for this provider), and
+        # run_claude_cli_turn() returns a NormalizedResponse rather than
+        # raising, so the killed turn looked like a silent success while the
+        # CLI subprocess kept running, unkilled, in the background.
+        monkeypatch.setenv("CLAUDE_CLI_PATH", SLOW_FAKE)
+        agent = _FakeClaudeCliAgent(session_id="sess-dispatch-stale-timeout")
+        # Tiny stale threshold so the watchdog fires almost immediately,
+        # instead of the interrupt test's deliberately generous 60.0s.
+        agent._compute_non_stream_stale_timeout = lambda api_kwargs: 0.5
+        api_kwargs = {**_kwargs(), "hermes_session_id": agent.session_id}
+
+        t_start = time.time()
+        with pytest.raises(TimeoutError):
+            interruptible_api_call(agent, api_kwargs)
+        elapsed = time.time() - t_start
+
+        assert elapsed < 5.0, (
+            f"stale watchdog took {elapsed:.1f}s to raise, should kill the "
+            "subprocess well under the fixture's 30s sleep, not wait it out"
+        )
+        assert agent.session_id not in _active_turns, (
+            "stale watchdog left the CLI subprocess registered as in-flight "
+            "(interrupt_turn() was not reached for claude_cli, so the "
+            "subprocess group was never actually killed)"
+        )
