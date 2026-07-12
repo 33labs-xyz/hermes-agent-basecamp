@@ -52,22 +52,28 @@ export function envKeyToSlug(envKey: string): string {
   return envKey.replace(/_API_KEY$/, '').toLowerCase().replace(/_/g, '-')
 }
 
-// True only when the user SAVED a credential for this provider inside Basecamp.
+// Providers the backend authenticates WITHOUT any user-saved .env key - their
+// auth_type is not an API key (e.g. external_process = a local CLI the backend
+// detects). The backend only returns these with authenticated:true when they
+// are actually usable, and there is no .env key to check, so the app-side
+// "did the user save a key" gate does not apply. Extend as more are added.
+const NON_API_KEY_PROVIDERS = new Set<string>(['claude-cli'])
+
+// True only when the user configured this provider inside Basecamp - either by
+// saving its credential (/api/env is_set), or, for NON_API_KEY_PROVIDERS, by the
+// backend having authenticated it from a non-key source (the model-options row
+// only exists when it is usable).
 //
-// The signal is /api/env `is_set`, which the backend derives purely from the
-// on-disk ~/.hermes/.env; it does NOT merge os.environ. So ambient creds the
-// backend harvests to authenticate a provider (the gh CLI keyring -> Copilot,
-// an ANTHROPIC_* env -> Anthropic) read is_set:false and are correctly
-// excluded, while a key the user pasted in Settings -> Providers reads
-// is_set:true.
-//
-// KNOWN LIMIT: a provider set up purely via in-app OAuth writes to auth.json /
-// the credential pool, not to .env, so this predicate would miss it. No such
-// provider ships today (Claude-subscription OAuth was removed), so there is no
-// regression; extend this predicate if one is added.
+// The is_set signal comes from ~/.hermes/.env only; it does NOT merge os.environ,
+// so ambient creds the backend harvests to authenticate a provider (gh CLI
+// keyring -> Copilot, an ANTHROPIC_* env -> Anthropic) read is_set:false and are
+// correctly excluded, while a key pasted in Settings -> Providers reads is_set:true.
 export function isProviderSetUpInApp(
   slug: string,
   env: null | Record<string, EnvVarInfo> | undefined
 ): boolean {
+  if (NON_API_KEY_PROVIDERS.has(slug)) {
+    return true
+  }
   return !!env && providerEnvKeys(slug).some(key => env[key]?.is_set === true)
 }

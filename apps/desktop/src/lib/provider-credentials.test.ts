@@ -73,6 +73,21 @@ describe('isProviderSetUpInApp', () => {
     expect(isProviderSetUpInApp('openrouter', null)).toBe(false)
     expect(isProviderSetUpInApp('openrouter', undefined)).toBe(false)
   })
+
+  it('is true for claude-cli even with no saved key (backend authenticates it via the local CLI, not a .env key)', () => {
+    // claude-cli is auth_type external_process: the backend only returns it
+    // (authenticated:true) when the `claude` binary is present, and there is no
+    // .env key to check. The app-side "did the user save a key" gate must not
+    // apply, or the provider is silently hidden from the model picker.
+    expect(isProviderSetUpInApp('claude-cli', env({}))).toBe(true)
+    expect(isProviderSetUpInApp('claude-cli', env({ CLAUDE_CLI_API_KEY: false }))).toBe(true)
+  })
+
+  it('still gates ordinary api-key providers on a saved key (the claude-cli exemption is scoped)', () => {
+    // Guards against a blanket return-true regression.
+    expect(isProviderSetUpInApp('openrouter', env({}))).toBe(false)
+    expect(isProviderSetUpInApp('deepseek', env({ OPENROUTER_API_KEY: true }))).toBe(false)
+  })
 })
 
 describe('envKeyToSlug', () => {
