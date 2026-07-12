@@ -229,6 +229,20 @@ def interruptible_api_call(agent, api_kwargs: dict):
                         invalidate_runtime_client(region)
                     raise
                 result["response"] = normalize_converse_response(raw_response)
+            elif agent.api_mode == "claude_cli":
+                from agent.transports.claude_cli import run_claude_cli_turn
+                _first = {"fired": False}
+                _on_first = getattr(agent, "_codex_on_first_delta", None)
+
+                def _on_delta(_text: str) -> None:
+                    if not _first["fired"] and _on_first:
+                        _first["fired"] = True
+                        try:
+                            _on_first()
+                        except Exception:
+                            pass
+
+                result["response"] = run_claude_cli_turn(api_kwargs, on_delta=_on_delta)
             else:
                 request_client = _set_request_client(
                     agent._create_request_openai_client(
@@ -541,6 +555,9 @@ def interruptible_api_call(agent, api_kwargs: dict):
                 if agent.api_mode == "anthropic_messages":
                     agent._anthropic_client.close()
                     agent._rebuild_anthropic_client()
+                elif agent.api_mode == "claude_cli":
+                    from agent.transports.claude_cli import interrupt_turn
+                    interrupt_turn(str(api_kwargs.get("hermes_session_id") or ""))
                 else:
                     _close_request_client_once("interrupt_abort")
             except Exception:
@@ -657,6 +674,15 @@ def build_api_kwargs(agent, api_messages: list) -> dict:
             replay_encrypted_reasoning=bool(
                 getattr(agent, "_codex_reasoning_replay_enabled", True)
             ),
+        )
+
+    if agent.api_mode == "claude_cli":
+        _ct = agent._get_transport()
+        return _ct.build_kwargs(
+            model=agent.model,
+            messages=api_messages,
+            tools=agent.tools,
+            hermes_session_id=getattr(agent, "session_id", None),
         )
 
     # ── chat_completions (default) ─────────────────────────────────────
