@@ -62,15 +62,35 @@ _active_turns_lock = threading.Lock()
 
 
 def begin_turn(session_key: str, turn: ClaudeCliTurn) -> None:
-    """Register a turn as in-flight for session_key."""
+    """Register a turn as in-flight for session_key.
+
+    No-ops for a falsy session_key, mirroring the guard the session-
+    continuity map uses on its own write-back (see run_claude_cli_turn).
+    """
+    if not session_key:
+        return
     with _active_turns_lock:
         _active_turns[session_key] = turn
 
 
-def end_turn(session_key: str) -> None:
-    """Deregister the in-flight turn for session_key, if any."""
+def end_turn(session_key: str, turn: ClaudeCliTurn | None = None) -> None:
+    """Deregister the in-flight turn for session_key, if any.
+
+    When turn is given, deregistration is compare-and-delete: the entry
+    is only removed if it still holds this exact turn object. This
+    guards against a late cleanup from an interrupted turn A clobbering
+    a newer turn B that was registered under the same session_key while
+    A was still unwinding. When turn is omitted, deregisters
+    unconditionally.
+    """
+    if not session_key:
+        return
     with _active_turns_lock:
-        _active_turns.pop(session_key, None)
+        if turn is None:
+            _active_turns.pop(session_key, None)
+            return
+        if _active_turns.get(session_key) is turn:
+            del _active_turns[session_key]
 
 
 def interrupt_turn(session_key: str) -> bool:
@@ -176,18 +196,15 @@ class ClaudeCliTransport(ProviderTransport):
     ) -> dict[str, Any]:
         """Build the api_kwargs dict run_claude_cli_turn() consumes.
 
-        Every other transport's build_kwargs call site passes the Hermes
-        session identifier as session_id (agent.session_id); it is carried
-        through here as hermes_session_id, the key run_claude_cli_turn()
-        reads to key CLI session continuity and the interrupt registry.
-        hermes_session_id is also accepted directly for callers that
-        already use that name.
+        hermes_session_id is the single canonical key for the Hermes
+        session identifier; it is the key run_claude_cli_turn() reads to
+        key CLI session continuity and the interrupt registry. Callers
+        must pass it by that name.
         """
-        session_id = params.get("hermes_session_id") or params.get("session_id")
         return {
             "model": model,
             "messages": messages,
-            "hermes_session_id": session_id,
+            "hermes_session_id": params.get("hermes_session_id"),
         }
 
     def normalize_response(
@@ -240,7 +257,7 @@ def _execute_turn(
     try:
         return turn.run()
     finally:
-        end_turn(session_key)
+        end_turn(session_key, turn)
 
 
 def run_claude_cli_turn(
