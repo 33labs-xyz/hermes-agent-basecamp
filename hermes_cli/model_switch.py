@@ -1534,6 +1534,17 @@ def list_authenticated_providers(
                     has_creds = True
             except Exception as exc:
                 logger.debug("Anthropic Claude Code creds check failed: %s", exc)
+        # Fallback: the Claude (subscription) provider is a local subprocess,
+        # not an HTTP/OAuth backend - it is "authenticated" iff the `claude`
+        # CLI binary is resolvable (CLAUDE_CLI_PATH env or `claude` on PATH).
+        # Scope strictly to claude-cli: copilot-acp is ALSO external_process
+        # and must NOT be marked authenticated by the presence of `claude`.
+        if not has_creds and hermes_slug == "claude-cli":
+            try:
+                from agent.claude_cli_client import resolve_cli_path
+                has_creds = resolve_cli_path() is not None
+            except Exception as exc:
+                logger.debug("claude-cli path check failed: %s", exc)
         if not has_creds:
             continue
 

@@ -224,6 +224,11 @@ _PROVIDER_MODELS: dict[str, list[str]] = {
     "copilot-acp": [
         "copilot-acp",
     ],
+    "claude-cli": [
+        "claude-cli/opus",
+        "claude-cli/sonnet",
+        "claude-cli/haiku",
+    ],
     "copilot": [
         "gpt-5.4",
         "gpt-5.4-mini",
