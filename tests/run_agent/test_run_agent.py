@@ -3333,6 +3333,81 @@ class TestHandleMaxIterations:
             for item in input_items
         )
 
+    def test_claude_cli_summary_uses_cli_turn_not_openai_client(self, agent):
+        """finding-B: handle_max_iterations() had no claude_cli branch
+        before this fix; the generic else branch called
+        agent._ensure_primary_openai_client(...).chat.completions.create(...),
+        which crashes for claude_cli (no OpenAI client ever exists for this
+        provider). Assert the summary now runs through run_claude_cli_turn
+        with enable_tools=False (text-only - the model must not call
+        another tool once the iteration limit is already hit) and
+        hermes_session_id=agent.session_id (so --resume still gives the
+        CLI its full turn history to summarize)."""
+        agent.api_mode = "claude_cli"
+        agent.model = "claude-cli/sonnet"
+        agent.session_id = "sess-max-iter"
+        agent._cached_system_prompt = "You are helpful."
+        captured = {}
+
+        def fake_run_claude_cli_turn(api_kwargs, **kwargs):
+            captured["api_kwargs"] = api_kwargs
+            captured["enable_tools"] = kwargs.get("enable_tools")
+            return SimpleNamespace(content="Summary from CLI.")
+
+        def _boom(*_a, **_kw):
+            raise AssertionError(
+                "claude_cli summary must not touch the OpenAI client machinery"
+            )
+
+        agent._ensure_primary_openai_client = _boom
+        messages = [{"role": "user", "content": "do stuff"}]
+
+        with patch(
+            "agent.transports.claude_cli.run_claude_cli_turn",
+            side_effect=fake_run_claude_cli_turn,
+        ):
+            result = agent._handle_max_iterations(messages, 60)
+
+        assert result == "Summary from CLI."
+        assert captured["enable_tools"] is False
+        assert captured["api_kwargs"]["hermes_session_id"] == "sess-max-iter"
+        assert captured["api_kwargs"]["model"] == "claude-cli/sonnet"
+
+    def test_claude_cli_summary_retries_through_cli_turn_when_first_attempt_is_empty(self, agent):
+        """Mirrors the test above but for the retry branch (fires when the
+        first summary attempt comes back empty): that path must also route
+        through run_claude_cli_turn with enable_tools=False rather than
+        falling into the crashing OpenAI else-branch."""
+        agent.api_mode = "claude_cli"
+        agent.model = "claude-cli/sonnet"
+        agent.session_id = "sess-max-iter-retry"
+        agent._cached_system_prompt = "You are helpful."
+        calls = []
+
+        def fake_run_claude_cli_turn(api_kwargs, **kwargs):
+            calls.append({"api_kwargs": api_kwargs, "enable_tools": kwargs.get("enable_tools")})
+            if len(calls) == 1:
+                return SimpleNamespace(content="")
+            return SimpleNamespace(content="Retry summary from CLI.")
+
+        def _boom(*_a, **_kw):
+            raise AssertionError(
+                "claude_cli summary retry must not touch the OpenAI client machinery"
+            )
+
+        agent._ensure_primary_openai_client = _boom
+        messages = [{"role": "user", "content": "do stuff"}]
+
+        with patch(
+            "agent.transports.claude_cli.run_claude_cli_turn",
+            side_effect=fake_run_claude_cli_turn,
+        ):
+            result = agent._handle_max_iterations(messages, 60)
+
+        assert result == "Retry summary from CLI."
+        assert len(calls) == 2
+        assert all(c["enable_tools"] is False for c in calls)
+
     def test_api_sanitizer_matches_responses_call_id_when_id_differs(self, agent):
         messages = [
             {

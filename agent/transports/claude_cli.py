@@ -14,12 +14,24 @@ needed for multi-turn continuity:
 - A module-level active-turn registry lets an external caller (the
   interrupt handler) kill an in-flight CLI subprocess by hermes_session_id.
 
-Stage 1 scope: tools are not forwarded to the CLI, so NormalizedResponse
-.tool_calls is always None and finish_reason is "stop" on success or
-"error" on failure.
+Stage 2 adds tool support: each turn gets an ephemeral MCP config (see
+_prepare_mcp_bridge) that points the CLI at hermes_cli/mcp_bridge.py, a
+stdio MCP server proxying hermes' own tools over localhost HTTP. The CLI
+resolves any tool calls itself during the turn; Hermes never sees a
+discrete tool-call round trip for this transport, so NormalizedResponse
+.tool_calls is always None (tool activity surfaces only via the
+on_tool_event callback, if one is supplied) and finish_reason is "stop"
+on success or "error" on failure. When no MCP bridge can be wired up
+(no hermes_session_id, or no dashboard web server running in this
+process), a turn runs exactly like Stage 1: no tools, same as before.
 """
 from __future__ import annotations
 
+import json
+import os
+import secrets
+import sys
+import tempfile
 import threading
 import uuid
 from typing import Any, Callable
@@ -27,6 +39,7 @@ from typing import Any, Callable
 from agent.claude_cli_client import ClaudeCliTurn, CliTurnResult, resolve_cli_path
 from agent.transports.base import ProviderTransport
 from agent.transports.types import NormalizedResponse, Usage
+from hermes_cli.bridge_tokens import register_bridge_token, revoke_bridge_token
 
 _MODEL_PREFIX = "claude-cli/"
 
@@ -240,6 +253,7 @@ def _execute_turn(
     session_id: str,
     resume: bool,
     session_key: str,
+    mcp_config_path: str | None,
     on_delta: Callable[[str], None] | None,
     on_tool_event: Callable[[dict], None] | None,
 ) -> CliTurnResult:
@@ -250,6 +264,7 @@ def _execute_turn(
         system_prompt=system_prompt,
         session_id=session_id,
         resume=resume,
+        mcp_config_path=mcp_config_path,
         on_delta=on_delta,
         on_tool_event=on_tool_event,
     )
@@ -260,10 +275,128 @@ def _execute_turn(
         end_turn(session_key, turn)
 
 
+def _resolve_gateway_base_url() -> str | None:
+    """HTTP base URL of the hermes dashboard's own web server, if this
+    process is hosting one.
+
+    The MCP bridge subprocess (hermes_cli/mcp_bridge.py) needs a URL to
+    call back into /api/internal/tool-call and /api/internal/tool-schemas.
+    hermes_cli/web_server.py already tracks its own live bind address on
+    app.state.bound_host / app.state.bound_port (set in start_server(),
+    with bound_port read back from the live uvicorn socket so an
+    ephemeral port resolves correctly). Two existing helpers there already
+    build a URL from that same pair for a spawned child process to dial
+    back in: _build_gateway_ws_url() / _build_sidecar_url() (IPv6-literal
+    bracket wrapping) and _maybe_open_browser() (0.0.0.0 / :: -> 127.0.0.1,
+    since a wildcard bind address is not itself dialable). The MCP bridge
+    subprocess is a dialer like both of those, so this combines both: the
+    wildcard-bind normalization, then bracket-wrap whatever host remains
+    if it is still IPv6-literal (covers a real "::1" bind, which the
+    wildcard check does not touch).
+
+    Imported lazily so a claude_cli turn that never touches the dashboard
+    (a bare terminal session with no web server running) never pays for
+    importing hermes_cli.web_server's full FastAPI/uvicorn import graph -
+    the same reasoning hermes_cli/bridge_tokens.py documents for staying
+    out of web_server.py. Returns None (never raises) when no web server
+    is running in this process, or it has not finished binding yet; the
+    caller treats that as "no MCP bridge for this turn", not an error - a
+    bare CLI session with no dashboard is an ordinary, expected state.
+    """
+    try:
+        from hermes_cli.web_server import app
+    except Exception:
+        return None
+    host = getattr(app.state, "bound_host", None)
+    port = getattr(app.state, "bound_port", None)
+    if not host or not port:
+        return None
+    display_host = "127.0.0.1" if host in ("0.0.0.0", "::") else host
+    if ":" in display_host and not display_host.startswith("["):
+        display_host = f"[{display_host}]"
+    return f"http://{display_host}:{port}"
+
+
+def _write_mcp_config(hermes_session_id: str, token: str, base_url: str) -> str:
+    """Write the ephemeral per-turn MCP config the CLI reads via
+    --mcp-config, pointing it at hermes' own stdio bridge (mcp_bridge.py)
+    so the CLI sees only Basecamp's tools - build_command() already adds
+    --strict-mcp-config --tools "" whenever a config path is passed, which
+    is what keeps the CLI's own built-in file/bash tools out of the mix.
+
+    Returns the temp file's path. Created with delete=False because the
+    CLI subprocess reads it from disk well after this function returns;
+    the caller (run_claude_cli_turn) deletes it once the turn ends.
+    """
+    config = {
+        "mcpServers": {
+            "basecamp": {
+                "command": sys.executable,
+                "args": [
+                    "-m", "hermes_cli.mcp_bridge",
+                    "--gateway-url", base_url,
+                    "--session-id", hermes_session_id,
+                    "--bridge-token", token,
+                ],
+            }
+        }
+    }
+    handle = tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False)
+    try:
+        json.dump(config, handle)
+    finally:
+        handle.close()
+    return handle.name
+
+
+def _prepare_mcp_bridge(session_key: str) -> str | None:
+    """Mint and register a per-turn bridge token, then write the MCP
+    config that points the CLI at it.
+
+    Returns the config path, or None when there is no session_key to key
+    the token under, or no reachable gateway base URL (see
+    _resolve_gateway_base_url) - the turn then runs exactly like Stage 1,
+    with no tools, instead of failing. The token itself is never returned;
+    nothing outside this module needs the raw value, only the config file
+    that already embeds it and the session_key used to revoke it later.
+    """
+    if not session_key:
+        return None
+    base_url = _resolve_gateway_base_url()
+    if not base_url:
+        return None
+    token = secrets.token_urlsafe(32)
+    register_bridge_token(session_key, token)
+    try:
+        return _write_mcp_config(session_key, token, base_url)
+    except OSError:
+        revoke_bridge_token(session_key)
+        return None
+
+
+def _cleanup_mcp_bridge(session_key: str, mcp_config_path: str | None) -> None:
+    """Revoke the bridge token and delete the ephemeral config file.
+
+    Called once from run_claude_cli_turn's finally block regardless of
+    whether the turn(s) inside it succeeded. mcp_config_path is None
+    exactly when _prepare_mcp_bridge never registered a token, so gating
+    on it here skips a pointless revoke call for a token that was never
+    minted.
+    """
+    if not mcp_config_path:
+        return
+    revoke_bridge_token(session_key)
+    try:
+        os.remove(mcp_config_path)
+    except OSError:
+        pass
+
+
 def run_claude_cli_turn(
     api_kwargs: dict[str, Any],
     on_delta: Callable[[str], None] | None = None,
     on_tool_event: Callable[[dict], None] | None = None,
+    enable_tools: bool = True,
 ) -> NormalizedResponse:
     """Run a single Hermes turn against the Claude Code CLI.
 
@@ -276,6 +409,15 @@ def run_claude_cli_turn(
     later turns resume it. If a resume attempt fails because the CLI
     session was evicted, falls back once to a fresh session with a
     truncation note prepended to the system prompt.
+
+    enable_tools=False skips the MCP bridge entirely for this turn (the
+    CLI still runs with --tools "", so zero built-in tools either) while
+    leaving hermes_session_id / --resume continuity untouched. This is
+    for callers like handle_max_iterations() that need a text-only reply
+    grounded in the CLI's full --resume history, not a from-scratch
+    session: the model must not call another tool once the iteration
+    limit is already hit, but it still needs the conversation so far to
+    have anything to summarize.
     """
     if resolve_cli_path() is None:
         return NormalizedResponse(
@@ -297,34 +439,44 @@ def run_claude_cli_turn(
     resume = cli_session_id is not None
     session_id = cli_session_id if resume else str(uuid.uuid4())
 
-    result = _execute_turn(
-        prompt=prompt,
-        model=model,
-        system_prompt=system_prompt,
-        session_id=session_id,
-        resume=resume,
-        session_key=session_key,
-        on_delta=on_delta,
-        on_tool_event=on_tool_event,
-    )
-
-    if resume and result.error and _looks_like_evicted_session(result.error):
-        fallback_system_prompt = (
-            _TRUNCATION_NOTE
-            if not system_prompt
-            else f"{_TRUNCATION_NOTE}\n{system_prompt}"
-        )
-        session_id = str(uuid.uuid4())
+    # One bridge token/config covers both the primary attempt and the
+    # eviction-fallback retry below: they are the same logical turn, and
+    # minting a second token for the retry would just be a second thing
+    # to clean up for no benefit.
+    mcp_config_path = _prepare_mcp_bridge(session_key) if enable_tools else None
+    try:
         result = _execute_turn(
             prompt=prompt,
             model=model,
-            system_prompt=fallback_system_prompt,
+            system_prompt=system_prompt,
             session_id=session_id,
-            resume=False,
+            resume=resume,
             session_key=session_key,
+            mcp_config_path=mcp_config_path,
             on_delta=on_delta,
             on_tool_event=on_tool_event,
         )
+
+        if resume and result.error and _looks_like_evicted_session(result.error):
+            fallback_system_prompt = (
+                _TRUNCATION_NOTE
+                if not system_prompt
+                else f"{_TRUNCATION_NOTE}\n{system_prompt}"
+            )
+            session_id = str(uuid.uuid4())
+            result = _execute_turn(
+                prompt=prompt,
+                model=model,
+                system_prompt=fallback_system_prompt,
+                session_id=session_id,
+                resume=False,
+                session_key=session_key,
+                mcp_config_path=mcp_config_path,
+                on_delta=on_delta,
+                on_tool_event=on_tool_event,
+            )
+    finally:
+        _cleanup_mcp_bridge(session_key, mcp_config_path)
 
     if session_key:
         with _session_map_lock:

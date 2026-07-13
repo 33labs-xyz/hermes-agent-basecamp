@@ -1446,6 +1446,23 @@ def handle_max_iterations(agent, messages: list, api_call_count: int) -> str:
             _ct_sum = agent._get_transport()
             _cnr_sum = _ct_sum.normalize_response(summary_response)
             final_response = (_cnr_sum.content or "").strip()
+        elif agent.api_mode == "claude_cli":
+            from agent.transports.claude_cli import run_claude_cli_turn
+            claude_cli_kwargs = {
+                "model": agent.model,
+                "messages": api_messages,
+                "hermes_session_id": getattr(agent, "session_id", None),
+            }
+            # enable_tools=False: a max-iterations summary must be
+            # text-only, so no MCP bridge is wired for this turn. Tools
+            # for claude_cli are gated by whether an --mcp-config is
+            # passed to the subprocess, not by anything in api_kwargs, so
+            # (unlike the codex_kwargs.pop("tools", None) above) there is
+            # no "tools" key to drop here — hermes_session_id is kept so
+            # --resume still gives the CLI its full turn history to
+            # summarize; only tool-calling is suppressed.
+            _cli_summary = run_claude_cli_turn(claude_cli_kwargs, enable_tools=False)
+            final_response = (_cli_summary.content or "").strip()
         else:
             summary_kwargs = {
                 "model": agent.model,
@@ -1528,6 +1545,15 @@ def handle_max_iterations(agent, messages: list, api_call_count: int) -> str:
                 _ct_retry = agent._get_transport()
                 _cnr_retry = _ct_retry.normalize_response(retry_response)
                 final_response = (_cnr_retry.content or "").strip()
+            elif agent.api_mode == "claude_cli":
+                from agent.transports.claude_cli import run_claude_cli_turn
+                claude_cli_kwargs = {
+                    "model": agent.model,
+                    "messages": api_messages,
+                    "hermes_session_id": getattr(agent, "session_id", None),
+                }
+                _cli_retry = run_claude_cli_turn(claude_cli_kwargs, enable_tools=False)
+                final_response = (_cli_retry.content or "").strip()
             elif agent.api_mode == "anthropic_messages":
                 _tretry = agent._get_transport()
                 _ant_kw2 = _tretry.build_kwargs(model=agent.model, messages=api_messages, tools=None,
@@ -1629,6 +1655,22 @@ def interruptible_streaming_api_call(agent, api_kwargs: dict, *, on_first_delta=
         # in _interruptible_api_call already calls it; we just need to
         # ensure on_first_delta reaches it. Store it on the instance
         # temporarily so _run_codex_stream can pick it up.
+        agent._codex_on_first_delta = on_first_delta
+        try:
+            return agent._interruptible_api_call(api_kwargs)
+        finally:
+            agent._codex_on_first_delta = None
+
+    if agent.api_mode == "claude_cli":
+        # No dedicated streaming variant for the CLI transport: unlike
+        # chat_completions/anthropic_messages below, there is no
+        # _call_claude_cli() in this function, so without this early
+        # return the generic path's _call() would fall into
+        # _call_chat_completions() and crash building an OpenAI client
+        # that claude_cli never has. _interruptible_api_call's own
+        # claude_cli branch already runs the CLI turn correctly (and
+        # forwards deltas via ClaudeCliTurn.on_delta), so delegate to it,
+        # same on_first_delta hand-off as codex_responses above.
         agent._codex_on_first_delta = on_first_delta
         try:
             return agent._interruptible_api_call(api_kwargs)
