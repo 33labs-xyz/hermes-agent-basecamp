@@ -11,13 +11,14 @@ import {
   sortProviders
 } from '@/components/desktop-onboarding-overlay'
 import { Button } from '@/components/ui/button'
-import { disconnectOAuthProvider, listOAuthProviders } from '@/hermes'
+import { CopyButton } from '@/components/ui/copy-button'
+import { disconnectOAuthProvider, getGlobalModelOptions, listOAuthProviders } from '@/hermes'
 import { useI18n } from '@/i18n'
-import { Check, ChevronDown, ChevronRight, KeyRound, Loader2, Terminal, Trash2 } from '@/lib/icons'
+import { Check, ChevronDown, ChevronRight, ExternalLink, KeyRound, Loader2, Terminal, Trash2 } from '@/lib/icons'
 import { cn } from '@/lib/utils'
 import { notify, notifyError } from '@/store/notifications'
 import { $desktopOnboarding, startManualProviderOAuth } from '@/store/onboarding'
-import type { EnvVarInfo, OAuthProvider } from '@/types/hermes'
+import type { EnvVarInfo, ModelOptionProvider, OAuthProvider } from '@/types/hermes'
 
 import { isKeyVar, ProviderKeyRows } from './credential-key-ui'
 import { SettingsCategoryHeading, useEnvCredentials } from './env-credentials'
@@ -278,10 +279,40 @@ function NoProviderKeys() {
   )
 }
 
+// Claude (subscription) authenticates via a locally installed CLI, not OAuth or
+// a pasted API key, so it never appears in the OAuthPicker list above. Task 4
+// still surfaces it as an unauthenticated row from /api/model/options - show
+// the setup command here so a new user knows how to connect it.
+function ClaudeCliSetupHint() {
+  const { t } = useI18n()
+  const copy = t.settings.providers
+
+  return (
+    <div className="mb-5 grid gap-2 rounded-lg border border-border/60 bg-background/40 p-3">
+      <div className="flex flex-wrap items-center gap-1.5">
+        <Terminal className="size-3.5 shrink-0 text-muted-foreground" />
+        <span className="text-[length:var(--conversation-text-font-size)]">{copy.claudeCliSetupHint}</span>
+        <CopyButton appearance="inline" text="claude login" />
+      </div>
+      <a
+        className="inline-flex w-fit items-center gap-1 text-[length:var(--conversation-caption-font-size)] text-(--ui-text-tertiary) underline-offset-4 transition-colors hover:text-foreground hover:underline"
+        href="https://claude.com/claude-code"
+        onClick={e => e.stopPropagation()}
+        rel="noreferrer"
+        target="_blank"
+      >
+        {copy.claudeCliLearnMore}
+        <ExternalLink className="size-3" />
+      </a>
+    </div>
+  )
+}
+
 export function ProvidersSettings({ onClose, onViewChange, view }: ProvidersSettingsProps) {
   const { t } = useI18n()
   const { rowProps, vars } = useEnvCredentials()
   const [oauthProviders, setOauthProviders] = useState<OAuthProvider[]>([])
+  const [claudeCliProvider, setClaudeCliProvider] = useState<ModelOptionProvider | undefined>(undefined)
   const [openProvider, setOpenProvider] = useState<null | string>(null)
   const [disconnecting, setDisconnecting] = useState<null | string>(null)
   // The onboarding overlay owns the OAuth flow. Watch its `manual` flag so we
@@ -316,6 +347,26 @@ export function ProvidersSettings({ onClose, onViewChange, view }: ProvidersSett
 
     return () => void (cancelled = true)
   }, [onboardingActive])
+
+  useEffect(() => {
+    let cancelled = false
+
+    // Claude (subscription) is a setup hint, not a live account status - a
+    // single best-effort fetch on mount is enough, so this has no deps.
+    void (async () => {
+      try {
+        const { providers } = await getGlobalModelOptions()
+
+        if (!cancelled) {
+          setClaudeCliProvider(providers?.find(provider => provider.slug === 'claude-cli'))
+        }
+      } catch {
+        // Ignore - the setup hint just won't render.
+      }
+    })()
+
+    return () => void (cancelled = true)
+  }, [])
 
   // External (CLI-managed) providers can't be cleared via the API by design —
   // Hermes never deletes creds another tool owns behind a silent API call.
@@ -368,6 +419,10 @@ export function ProvidersSettings({ onClose, onViewChange, view }: ProvidersSett
   // The sidebar subnav owns the Accounts/API-keys split now; with no OAuth
   // providers there's nothing for the "Accounts" view to show, so fall to keys.
   const showApiKeys = view === 'keys' || !hasOauth
+  // Backend lists Claude (subscription) even before it is set up (see Task 4's
+  // include_unconfigured row) - authenticated:false means the CLI is missing,
+  // logged out, or otherwise not usable yet.
+  const showClaudeCliSetupHint = claudeCliProvider?.authenticated === false
 
   const keyGroups = buildProviderKeyGroups(vars)
 
@@ -403,6 +458,7 @@ export function ProvidersSettings({ onClose, onViewChange, view }: ProvidersSett
         onWantApiKey={() => onViewChange('keys')}
         providers={oauthProviders}
       />
+      {showClaudeCliSetupHint && <ClaudeCliSetupHint />}
     </SettingsContent>
   )
 }

@@ -7,12 +7,14 @@ import type { OAuthProvider } from '@/types/hermes'
 const listOAuthProviders = vi.fn()
 const disconnectOAuthProvider = vi.fn()
 const getEnvVars = vi.fn()
+const getGlobalModelOptions = vi.fn()
 const startManualProviderOAuth = vi.fn()
 const onboarding = atom({ manual: false })
 
 vi.mock('@/hermes', () => ({
   disconnectOAuthProvider: (providerId: string) => disconnectOAuthProvider(providerId),
   getEnvVars: () => getEnvVars(),
+  getGlobalModelOptions: () => getGlobalModelOptions(),
   listOAuthProviders: () => listOAuthProviders()
 }))
 
@@ -39,6 +41,7 @@ function provider(id: string, loggedIn: boolean, patch: Partial<OAuthProvider> =
 beforeEach(() => {
   onboarding.set({ manual: false })
   getEnvVars.mockResolvedValue({})
+  getGlobalModelOptions.mockResolvedValue({ providers: [] })
   disconnectOAuthProvider.mockResolvedValue({ ok: true, provider: 'nous' })
   listOAuthProviders.mockResolvedValue({
     providers: [provider('nous', true), provider('minimax-oauth', false)]
@@ -119,5 +122,37 @@ describe('ProvidersSettings', () => {
     expect(await screen.findByText('Qwen Code')).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Remove Qwen Code' })).toBeNull()
     expect(screen.getByText(/managed by its own CLI/)).toBeTruthy()
+  })
+
+  it('shows a setup hint with a copyable command for the unconfigured Claude subscription', async () => {
+    getGlobalModelOptions.mockResolvedValue({
+      providers: [
+        { authenticated: false, auth_type: 'external_process', name: 'Claude (subscription)', slug: 'claude-cli' }
+      ]
+    })
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } })
+
+    await renderProvidersSettings()
+
+    expect(await screen.findByText('Install Claude Code and run: claude login')).toBeTruthy()
+
+    const link = screen.getByRole('link', { name: /Learn more/ })
+    expect(link.getAttribute('href')).toBe('https://claude.com/claude-code')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Copy' }))
+
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith('claude login'))
+  })
+
+  it('does not show the Claude subscription setup hint once it is authenticated', async () => {
+    getGlobalModelOptions.mockResolvedValue({
+      providers: [{ authenticated: true, auth_type: 'external_process', name: 'Claude (subscription)', slug: 'claude-cli' }]
+    })
+
+    await renderProvidersSettings()
+
+    await screen.findByText('Nous Portal')
+    expect(screen.queryByText('Install Claude Code and run: claude login')).toBeNull()
   })
 })

@@ -775,7 +775,9 @@ export const zh: Translations = {
       removedMessage: provider => `${provider} 已移除。`,
       failedRemove: provider => `无法移除 ${provider}`,
       noProviderKeys: '没有可用的提供方 API 密钥。',
-      loading: '正在加载提供方...'
+      loading: '正在加载提供方...',
+      claudeCliSetupHint: '安装 Claude Code 并运行：claude login',
+      claudeCliLearnMore: '了解更多'
     },
     sessions: {
       loading: '正在加载已归档会话…',

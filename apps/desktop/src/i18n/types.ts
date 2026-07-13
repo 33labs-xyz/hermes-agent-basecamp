@@ -464,6 +464,8 @@ export interface Translations {
       failedRemove: (provider: string) => string
       noProviderKeys: string
       loading: string
+      claudeCliSetupHint: string
+      claudeCliLearnMore: string
     }
     sessions: {
       loading: string

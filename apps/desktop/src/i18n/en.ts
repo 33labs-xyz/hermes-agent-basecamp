@@ -582,7 +582,9 @@ export const en: Translations = {
       removedMessage: provider => `${provider} was removed.`,
       failedRemove: provider => `Could not remove ${provider}`,
       noProviderKeys: 'No provider API keys available.',
-      loading: 'Loading providers...'
+      loading: 'Loading providers...',
+      claudeCliSetupHint: 'Install Claude Code and run: claude login',
+      claudeCliLearnMore: 'Learn more'
     },
     sessions: {
       loading: 'Loading archived sessions…',
