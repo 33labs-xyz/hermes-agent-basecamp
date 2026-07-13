@@ -383,7 +383,17 @@ def _prepare_mcp_bridge(session_key: str) -> str | None:
     register_bridge_token(session_key, token)
     try:
         return _write_mcp_config(session_key, token, base_url)
-    except OSError:
+    except Exception:
+        # Any failure writing the config must revoke the token we just
+        # registered, or it leaks live in the module registry with no
+        # config that references it. Catch Exception, not just OSError:
+        # json.dump into a locale-encoded temp file can raise
+        # UnicodeEncodeError (a ValueError, not an OSError) on an exotic
+        # session_id, and that path leaked before. Bridge setup is
+        # best-effort, so degrade to a Stage-1 (no-tools) turn instead of
+        # surfacing the error. KeyboardInterrupt / SystemExit are not
+        # Exception subclasses, so they still propagate - a Ctrl-C must
+        # not be swallowed into a silent no-tools turn.
         revoke_bridge_token(session_key)
         return None
 
@@ -456,10 +466,11 @@ def run_claude_cli_turn(
     # One bridge token/config covers both the primary attempt and the
     # eviction-fallback retry below: they are the same logical turn, and
     # minting a second token for the retry would just be a second thing
-    # to clean up for no benefit. Prepared inside the try so that even if
-    # _prepare_mcp_bridge raises after registering the token, the finally
-    # still revokes it: the guarantee is "cleaned up exactly once on every
-    # exit path".
+    # to clean up for no benefit. _prepare_mcp_bridge self-heals its own
+    # token on any setup failure (revoke then return None -> Stage 1), so
+    # a returned path always has a live token behind it and a None never
+    # leaves one registered; the finally then tears that pair down exactly
+    # once after the turn(s) complete.
     mcp_config_path: str | None = None
     try:
         if enable_tools:
