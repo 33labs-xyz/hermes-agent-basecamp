@@ -112,7 +112,7 @@ class TestInternalToolCallEndpoint:
         assert "tools" not in resp.json()          # no schema payload leaked on reject
 
     # 5b. Finding 2 guard: a valid token supplied only as a QUERY param (no header)
-    #     must be rejected — the endpoint reads the token from the header only, so
+    #     must be rejected - the endpoint reads the token from the header only, so
     #     the secret never has to appear in a loggable URL.
     def test_tool_schemas_rejects_token_in_query_param(self, monkeypatch):
         from hermes_cli import web_server

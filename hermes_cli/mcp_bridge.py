@@ -64,7 +64,7 @@ def _fetch_tool_schemas(base_url: str, session_id: str, token: str) -> list[dict
             f"({type(exc).__name__})"
         ) from None
     if resp.status_code != 200:
-        # Status code + fixed message only — no URL, no query string, no token.
+        # Status code + fixed message only - no URL, no query string, no token.
         raise RuntimeError(
             f"hermes backend returned HTTP {resp.status_code} fetching tool schemas"
         )
@@ -117,7 +117,7 @@ def _post_tool_call(
 def _build_tool_specs(schemas: list[dict]) -> list[tuple[str, str, dict]]:
     """Normalize fetched schemas into (name, description, input_schema) tuples.
     Malformed entries (not a dict, or missing name) are skipped. `input_schema`
-    is the tool's real JSON-Schema `parameters` object — advertised verbatim to
+    is the tool's real JSON-Schema `parameters` object, advertised verbatim to
     the model. No `mcp` dependency, so this seam is unit-testable directly."""
     specs: list[tuple[str, str, dict]] = []
     for spec in schemas:
