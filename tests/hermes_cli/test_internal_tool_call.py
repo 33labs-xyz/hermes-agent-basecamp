@@ -102,15 +102,33 @@ class TestInternalToolCallEndpoint:
         finally:
             revoke_bridge_token("sess-ev")
 
-    # 5. GET tool-schemas: no valid token -> 403 (same guard as the POST endpoint).
+    # 5. GET tool-schemas: bad header token -> 403 (same guard as the POST endpoint).
     def test_tool_schemas_rejected_without_valid_token(self):
         resp = self.client.get(
-            "/api/internal/tool-schemas",
-            params={"session_id": "sess-x", "bridge_token": "bogus"},
+            "/api/internal/tool-schemas?session_id=sess-x",
+            headers={"X-Bridge-Token": "bogus"},
         )
         assert resp.status_code == 403
+        assert "tools" not in resp.json()          # no schema payload leaked on reject
 
-    # 6. GET tool-schemas: valid token -> returns only the function schemas, unwrapped.
+    # 5b. Finding 2 guard: a valid token supplied only as a QUERY param (no header)
+    #     must be rejected — the endpoint reads the token from the header only, so
+    #     the secret never has to appear in a loggable URL.
+    def test_tool_schemas_rejects_token_in_query_param(self, monkeypatch):
+        from hermes_cli import web_server
+        from hermes_cli.bridge_tokens import register_bridge_token, revoke_bridge_token
+        register_bridge_token("sess-q", "tok-q")
+        monkeypatch.setattr(web_server, "get_tool_definitions", lambda **kw: [])
+        try:
+            resp = self.client.get(
+                "/api/internal/tool-schemas",
+                params={"session_id": "sess-q", "bridge_token": "tok-q"},  # query only
+            )
+            assert resp.status_code == 403
+        finally:
+            revoke_bridge_token("sess-q")
+
+    # 6. GET tool-schemas: valid header token -> returns only the function schemas, unwrapped.
     def test_tool_schemas_with_valid_token_returns_functions(self, monkeypatch):
         from hermes_cli import web_server
         from hermes_cli.bridge_tokens import register_bridge_token, revoke_bridge_token
@@ -126,8 +144,8 @@ class TestInternalToolCallEndpoint:
         )
         try:
             resp = self.client.get(
-                "/api/internal/tool-schemas",
-                params={"session_id": "sess-sc", "bridge_token": "tok-sc"},
+                "/api/internal/tool-schemas?session_id=sess-sc",
+                headers={"X-Bridge-Token": "tok-sc"},
             )
             assert resp.status_code == 200
             tools = resp.json()["tools"]

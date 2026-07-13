@@ -3872,11 +3872,14 @@ async def internal_tool_call(body: InternalToolCall, request: Request):
 
 
 @app.get("/api/internal/tool-schemas")
-async def internal_tool_schemas(session_id: str, bridge_token: str, request: Request):
+async def internal_tool_schemas(session_id: str, request: Request):
     # Same guard as the tool-call endpoint: localhost-only + per-session token,
-    # and a single opaque 403 that does not reveal which check failed.
+    # and a single opaque 403 that does not reveal which check failed. The token
+    # is read from the X-Bridge-Token header (never a query param) so it cannot
+    # leak into server access logs or bridge-side exception strings.
     from hermes_cli.bridge_tokens import verify_bridge_token
 
+    bridge_token = request.headers.get("X-Bridge-Token", "")
     if not _local_dashboard_request(request):
         raise HTTPException(status_code=403, detail="Forbidden")
     if not verify_bridge_token(session_id, bridge_token):
