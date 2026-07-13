@@ -103,7 +103,6 @@ import {
   MESSAGING_ROUTE,
   PROJECTS_ROUTE,
   SKILLS_ROUTE,
-  STAFF_ROUTE,
   STUDIO_ROUTE
 } from '../../routes'
 import { SidebarPanelLabel } from '../../shell/sidebar-label'
@@ -147,14 +146,11 @@ const SIDEBAR_NAV: SidebarNavItem[] = [
   },
   { id: 'messaging', label: '', icon: props => <Codicon name="comment" {...props} />, route: MESSAGING_ROUTE },
   { id: 'artifacts', label: '', icon: props => <Codicon name="files" {...props} />, route: ARTIFACTS_ROUTE },
-  // Staff (hired-agent marketplace) is shown in the rail. Stripe activation is
-  // still off, so it runs in preview mode until billing is switched on.
-  { id: 'staff', label: 'Staff', icon: props => <Codicon name="person" {...props} />, route: STAFF_ROUTE },
   // Studio: the local generative-AI studio (Muapi BYOK).
   { id: 'studio', label: 'Studio', icon: props => <Codicon name="sparkle" {...props} />, route: STUDIO_ROUTE },
-  // Learn is the last nav item: embeds the external Basecamp site (courses +
-  // product updates) in a webview.
-  { id: 'learn', label: 'Learn', icon: props => <Codicon name="book" {...props} />, route: LEARN_ROUTE }
+  // Portal is the last nav item: embeds the external Basecamp portal site
+  // (courses + services + product updates) in a webview.
+  { id: 'learn', label: 'Portal', icon: props => <Codicon name="book" {...props} />, route: LEARN_ROUTE }
 ]
 
 const WORKSPACE_PAGE = 5

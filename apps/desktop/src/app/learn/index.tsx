@@ -5,11 +5,10 @@ import { openExternalLink } from '@/lib/external-link'
 
 import type { SetStatusbarItemGroup } from '../shell/statusbar-controls'
 
-// The embedded Basecamp marketing + education site (courses + product updates).
-// Deployed separately on Netlify; source lives in the workspace under
-// projects/incubator/basecamp-learn. Served with `frame-ancestors *` so it can
-// be embedded here.
-const LEARN_URL = 'https://basecamp-learn.netlify.app'
+// The embedded Basecamp Portal site (courses + services + product updates).
+// Deployed separately on Netlify and served with `frame-ancestors *` so it can
+// be embedded in the webview below.
+const LEARN_URL = 'https://basecamp-portal-493.netlify.app'
 
 interface LearnViewProps {
   setStatusbarItemGroup: SetStatusbarItemGroup

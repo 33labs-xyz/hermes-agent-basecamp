@@ -1,5 +1,5 @@
 import { useStore } from '@nanostores/react'
-import { type ComponentType, useCallback, useEffect, useMemo, useState } from 'react'
+import { type ComponentType, type DragEvent, useCallback, useEffect, useMemo, useState } from 'react'
 
 import { Button } from '@/components/ui/button'
 import { Codicon } from '@/components/ui/codicon'
@@ -11,6 +11,7 @@ import { $studioKey, ensureStudioKeyLoaded, saveStudioKey } from '@/store/studio
 import { PAGE_INSET_X } from '../layout-constants'
 import type { SetStatusbarItemGroup } from '../shell/statusbar-controls'
 
+import { basename, collectDrop, dataUrlToFile, filterImageFiles, isImageFile } from './drop-files'
 import { StudioLibrary } from './library'
 import {
   AudioStudio,
@@ -108,6 +109,10 @@ export function StudioView({ setStatusbarItemGroup }: StudioViewProps) {
   // Closing the gate without connecting stops it re-opening on every keystroke;
   // switching tabs re-arms it.
   const [keyGateDismissed, setKeyGateDismissed] = useState(false)
+  // Images dropped onto the Studio pane, handed to the active generation
+  // studio via its droppedFiles/onFilesHandled props. Cleared once the vendor
+  // studio reports it picked them up.
+  const [droppedFiles, setDroppedFiles] = useState<File[]>([])
 
   useEffect(() => {
     ensureStudioKeyLoaded()
@@ -177,6 +182,40 @@ export function StudioView({ setStatusbarItemGroup }: StudioViewProps) {
   const active = STUDIO_TABS.find(tab => tab.id === activeTab) ?? STUDIO_TABS[0]
   const ActiveStudio = active.Component
 
+  // Drag-and-drop only makes sense while a generation studio is showing - the
+  // Library and Workflow tabs have nothing to upload into, so the drop is a
+  // no-op there. Accepts both a plain OS drag (Finder/Explorer) and an
+  // internal drag from the file tree (paths, read via IPC and decoded into
+  // Files without the vendor studio ever knowing the difference).
+  const handleDrop = async (event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault()
+
+    if (!isGenerationStudio(active)) {return}
+
+    const { osFiles, paths } = collectDrop(event.dataTransfer)
+    const imagesFromOs = filterImageFiles(osFiles)
+    const imagesFromPaths: File[] = []
+
+    for (const path of paths) {
+      try {
+        const dataUrl = await window.hermesDesktop?.readFileDataUrl(path)
+
+        if (!dataUrl) {continue}
+
+        const file = dataUrlToFile(dataUrl, basename(path))
+
+        if (file && isImageFile(file)) {imagesFromPaths.push(file)}
+      } catch {
+        // Unreadable path (permissions, missing file, etc.) - skip it, the
+        // rest of the drop still goes through.
+      }
+    }
+
+    const images = [...imagesFromOs, ...imagesFromPaths]
+
+    if (images.length > 0) {setDroppedFiles(images)}
+  }
+
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col">
       {/* Tab bar shares the titlebar strip, so its right edge must clear the
@@ -216,6 +255,11 @@ export function StudioView({ setStatusbarItemGroup }: StudioViewProps) {
           typing-trigger would stack the overlay on top of the gate's own input. */}
       <div
         className="relative min-h-0 flex-1 overflow-auto"
+        onDragOver={event => {
+          event.preventDefault()
+          event.dataTransfer.dropEffect = 'copy'
+        }}
+        onDrop={handleDrop}
         onInputCapture={active.requiresKey && !hasKey ? undefined : handleStudioInput}
       >
         {/* Keep-alive: every generation studio opened this session stays mounted
@@ -225,10 +269,16 @@ export function StudioView({ setStatusbarItemGroup }: StudioViewProps) {
           if (!mountedTabs.has(tab.id)) {return null}
 
           const Studio = tab.Component
+          const isActiveTab = tab.id === activeTab
 
           return (
-            <div className="h-full" data-studio-pane={tab.id} hidden={tab.id !== activeTab} key={tab.id}>
-              <Studio apiKey={storedKey ?? ''} onGenerationComplete={genCompleteHandlers.get(tab.id)} />
+            <div className="h-full" data-studio-pane={tab.id} hidden={!isActiveTab} key={tab.id}>
+              <Studio
+                apiKey={storedKey ?? ''}
+                droppedFiles={isActiveTab ? droppedFiles : undefined}
+                onFilesHandled={isActiveTab ? () => setDroppedFiles([]) : undefined}
+                onGenerationComplete={genCompleteHandlers.get(tab.id)}
+              />
             </div>
           )
         })}
