@@ -97,6 +97,14 @@ export function isOverlayView(view: AppView): boolean {
   return OVERLAY_VIEWS.has(view)
 }
 
+// The file-browser (folders) rail is available in chat and on the Studio
+// screen — Studio users open it to browse folders and drag images into a
+// studio. It stays disabled on overlay views (settings, agents, …) and on the
+// other full-page views, which have no use for a folder tree.
+export function foldersPaneEnabled(chatOpen: boolean, currentView: AppView): boolean {
+  return chatOpen || currentView === 'studio'
+}
+
 export function isNewChatRoute(pathname: string): boolean {
   return pathname === NEW_CHAT_ROUTE
 }
