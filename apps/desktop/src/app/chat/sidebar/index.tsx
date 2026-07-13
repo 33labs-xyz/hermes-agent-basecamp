@@ -99,11 +99,11 @@ import {
 import {
   type AppView,
   ARTIFACTS_ROUTE,
+  LEARN_ROUTE,
   MESSAGING_ROUTE,
   PROJECTS_ROUTE,
   SKILLS_ROUTE,
-  // STAFF_ROUTE hidden for now — restore alongside the SIDEBAR_NAV entry below.
-  // STAFF_ROUTE,
+  STAFF_ROUTE,
   STUDIO_ROUTE
 } from '../../routes'
 import { SidebarPanelLabel } from '../../shell/sidebar-label'
@@ -147,12 +147,14 @@ const SIDEBAR_NAV: SidebarNavItem[] = [
   },
   { id: 'messaging', label: '', icon: props => <Codicon name="comment" {...props} />, route: MESSAGING_ROUTE },
   { id: 'artifacts', label: '', icon: props => <Codicon name="files" {...props} />, route: ARTIFACTS_ROUTE },
-  // Staff hidden for now. The /staff route + StaffView stay registered (routes.ts),
-  // so it still works if navigated directly; uncomment this entry AND the
-  // STAFF_ROUTE import above to restore the hired-agent marketplace to the rail.
-  // { id: 'staff', label: 'Staff', icon: props => <Codicon name="person" {...props} />, route: STAFF_ROUTE },
-  // Studio is the last nav item: the local generative-AI studio (Muapi BYOK).
-  { id: 'studio', label: 'Studio', icon: props => <Codicon name="sparkle" {...props} />, route: STUDIO_ROUTE }
+  // Staff (hired-agent marketplace) is shown in the rail. Stripe activation is
+  // still off, so it runs in preview mode until billing is switched on.
+  { id: 'staff', label: 'Staff', icon: props => <Codicon name="person" {...props} />, route: STAFF_ROUTE },
+  // Studio: the local generative-AI studio (Muapi BYOK).
+  { id: 'studio', label: 'Studio', icon: props => <Codicon name="sparkle" {...props} />, route: STUDIO_ROUTE },
+  // Learn is the last nav item: embeds the external Basecamp site (courses +
+  // product updates) in a webview.
+  { id: 'learn', label: 'Learn', icon: props => <Codicon name="book" {...props} />, route: LEARN_ROUTE }
 ]
 
 const WORKSPACE_PAGE = 5

@@ -117,6 +117,7 @@ export type CommandDispatchResponse =
 export type SidebarNavId =
   | 'artifacts'
   | 'command-center'
+  | 'learn'
   | 'messaging'
   | 'new-session'
   | 'projects'

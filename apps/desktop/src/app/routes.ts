@@ -15,6 +15,9 @@ export const PROJECTS_ROUTE = '/projects'
 // Staff (hired agent marketplace) is a full-page (non-overlay) view, same
 // shape as Projects/Studio — always reachable from the sidebar rail.
 export const STAFF_ROUTE = '/staff'
+// Learn (embedded marketing + education site) is a full-page (non-overlay)
+// view, same shape as Staff/Studio - always reachable from the sidebar rail.
+export const LEARN_ROUTE = '/learn'
 
 export type AppView =
   | 'agents'
@@ -22,6 +25,7 @@ export type AppView =
   | 'chat'
   | 'command-center'
   | 'cron'
+  | 'learn'
   | 'messaging'
   | 'profiles'
   | 'projects'
@@ -35,6 +39,7 @@ export type AppRouteId =
   | 'artifacts'
   | 'command-center'
   | 'cron'
+  | 'learn'
   | 'messaging'
   | 'new'
   | 'profiles'
@@ -58,6 +63,7 @@ export const APP_ROUTES = [
   { id: 'artifacts', path: ARTIFACTS_ROUTE, view: 'artifacts' },
   { id: 'studio', path: STUDIO_ROUTE, view: 'studio' },
   { id: 'staff', path: STAFF_ROUTE, view: 'staff' },
+  { id: 'learn', path: LEARN_ROUTE, view: 'learn' },
   { id: 'cron', path: CRON_ROUTE, view: 'cron' },
   { id: 'profiles', path: PROFILES_ROUTE, view: 'profiles' },
   { id: 'agents', path: AGENTS_ROUTE, view: 'agents' }

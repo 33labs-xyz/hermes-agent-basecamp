@@ -131,6 +131,7 @@ const AgentsView = lazy(async () => ({ default: (await import('./agents')).Agent
 const ArtifactsView = lazy(async () => ({ default: (await import('./artifacts')).ArtifactsView }))
 const CommandCenterView = lazy(async () => ({ default: (await import('./command-center')).CommandCenterView }))
 const CronView = lazy(async () => ({ default: (await import('./cron')).CronView }))
+const LearnView = lazy(async () => ({ default: (await import('./learn')).LearnView }))
 const MessagingView = lazy(async () => ({ default: (await import('./messaging')).MessagingView }))
 const ProfilesView = lazy(async () => ({ default: (await import('./profiles')).ProfilesView }))
 const ProjectsView = lazy(async () => ({ default: (await import('./projects')).ProjectsView }))
@@ -1150,6 +1151,14 @@ export function DesktopController() {
               </Suspense>
             }
             path="staff"
+          />
+          <Route
+            element={
+              <Suspense fallback={null}>
+                <LearnView setStatusbarItemGroup={setStatusbarItemGroup} />
+              </Suspense>
+            }
+            path="learn"
           />
           <Route
             element={
