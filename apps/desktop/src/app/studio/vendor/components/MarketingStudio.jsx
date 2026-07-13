@@ -71,7 +71,7 @@ const ASSETS = {
     // Preset avatars are sent to the generation backend by URL, so each must be publicly
     // fetchable. Jeremiah's photo is served from this repo's public tree via GitHub raw.
     // At release this is repointed to a jsDelivr @<commit-sha> CDN URL for permanence.
-    { id: "71cfd27e-5fec-4bdc-9117-831c13c758cf", name: "Jeremiah", url: "https://raw.githubusercontent.com/33labs-xyz/hermes-agent-basecamp/feat/staff-marketplace/apps/desktop/src/app/studio/vendor/assets/avatars/jeremiah.webp" },
+    { id: "71cfd27e-5fec-4bdc-9117-831c13c758cf", name: "Jeremiah", url: "https://cdn.jsdelivr.net/gh/33labs-xyz/hermes-agent-basecamp@fa90dc6b7814cb8c561cd6d38112bf7a0371dde6/apps/desktop/src/app/studio/vendor/assets/avatars/jeremiah.webp" },
     { id: "aa252283-8591-4d14-91a8-41ce54187992", name: "Priya", url: "https://d3adwkbyhxyrtq.cloudfront.net/web-app/Priya.webp" },
     { id: "ba6c9b18-f79c-4dab-9649-88a181d0a038", name: "Elena", url: "https://d3adwkbyhxyrtq.cloudfront.net/web-app/Elena.webp" },
     { id: "30e2cadd-987c-4a7a-81c3-094d4fb3a65e", name: "Kai", url: "https://d3adwkbyhxyrtq.cloudfront.net/web-app/Kai.webp" },
