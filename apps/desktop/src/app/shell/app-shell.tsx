@@ -10,6 +10,7 @@ import {
   $fileBrowserOpen,
   $panesFlipped,
   $sidebarOpen,
+  $titlebarControlsWidth,
   FILE_BROWSER_DEFAULT_WIDTH,
   FILE_BROWSER_PANE_ID,
   setSidebarOpen
@@ -22,7 +23,7 @@ import { SIDEBAR_COLLAPSE_MEDIA_QUERY } from '../layout-constants'
 
 import { KeybindPanel } from './keybind-panel'
 import { StatusbarControls, type StatusbarItem } from './statusbar-controls'
-import { TITLEBAR_HEIGHT, titlebarControlsPosition } from './titlebar'
+import { TITLEBAR_HEIGHT, titlebarControlsPosition, titlebarControlsReservation } from './titlebar'
 import { TitlebarControls, type TitlebarTool } from './titlebar-controls'
 
 interface AppShellProps {
@@ -77,6 +78,7 @@ export function AppShell({
   const panesFlipped = useStore($panesFlipped)
   const narrowViewport = useMediaQuery(SIDEBAR_COLLAPSE_MEDIA_QUERY)
   const fileBrowserWidthOverride = useStore($paneWidthOverride(FILE_BROWSER_PANE_ID))
+  const titlebarControlsWidthPx = useStore($titlebarControlsWidth)
   const connection = useStore($connection)
   const viewportFullscreen = useSyncExternalStore(subscribeWindowSize, viewportIsFullscreen, () => false)
   const isFullscreen = Boolean(connection?.isFullscreen) || viewportFullscreen
@@ -109,18 +111,21 @@ export function AppShell({
     ? 0
     : titlebarControls.left + TITLEBAR_HEIGHT + Math.round(TITLEBAR_HEIGHT / 2)
 
-  // The static system cluster (haptics, profiles, settings, right-sidebar) is
-  // hardcoded in TitlebarControls. Pane-supplied tools (preview's group) render
-  // in a separate cluster anchored further left.
+  // The static system cluster (browser, haptics, keybinds, profile chip,
+  // settings, right-sidebar) is rendered by TitlebarControls; pane-supplied
+  // tools (preview's group) render in a separate cluster anchored further left.
+  // The pane-tool cluster reserves `systemToolsWidth` of room so it can't slide
+  // under the system cluster.
   //
-  // Width math has to include the `gap-x-1` (0.25rem) between buttons:
-  // N buttons + (N - 1) inner gaps, plus one extra 0.25rem of breathing room
-  // between the pane-tool cluster and the system cluster so they don't sit
-  // flush against each other. Modeled as N gaps (N - 1 inner + 1 trailing)
-  // to keep the formula generic for any pane-tool count.
-  const SYSTEM_TOOL_COUNT = 4
+  // The reservation tracks the cluster's *measured* width (published by
+  // TitlebarControls via a ResizeObserver) plus a 0.25rem breather. A fixed
+  // per-button count can't capture the profile chip's `w-auto` width — once it
+  // shows a provider balance the cluster grows, and undercounting is exactly
+  // what let the pane tools overlap it. Before the first measurement lands, fall
+  // back to a per-button estimate for the 5 fixed icon buttons.
+  const SYSTEM_TOOL_COUNT = 5
   const paneToolCount = titlebarTools?.filter(tool => !tool.hidden).length ?? 0
-  const systemToolsWidth = `calc(${SYSTEM_TOOL_COUNT} * (var(--titlebar-control-size) + 0.25rem))`
+  const systemToolsWidth = titlebarControlsReservation(titlebarControlsWidthPx, SYSTEM_TOOL_COUNT)
 
   const fileBrowserWidth =
     fileBrowserWidthOverride !== undefined ? `${fileBrowserWidthOverride}px` : FILE_BROWSER_DEFAULT_WIDTH

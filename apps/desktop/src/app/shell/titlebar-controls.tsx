@@ -1,5 +1,6 @@
 import { useStore } from '@nanostores/react'
 import type { ComponentProps, ReactNode } from 'react'
+import { useCallback, useRef } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 
 import { Button } from '@/components/ui/button'
@@ -13,10 +14,12 @@ import {
   $fileBrowserOpen,
   $panesFlipped,
   $sidebarOpen,
+  setTitlebarControlsWidth,
   toggleFileBrowserOpen,
   togglePanesFlipped,
   toggleSidebarOpen
 } from '@/store/layout'
+import { openBrowserPreview } from '@/store/preview'
 
 import { appViewForPath, isOverlayView } from '../routes'
 
@@ -54,6 +57,33 @@ export function TitlebarControls({ leftTools = [], tools = [], onOpenSettings }:
   const fileBrowserOpen = useStore($fileBrowserOpen)
   const sidebarOpen = useStore($sidebarOpen)
   const panesFlipped = useStore($panesFlipped)
+
+  // Measure the rendered width of the static right-edge cluster and publish it
+  // so AppShell can reserve exactly that much room for the pane-tool cluster.
+  // The profile chip is `w-auto` (shows a provider balance once keys exist), so
+  // a fixed per-button count undercounts it and the pane tools slide under —
+  // that was the top-right overlap. A ResizeObserver keeps the reservation
+  // exact as the chip widens/narrows. Callback ref so it re-measures whenever
+  // the node mounts (the cluster is hidden entirely on overlay views).
+  const controlsObserverRef = useRef<ResizeObserver | null>(null)
+  const measureControls = useCallback((node: HTMLDivElement | null) => {
+    controlsObserverRef.current?.disconnect()
+    controlsObserverRef.current = null
+
+    if (!node) {
+      return
+    }
+
+    setTitlebarControlsWidth(node.offsetWidth)
+
+    if (typeof ResizeObserver === 'undefined') {
+      return
+    }
+
+    const observer = new ResizeObserver(() => setTitlebarControlsWidth(node.offsetWidth))
+    observer.observe(node)
+    controlsObserverRef.current = observer
+  }, [])
 
   const toggleHaptics = () => {
     if (!hapticsMuted) {
@@ -111,6 +141,15 @@ export function TitlebarControls({ leftTools = [], tools = [], onOpenSettings }:
 
   // Static system tools — always pinned to the screen's right edge.
   const systemTools: TitlebarTool[] = [
+    {
+      icon: <Codicon name="globe" />,
+      id: 'browser',
+      label: t.titlebar.openBrowser,
+      onSelect: () => {
+        triggerHaptic('open')
+        openBrowserPreview()
+      }
+    },
     {
       active: hapticsMuted,
       icon: <Codicon name={hapticsMuted ? 'mute' : 'unmute'} />,
@@ -184,6 +223,7 @@ export function TitlebarControls({ leftTools = [], tools = [], onOpenSettings }:
       )}
 
       <div
+        ref={measureControls}
         aria-label={t.shell.appControls}
         className="fixed right-(--titlebar-tools-right) top-(--titlebar-controls-top) z-70 flex flex-row items-center justify-end gap-x-1 pointer-events-auto select-none [-webkit-app-region:no-drag]"
       >

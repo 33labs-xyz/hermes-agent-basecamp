@@ -4,7 +4,8 @@ import {
   TITLEBAR_CONTROL_OFFSET_X,
   TITLEBAR_EDGE_INSET,
   TITLEBAR_FALLBACK_WINDOW_BUTTON_X,
-  titlebarControlsPosition
+  titlebarControlsPosition,
+  titlebarControlsReservation
 } from './titlebar'
 
 describe('titlebarControlsPosition', () => {
@@ -22,5 +23,26 @@ describe('titlebarControlsPosition', () => {
 
   it('uses the macOS fallback while the initial window state is unknown', () => {
     expect(titlebarControlsPosition(undefined).left).toBe(TITLEBAR_FALLBACK_WINDOW_BUTTON_X + TITLEBAR_CONTROL_OFFSET_X)
+  })
+})
+
+describe('titlebarControlsReservation', () => {
+  it('reserves the measured cluster width plus a breather once measured', () => {
+    // The real right-edge cluster is 5 icon buttons + a variable-width profile
+    // chip. Measuring it (rather than counting fixed buttons) is what stops the
+    // pane-tool cluster from overlapping it.
+    expect(titlebarControlsReservation(180, 5)).toBe('calc(180px + 0.25rem)')
+  })
+
+  it('tracks a wider (profile-visible) cluster so it never undercounts', () => {
+    expect(titlebarControlsReservation(212, 5)).toBe('calc(212px + 0.25rem)')
+  })
+
+  it('falls back to a per-button estimate before the first measurement lands', () => {
+    expect(titlebarControlsReservation(0, 5)).toBe('calc(5 * (var(--titlebar-control-size) + 0.25rem))')
+  })
+
+  it('treats a negative measurement as unmeasured', () => {
+    expect(titlebarControlsReservation(-1, 5)).toBe('calc(5 * (var(--titlebar-control-size) + 0.25rem))')
   })
 })

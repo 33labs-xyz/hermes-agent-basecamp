@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
-import { $rightRailActiveTabId, RIGHT_RAIL_PREVIEW_TAB_ID } from './layout'
+import { $rightRailActiveTabId, RIGHT_RAIL_PREVIEW_TAB_ID, selectRightRailTab } from './layout'
 import {
   $filePreviewTabs,
   $filePreviewTarget,
@@ -9,13 +9,16 @@ import {
   $previewTarget,
   $sessionPreviewRegistry,
   beginPreviewServerRestart,
+  BROWSER_PREVIEW_START_URL,
   clearSessionPreviewRegistry,
   closeActiveRightRailTab,
   dismissPreviewTarget,
   getSessionPreviewRecord,
+  openBrowserPreview,
   type PreviewTarget,
   progressPreviewServerRestart,
-  setCurrentSessionPreviewTarget
+  setCurrentSessionPreviewTarget,
+  setPreviewTarget
 } from './preview'
 import { $activeSessionId, $selectedStoredSessionId } from './session'
 
@@ -131,5 +134,34 @@ describe('preview store', () => {
     expect($filePreviewTarget.get()).toBeNull()
     expect($rightRailActiveTabId.get()).toBe(RIGHT_RAIL_PREVIEW_TAB_ID)
     expect($previewTarget.get()).toEqual(withRenderMode(live, 'preview'))
+  })
+})
+
+describe('openBrowserPreview', () => {
+  beforeEach(() => {
+    setPreviewTarget(null)
+    selectRightRailTab('file:parked')
+  })
+
+  it('reveals the preview pane as a url browser at the default start page', () => {
+    openBrowserPreview()
+
+    const target = $previewTarget.get()
+
+    expect(target?.kind).toBe('url')
+    expect(target?.url).toBe(BROWSER_PREVIEW_START_URL)
+    expect($rightRailActiveTabId.get()).toBe(RIGHT_RAIL_PREVIEW_TAB_ID)
+  })
+
+  it('is idempotent - re-revealing keeps the same single browser target', () => {
+    openBrowserPreview()
+
+    const first = $previewTarget.get()
+
+    selectRightRailTab('file:parked')
+    openBrowserPreview()
+
+    expect($previewTarget.get()).toBe(first)
+    expect($rightRailActiveTabId.get()).toBe(RIGHT_RAIL_PREVIEW_TAB_ID)
   })
 })

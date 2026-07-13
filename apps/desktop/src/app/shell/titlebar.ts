@@ -31,6 +31,26 @@ export const titlebarHeaderTitleClass = 'flex min-w-0 flex-1 items-center gap-1.
 export const titlebarHeaderShadowClass =
   "after:pointer-events-none after:absolute after:left-0 after:right-0 after:top-full after:h-4 after:bg-linear-to-b after:from-(--ui-chat-surface-background) after:to-transparent after:content-['']"
 
+// Inner gap-x-1 between titlebar buttons, in rem. Also the trailing breather
+// the pane-tool cluster leaves before the static system cluster.
+export const TITLEBAR_TOOL_GAP_REM = 0.25
+
+// CSS length the titlebar reserves for the static right-edge control cluster
+// (browser, haptics, keybinds, the variable-width profile chip, settings, and
+// the right-sidebar toggle). Prefer the measured pixel width of the real,
+// rendered cluster — a fixed per-button count can't capture the profile chip's
+// `w-auto` width and undercounting it lets the pane-tool cluster overlap the
+// system cluster. Before the first measurement lands, fall back to a
+// conservative per-button estimate (N buttons + N gaps: N-1 inner gap-x-1 plus
+// one trailing breather).
+export function titlebarControlsReservation(measuredWidth: number, fallbackButtonCount: number): string {
+  if (measuredWidth > 0) {
+    return `calc(${measuredWidth}px + ${TITLEBAR_TOOL_GAP_REM}rem)`
+  }
+
+  return `calc(${fallbackButtonCount} * (var(--titlebar-control-size) + ${TITLEBAR_TOOL_GAP_REM}rem))`
+}
+
 export function titlebarControlsPosition(
   windowButtonPosition: HermesConnection['windowButtonPosition'] | undefined,
   isFullscreen = false

@@ -104,6 +104,24 @@ export function setPreviewTarget(target: PreviewTarget | null) {
   }
 }
 
+/** Default landing page for the titlebar browser button. Search-capable without
+ * an address bar and privacy-preserving; swap the constant to change it. */
+export const BROWSER_PREVIEW_START_URL = 'https://duckduckgo.com/'
+const BROWSER_PREVIEW_SOURCE = 'titlebar-browser'
+
+/** Reveal the preview rail as a plain in-app browser at the default start page.
+ * Deliberately not registered in the session preview registry: this is an
+ * ad-hoc browser, not a session artifact, so it never auto-reopens or persists.
+ * Idempotent via setPreviewTarget's same-target guard. */
+export function openBrowserPreview() {
+  setPreviewTarget({
+    kind: 'url',
+    label: 'Browser',
+    source: BROWSER_PREVIEW_SOURCE,
+    url: BROWSER_PREVIEW_START_URL
+  })
+}
+
 export function filePreviewTabId(target: PreviewTarget): `file:${string}` {
   return `file:${target.url}`
 }

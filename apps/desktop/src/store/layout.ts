@@ -51,6 +51,21 @@ export const $fileBrowserOpen: ReadableAtom<boolean> = computed(
 
 export const $rightRailActiveTabId = atom<RightRailTabId>(RIGHT_RAIL_PREVIEW_TAB_ID)
 
+// Measured pixel width of the static right-edge titlebar control cluster
+// (browser, haptics, keybinds, the variable-width profile chip, settings, and
+// the right-sidebar toggle). The pane-tool cluster reserves this much room so
+// it can never slide under the system cluster. 0 until the first measurement
+// lands, which the titlebar reservation treats as "unmeasured".
+export const $titlebarControlsWidth = atom<number>(0)
+
+export function setTitlebarControlsWidth(width: number) {
+  const next = Math.max(0, Math.round(width))
+
+  if ($titlebarControlsWidth.get() !== next) {
+    $titlebarControlsWidth.set(next)
+  }
+}
+
 export const $sidebarWidth: ReadableAtom<number> = computed($paneStates, states => {
   const override = states[CHAT_SIDEBAR_PANE_ID]?.widthOverride
 
