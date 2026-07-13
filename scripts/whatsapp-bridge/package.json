@@ -1,6 +1,6 @@
 {
   "name": "hermes-whatsapp-bridge",
-  "version": "0.16.26",
+  "version": "0.16.27",
   "description": "WhatsApp bridge for Hermes Agent using Baileys",
   "private": true,
   "type": "module",
