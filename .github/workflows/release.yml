@@ -12,8 +12,10 @@ name: Release (Electron auto-update)
 #   2. Commit + push that bump to the app branch (feat/projects).
 #   3. Run this workflow against that branch:
 #        gh workflow run release.yml --ref feat/projects
-#      electron-builder creates the v<version> tag + GitHub Release at the built
-#      commit and uploads the assets.
+#      The "Ensure release tag exists" step creates the v<version> tag at the
+#      built commit, then electron-builder attaches the GitHub Release to it and
+#      uploads the assets. (GitHub rejects publishing a release for a tag that
+#      does not already exist, so the tag must be created before --publish.)
 #
 # WHY workflow_dispatch and NOT a tag trigger: the first-launch backend bootstrap
 # pins to the build's git BRANCH via scripts/write-build-stamp.cjs (GITHUB_REF_NAME).
@@ -64,6 +66,26 @@ jobs:
       # the app subdir instead of the workspace root.
       - name: Install npm dependencies (workspace root)
         run: npm ci
+
+      # GitHub rejects creating a PUBLISHED (non-draft) release for a tag that
+      # does not already exist as a ref -- the API returns 422 "Published
+      # releases must have a valid tag". electron-builder's GitHub publisher
+      # does not pre-create the tag, so create it here at the built commit.
+      # Once the tag exists, --publish always attaches the release and uploads.
+      - name: Ensure release tag exists
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION=$(node -p "require('./apps/desktop/package.json').version")
+          TAG="v${VERSION}"
+          if gh api "repos/${GITHUB_REPOSITORY}/git/refs/tags/${TAG}" >/dev/null 2>&1; then
+            echo "Tag ${TAG} already exists; leaving as-is."
+          else
+            gh api -X POST "repos/${GITHUB_REPOSITORY}/git/refs" \
+              -f ref="refs/tags/${TAG}" -f sha="${GITHUB_SHA}"
+            echo "Created ${TAG} at ${GITHUB_SHA}."
+          fi
 
       - name: Build + publish Electron NSIS installer
         working-directory: apps/desktop
