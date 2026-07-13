@@ -12,10 +12,13 @@ name: Release (Electron auto-update)
 #   2. Commit + push that bump to the app branch (feat/projects).
 #   3. Run this workflow against that branch:
 #        gh workflow run release.yml --ref feat/projects
-#      The "Ensure release tag exists" step creates the v<version> tag at the
-#      built commit, then electron-builder attaches the GitHub Release to it and
-#      uploads the assets. (GitHub rejects publishing a release for a tag that
-#      does not already exist, so the tag must be created before --publish.)
+#      electron-builder builds + signs the installer with --publish never, then a
+#      dedicated step creates the v<version> GitHub Release (tag at the built
+#      commit) and uploads the .exe + .blockmap + latest.yml with the gh CLI.
+#      We do NOT let electron-builder publish: its GitHub publisher creates the
+#      release lazily DURING upload, which races the concurrent asset uploads and
+#      silently drops the large .exe + latest.yml (only the tiny blockmap
+#      survives) while still exiting 0. Uploading via gh is deterministic.
 #
 # WHY workflow_dispatch and NOT a tag trigger: the first-launch backend bootstrap
 # pins to the build's git BRANCH via scripts/write-build-stamp.cjs (GITHUB_REF_NAME).
@@ -67,39 +70,48 @@ jobs:
       - name: Install npm dependencies (workspace root)
         run: npm ci
 
-      # GitHub rejects creating a PUBLISHED (non-draft) release for a tag that
-      # does not already exist as a ref -- the API returns 422 "Published
-      # releases must have a valid tag". electron-builder's GitHub publisher
-      # does not pre-create the tag, so create it here at the built commit.
-      # Once the tag exists, --publish always attaches the release and uploads.
-      - name: Ensure release tag exists
+      - name: Build Electron NSIS installer (no publish)
+        working-directory: apps/desktop
+        # --publish never: build + sign the NSIS installer and write
+        # Basecamp-<ver>-win-x64.exe, its .blockmap, and latest.yml into ./release
+        # WITHOUT uploading. The next step uploads them deterministically so we
+        # avoid electron-builder's lazy-release-creation race that drops assets.
+        run: npm run build && npm run builder -- --win nsis --publish never
+        env:
+          # Unsigned tester build: skip code-signing identity discovery so the
+          # build never blocks on a missing certificate.
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+
+      - name: Publish GitHub Release + upload Windows assets
+        working-directory: apps/desktop
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          VERSION=$(node -p "require('./apps/desktop/package.json').version")
+          VERSION=$(node -p "require('./package.json').version")
           TAG="v${VERSION}"
-          if gh api "repos/${GITHUB_REPOSITORY}/git/refs/tags/${TAG}" >/dev/null 2>&1; then
-            echo "Tag ${TAG} already exists; leaving as-is."
+          EXE="release/Basecamp-${VERSION}-win-x64.exe"
+          # Fail loudly if electron-builder did not produce every expected asset.
+          for f in "$EXE" "${EXE}.blockmap" "release/latest.yml"; do
+            if [ ! -f "$f" ]; then
+              echo "Missing expected artifact: $f"
+              ls -la release || true
+              exit 1
+            fi
+          done
+          # Create the release (and its tag at the built commit) if it is absent.
+          if ! gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release create "$TAG" --repo "$GITHUB_REPOSITORY" \
+              --target "$GITHUB_SHA" --title "$VERSION" \
+              --notes "Basecamp $VERSION"
+            echo "Created release $TAG at $GITHUB_SHA."
           else
-            gh api -X POST "repos/${GITHUB_REPOSITORY}/git/refs" \
-              -f ref="refs/tags/${TAG}" -f sha="${GITHUB_SHA}"
-            echo "Created ${TAG} at ${GITHUB_SHA}."
+            echo "Release $TAG already exists; uploading into it."
           fi
-
-      - name: Build + publish Electron NSIS installer
-        working-directory: apps/desktop
-        # --publish always: build the NSIS installer AND upload latest.yml + .exe +
-        # .blockmap to the GitHub Release. releaseType "release" in package.json
-        # publishes it immediately rather than as a draft. GH_TOKEN is the
-        # Actions-provided token and needs the contents: write permission set
-        # above -- no personal access token required.
-        run: npm run build && npm run builder -- --win nsis --publish always
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Unsigned tester build: skip code-signing identity discovery so the
-          # build never blocks on a missing certificate.
-          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+          # --clobber makes re-runs overwrite instead of erroring on duplicates.
+          gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" --clobber \
+            "$EXE" "${EXE}.blockmap" "release/latest.yml"
+          echo "Uploaded Windows assets to $TAG."
 
       - name: Summary
         if: always()
