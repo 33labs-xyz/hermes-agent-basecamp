@@ -102,7 +102,8 @@ import {
   MESSAGING_ROUTE,
   PROJECTS_ROUTE,
   SKILLS_ROUTE,
-  STAFF_ROUTE,
+  // STAFF_ROUTE hidden for now — restore alongside the SIDEBAR_NAV entry below.
+  // STAFF_ROUTE,
   STUDIO_ROUTE
 } from '../../routes'
 import { SidebarPanelLabel } from '../../shell/sidebar-label'
@@ -146,9 +147,10 @@ const SIDEBAR_NAV: SidebarNavItem[] = [
   },
   { id: 'messaging', label: '', icon: props => <Codicon name="comment" {...props} />, route: MESSAGING_ROUTE },
   { id: 'artifacts', label: '', icon: props => <Codicon name="files" {...props} />, route: ARTIFACTS_ROUTE },
-  // Staff: the hired-agent marketplace (roster of scheduled/manual agents).
-  // Sits between Projects and Studio in the rail.
-  { id: 'staff', label: 'Staff', icon: props => <Codicon name="person" {...props} />, route: STAFF_ROUTE },
+  // Staff hidden for now. The /staff route + StaffView stay registered (routes.ts),
+  // so it still works if navigated directly; uncomment this entry AND the
+  // STAFF_ROUTE import above to restore the hired-agent marketplace to the rail.
+  // { id: 'staff', label: 'Staff', icon: props => <Codicon name="person" {...props} />, route: STAFF_ROUTE },
   // Studio is the last nav item: the local generative-AI studio (Muapi BYOK).
   { id: 'studio', label: 'Studio', icon: props => <Codicon name="sparkle" {...props} />, route: STUDIO_ROUTE }
 ]
