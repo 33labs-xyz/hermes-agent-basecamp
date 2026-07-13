@@ -67,7 +67,7 @@ from gateway.status import (
     get_runtime_status_running_pid,
     read_runtime_status,
 )
-from model_tools import handle_function_call
+from model_tools import get_tool_definitions, handle_function_call
 from utils import env_var_enabled
 
 try:
@@ -3869,6 +3869,28 @@ async def internal_tool_call(body: InternalToolCall, request: Request):
     _emit_bridge_tool_event(body.session_id, body.tool_name, body.arguments or {}, raw, ok)
 
     return {"ok": ok, "result": raw, "error": error}
+
+
+@app.get("/api/internal/tool-schemas")
+async def internal_tool_schemas(session_id: str, bridge_token: str, request: Request):
+    # Same guard as the tool-call endpoint: localhost-only + per-session token,
+    # and a single opaque 403 that does not reveal which check failed.
+    from hermes_cli.bridge_tokens import verify_bridge_token
+
+    if not _local_dashboard_request(request):
+        raise HTTPException(status_code=403, detail="Forbidden")
+    if not verify_bridge_token(session_id, bridge_token):
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    defs = get_tool_definitions(quiet_mode=True) or []
+    tools = [
+        td["function"]
+        for td in defs
+        if isinstance(td, dict)
+        and td.get("type") == "function"
+        and isinstance(td.get("function"), dict)
+    ]
+    return {"tools": tools}
 
 
 @app.delete("/api/env")

@@ -101,3 +101,37 @@ class TestInternalToolCallEndpoint:
             assert len(calls) == 1          # emitter invoked exactly once
         finally:
             revoke_bridge_token("sess-ev")
+
+    # 5. GET tool-schemas: no valid token -> 403 (same guard as the POST endpoint).
+    def test_tool_schemas_rejected_without_valid_token(self):
+        resp = self.client.get(
+            "/api/internal/tool-schemas",
+            params={"session_id": "sess-x", "bridge_token": "bogus"},
+        )
+        assert resp.status_code == 403
+
+    # 6. GET tool-schemas: valid token -> returns only the function schemas, unwrapped.
+    def test_tool_schemas_with_valid_token_returns_functions(self, monkeypatch):
+        from hermes_cli import web_server
+        from hermes_cli.bridge_tokens import register_bridge_token, revoke_bridge_token
+        register_bridge_token("sess-sc", "tok-sc")
+        monkeypatch.setattr(
+            web_server, "get_tool_definitions",
+            lambda **kw: [
+                {"type": "function", "function": {
+                    "name": "read_file", "description": "Read a file",
+                    "parameters": {"type": "object", "properties": {}}}},
+                {"type": "other", "function": {"name": "ignore_me"}},
+            ],
+        )
+        try:
+            resp = self.client.get(
+                "/api/internal/tool-schemas",
+                params={"session_id": "sess-sc", "bridge_token": "tok-sc"},
+            )
+            assert resp.status_code == 200
+            tools = resp.json()["tools"]
+            assert len(tools) == 1                 # non-function entry filtered out
+            assert tools[0]["name"] == "read_file"
+        finally:
+            revoke_bridge_token("sess-sc")
