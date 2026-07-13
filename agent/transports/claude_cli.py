@@ -344,8 +344,22 @@ def _write_mcp_config(hermes_session_id: str, token: str, base_url: str) -> str:
     handle = tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False)
     try:
         json.dump(config, handle)
-    finally:
         handle.close()
+    except BaseException:
+        # A write failure (disk full / quota mid-dump) must not orphan the
+        # file: the caller only ever learns this path via the return value,
+        # so an exception here would leave it on disk with no one holding a
+        # reference to delete it. Unlink it, then re-raise so the caller can
+        # revoke the token it already registered.
+        try:
+            handle.close()
+        except OSError:
+            pass
+        try:
+            os.remove(handle.name)
+        except OSError:
+            pass
+        raise
     return handle.name
 
 
@@ -442,9 +456,14 @@ def run_claude_cli_turn(
     # One bridge token/config covers both the primary attempt and the
     # eviction-fallback retry below: they are the same logical turn, and
     # minting a second token for the retry would just be a second thing
-    # to clean up for no benefit.
-    mcp_config_path = _prepare_mcp_bridge(session_key) if enable_tools else None
+    # to clean up for no benefit. Prepared inside the try so that even if
+    # _prepare_mcp_bridge raises after registering the token, the finally
+    # still revokes it: the guarantee is "cleaned up exactly once on every
+    # exit path".
+    mcp_config_path: str | None = None
     try:
+        if enable_tools:
+            mcp_config_path = _prepare_mcp_bridge(session_key)
         result = _execute_turn(
             prompt=prompt,
             model=model,

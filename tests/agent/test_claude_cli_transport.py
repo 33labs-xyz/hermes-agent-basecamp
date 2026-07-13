@@ -421,6 +421,56 @@ class TestMcpBridge:
         # And revoked once the turn (and its cleanup) has fully returned.
         assert verify_bridge_token(session_key, "deterministic-test-token") is False
 
+    def test_failed_config_write_revokes_token_and_leaves_no_temp_file(self, monkeypatch):
+        # A write failure mid-config (disk full / quota) must not leak
+        # either half of the bridge state: the token stays out of the
+        # registry and the half-created temp file is removed, while the
+        # turn still runs (degraded to Stage-1, no tools) rather than
+        # crashing. Patches the real json.dump so the real _write_mcp_config
+        # creates a NamedTemporaryFile and then fails writing to it.
+        monkeypatch.setenv("CLAUDE_CLI_PATH", FAKE)
+        monkeypatch.setattr(
+            claude_cli_transport, "_resolve_gateway_base_url",
+            lambda: "http://127.0.0.1:9999",
+        )
+        monkeypatch.setattr(
+            claude_cli_transport.secrets, "token_urlsafe",
+            lambda n: "doomed-write-token",
+        )
+
+        created_paths = []
+        real_named_tmp = claude_cli_transport.tempfile.NamedTemporaryFile
+
+        def _tracking_tmp(*args, **kwargs):
+            handle = real_named_tmp(*args, **kwargs)
+            created_paths.append(handle.name)
+            return handle
+
+        def _boom_dump(*args, **kwargs):
+            raise OSError("disk full")
+
+        monkeypatch.setattr(
+            claude_cli_transport.tempfile, "NamedTemporaryFile", _tracking_tmp
+        )
+        monkeypatch.setattr(claude_cli_transport.json, "dump", _boom_dump)
+
+        session_key = "sess-failed-write"
+        resp = run_claude_cli_turn(
+            {**_kwargs(), "hermes_session_id": session_key}
+        )
+
+        # Degrades to a normal Stage-1 turn rather than crashing.
+        assert resp.content == "Hello world"
+        assert resp.finish_reason == "stop"
+        # The token never stayed registered.
+        assert verify_bridge_token(session_key, "doomed-write-token") is False
+        # The half-written temp file was cleaned up, not orphaned on disk.
+        assert created_paths, "expected _write_mcp_config to create a temp file"
+        for path in created_paths:
+            assert not os.path.exists(path), (
+                "a failed config write must not orphan its temp file on disk"
+            )
+
     def test_no_gateway_available_runs_without_mcp_bridge(self, monkeypatch):
         # Graceful degradation: _resolve_gateway_base_url returning None
         # (no dashboard web server running in this process) must not

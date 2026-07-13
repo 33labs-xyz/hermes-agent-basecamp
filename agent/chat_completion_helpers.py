@@ -1458,7 +1458,7 @@ def handle_max_iterations(agent, messages: list, api_call_count: int) -> str:
             # for claude_cli are gated by whether an --mcp-config is
             # passed to the subprocess, not by anything in api_kwargs, so
             # (unlike the codex_kwargs.pop("tools", None) above) there is
-            # no "tools" key to drop here — hermes_session_id is kept so
+            # no "tools" key to drop here - hermes_session_id is kept so
             # --resume still gives the CLI its full turn history to
             # summarize; only tool-calling is suppressed.
             _cli_summary = run_claude_cli_turn(claude_cli_kwargs, enable_tools=False)
