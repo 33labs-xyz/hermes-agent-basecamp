@@ -21,6 +21,11 @@ vi.mock('../studio/use-studio-balance', () => ({
 vi.mock('@/store/studio-key', () => ({
   ensureStudioKeyLoaded: vi.fn()
 }))
+vi.mock('@/lib/external-link', () => ({
+  openExternalLink: vi.fn()
+}))
+
+import { openExternalLink } from '@/lib/external-link'
 
 import { TitlebarProfile } from './titlebar-profile'
 
@@ -118,5 +123,25 @@ describe('TitlebarProfile', () => {
     // Clicking a disabled row must not change the persisted pick.
     fireEvent.click(screen.getByText('Gemini'))
     expect($balanceProvider.get()).toBeNull()
+  })
+
+  it('opens the OpenRouter top-up page from the dropdown', () => {
+    render(<TitlebarProfile />)
+
+    openDropdown()
+    fireEvent.click(screen.getByText('Top up OpenRouter'))
+
+    expect(vi.mocked(openExternalLink)).toHaveBeenCalledWith('https://openrouter.ai/credits')
+  })
+
+  it('opens the Muapi top-up page when the Studio balance is shown', () => {
+    routeMock.view = 'studio'
+
+    render(<TitlebarProfile />)
+
+    openDropdown()
+    fireEvent.click(screen.getByText('Top up Muapi'))
+
+    expect(vi.mocked(openExternalLink)).toHaveBeenCalledWith('https://muapi.ai/access-keys')
   })
 })

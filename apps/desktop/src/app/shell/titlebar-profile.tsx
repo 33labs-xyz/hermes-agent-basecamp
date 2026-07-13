@@ -7,8 +7,10 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
+import { openExternalLink } from '@/lib/external-link'
 import { pickDisplayedProvider, resolveDefaultProvider } from '@/lib/provider-balances'
 import { cn } from '@/lib/utils'
 import { $balanceProvider, setBalanceProvider } from '@/store/balance-provider'
@@ -19,6 +21,13 @@ import { formatCredits } from '../studio/use-studio-balance'
 import { useOverlayRouting } from './hooks/use-overlay-routing'
 import { titlebarButtonClass } from './titlebar'
 import { useProviderBalances } from './use-provider-balances'
+
+// Deep links to each provider's own credits/top-up page, opened in the user's
+// browser from the balance dropdown. Keys match provider-balances row slugs.
+const TOPUP_URLS: Record<string, string> = {
+  muapi: 'https://muapi.ai/access-keys',
+  openrouter: 'https://openrouter.ai/credits'
+}
 
 // Persistent profile control in the titlebar's right cluster. Shows the balance
 // of the active provider (OpenRouter-first, Muapi on the Studio screen) beside
@@ -48,6 +57,8 @@ export function TitlebarProfile() {
   })
   const displayedRow = rows.find(row => row.slug === displayedSlug) ?? null
   const displayedBalance = displayedRow && displayedRow.status === 'ok' ? displayedRow.balance : null
+  // Top-up link for whichever provider's balance is on show (null if unknown).
+  const topupUrl = displayedSlug ? (TOPUP_URLS[displayedSlug] ?? null) : null
 
   // Nothing configured exposes a number: hide the whole control.
   if (!hasOk) {
@@ -115,6 +126,22 @@ export function TitlebarProfile() {
             </DropdownMenuItem>
           )
         })}
+        {topupUrl ? (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              className="flex items-center gap-2"
+              onSelect={event => {
+                event.preventDefault()
+                openExternalLink(topupUrl)
+                setOpen(false)
+              }}
+            >
+              <Codicon name="link-external" size={13} />
+              <span className="flex-1 truncate">Top up {displayedRow?.label ?? 'balance'}</span>
+            </DropdownMenuItem>
+          </>
+        ) : null}
       </DropdownMenuContent>
     </DropdownMenu>
   )
