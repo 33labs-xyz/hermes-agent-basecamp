@@ -1,7 +1,7 @@
 import { cleanup, render } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { LearnView } from './index'
+import { COMING_SOON, LearnView } from './index'
 
 afterEach(() => {
   cleanup()
@@ -19,5 +19,22 @@ describe('LearnView', () => {
     const root = container.firstElementChild as HTMLElement
 
     expect(root.className).toContain('pt-(--titlebar-height)')
+  })
+
+  // While the Portal is gated we must show the coming-soon overlay and NOT
+  // mount the webview, so the unfinished remote site is never fetched. When the
+  // gate is lifted (COMING_SOON === false) the inverse must hold: the webview
+  // mounts and no overlay is shown. Branching keeps this guard valid through
+  // the flip.
+  it('gates the Portal behind a coming-soon overlay while COMING_SOON is set', () => {
+    const { container, queryByText } = render(<LearnView setStatusbarItemGroup={vi.fn()} />)
+
+    if (COMING_SOON) {
+      expect(queryByText(/coming soon/i)).not.toBeNull()
+      expect(container.querySelector('webview')).toBeNull()
+    } else {
+      expect(queryByText(/coming soon/i)).toBeNull()
+      expect(container.querySelector('webview')).not.toBeNull()
+    }
   })
 })

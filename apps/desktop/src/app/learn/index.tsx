@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 
 import { Button } from '@/components/ui/button'
 import { openExternalLink } from '@/lib/external-link'
+import { Sparkles } from '@/lib/icons'
 
 import type { SetStatusbarItemGroup } from '../shell/statusbar-controls'
 
@@ -9,6 +10,13 @@ import type { SetStatusbarItemGroup } from '../shell/statusbar-controls'
 // Deployed separately on Netlify and served with `frame-ancestors *` so it can
 // be embedded in the webview below.
 const LEARN_URL = 'https://basecamp-portal-493.netlify.app'
+
+// The Portal content is still being finished, so the tab is gated behind a
+// coming-soon overlay for now. While gated we skip mounting the webview
+// entirely, so the unfinished remote site is never fetched or shown. Flip to
+// `false` (and update index.test.tsx) to re-enable the embedded Portal once
+// it's ready for public use.
+export const COMING_SOON = true
 
 interface LearnViewProps {
   setStatusbarItemGroup: SetStatusbarItemGroup
@@ -31,6 +39,11 @@ export function LearnView({ setStatusbarItemGroup }: LearnViewProps) {
   }, [setStatusbarItemGroup])
 
   useEffect(() => {
+    // Gated: never mount the webview, so the unfinished Portal is not fetched.
+    if (COMING_SOON) {
+      return
+    }
+
     const host = hostRef.current
 
     if (!host) {
@@ -79,7 +92,22 @@ export function LearnView({ setStatusbarItemGroup }: LearnViewProps) {
   return (
     <div className="relative flex h-full min-h-0 flex-1 flex-col pt-(--titlebar-height)">
       <div className="min-h-0 flex-1" ref={hostRef} />
-      {loadError ? (
+      {COMING_SOON ? (
+        <div className="absolute inset-0 flex items-center justify-center bg-background/95 px-6">
+          <div className="flex max-w-sm flex-col items-center gap-4 rounded-2xl border border-border bg-card p-8 text-center shadow-lg">
+            <div className="flex size-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+              <Sparkles className="size-7" />
+            </div>
+            <span className="rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-medium uppercase tracking-wide text-primary">
+              Coming soon
+            </span>
+            <h1 className="text-xl font-semibold text-foreground">Portal</h1>
+            <p className="text-sm text-muted-foreground">
+              Courses, services and product updates are on the way. Check back shortly.
+            </p>
+          </div>
+        </div>
+      ) : loadError ? (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-background/95 text-center">
           <p className="text-sm text-muted-foreground">Couldn&apos;t reach the Basecamp site.</p>
           <Button onClick={() => openExternalLink(LEARN_URL)} type="button" variant="secondary">
