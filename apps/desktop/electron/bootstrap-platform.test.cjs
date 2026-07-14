@@ -88,14 +88,18 @@ test('detectRemoteDisplay honors the HERMES_DESKTOP_DISABLE_GPU override both wa
 
 test('packaged electron entrypoints do not require unpackaged npm modules', () => {
   const electronDir = __dirname
-  const entrypoints = ['main.cjs', 'preload.cjs', 'bootstrap-platform.cjs']
+  const entrypoints = ['main.cjs', 'preload.cjs', 'bootstrap-platform.cjs', 'auto-updater.cjs']
   // - electron: provided by the electron runtime, always resolvable in packaged builds.
   // - node-pty: hoisted by workspace dedup AND shipped via extraResources to
   //   resources/native-deps/node-pty (see scripts/stage-native-deps.cjs). main.cjs
   //   has a try/catch fallback at line ~38 that resolves the staged copy when the
   //   bare require fails in the packaged asar, so the bare require itself is by
   //   design rather than an oversight.
-  const allowedBareRequires = new Set(['electron', 'node-pty'])
+  // - electron-updater: same pattern -- its dependency tree is staged to
+  //   resources/native-deps/node_modules/electron-updater (see stage-native-deps.cjs)
+  //   and auto-updater.cjs's loadUpdater() falls back to requiring it from
+  //   process.resourcesPath when the bare require fails in the packaged asar.
+  const allowedBareRequires = new Set(['electron', 'node-pty', 'electron-updater'])
   const requirePattern = /require\(['"]([^'"]+)['"]\)/g
 
   for (const entrypoint of entrypoints) {

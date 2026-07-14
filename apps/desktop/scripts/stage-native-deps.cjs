@@ -66,6 +66,28 @@ const NATIVE_DEPS = [
   }
 ]
 
+// Pure-JS runtime modules to stage as a full node_modules subtree.
+//
+// Unlike the native deps above (fine-grained include globs to skip debug
+// symbols), these are small pure-JS packages copied wholesale together with
+// their transitive prod-dependency closure.  electron-updater powers packaged
+// auto-update; the `files:` whitelist would otherwise leave it -- and its ~15
+// transitive deps -- out of the bundle, so auto-updater.cjs's
+// require('electron-updater') throws in the asar and every update path silently
+// no-ops.  Staged into build/native-deps/node_modules/ (flat, matching the
+// workspace's hoisted layout) and shipped via the same extraResources copy;
+// auto-updater.cjs falls back to requiring from
+// process.resourcesPath/native-deps/node_modules when the bare require fails.
+const MODULE_TREES = ['electron-updater']
+
+// node_modules search roots, in resolution order.  Workspace dedup hoists
+// everything flat into the repo root; the app-local dir is a fallback for any
+// dep that did not hoist.
+const MODULE_SEARCH_ROOTS = [
+  path.join(REPO_ROOT, 'node_modules'),
+  path.join(APP_ROOT, 'node_modules')
+]
+
 function rmrf(target) {
   fs.rmSync(target, { recursive: true, force: true })
 }
@@ -148,11 +170,89 @@ function stageOne(spec) {
   console.log(`[stage-native-deps] ${path.relative(APP_ROOT, spec.to)}: ${copied} files`)
 }
 
+// Resolve a package name to an on-disk directory by probing the search roots
+// in order. Handles scoped names (@scope/pkg). Returns null if not found.
+function findPackageDir(name, roots) {
+  for (const root of roots) {
+    const dir = path.join(root, ...name.split('/'))
+    if (fs.existsSync(path.join(dir, 'package.json'))) return dir
+  }
+  return null
+}
+
+// Resolve a package plus its transitive prod-dependency closure to on-disk
+// directories. Walks `dependencies` (production only -- dev/optional/peer are
+// not needed at runtime) breadth-first. Returns the resolved name->dir map and
+// any names that could not be located.
+function collectDependencyClosure(rootName, roots) {
+  const resolved = new Map()
+  const missing = []
+  const queue = [rootName]
+  while (queue.length) {
+    const name = queue.shift()
+    if (resolved.has(name) || missing.includes(name)) continue
+    const dir = findPackageDir(name, roots)
+    if (!dir) {
+      missing.push(name)
+      continue
+    }
+    resolved.set(name, dir)
+    let pkg
+    try {
+      pkg = JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8'))
+    } catch {
+      pkg = {}
+    }
+    for (const dep of Object.keys(pkg.dependencies || {})) {
+      if (!resolved.has(dep)) queue.push(dep)
+    }
+  }
+  return { resolved, missing }
+}
+
+// Copy a package + its whole dependency closure into the staged node_modules,
+// flat. A missing dependency is fatal: it means the closure would fault at
+// runtime in the packaged app, so fail the build loudly rather than ship a
+// broken updater.
+function stageModuleTree(rootName) {
+  const { resolved, missing } = collectDependencyClosure(rootName, MODULE_SEARCH_ROOTS)
+  if (missing.length) {
+    throw new Error(
+      `stage-native-deps: cannot resolve ${missing.join(', ')} for the ` +
+        `${rootName} dependency tree.  Run \`npm install\` at the workspace root first.`
+    )
+  }
+  let pkgCount = 0
+  let fileCount = 0
+  for (const [name, dir] of resolved) {
+    const dest = path.join(STAGE_ROOT, 'node_modules', ...name.split('/'))
+    ensureDir(dest)
+    for (const abs of walk(dir)) {
+      const rel = path.relative(dir, abs)
+      // Skip any nested node_modules: the closure is staged flat, so a nested
+      // copy would be dead weight and could ship a conflicting transitive
+      // version that shadows the flat one.
+      if (rel.split(path.sep).includes('node_modules')) continue
+      const out = path.join(dest, rel)
+      ensureDir(path.dirname(out))
+      fs.copyFileSync(abs, out)
+      fileCount += 1
+    }
+    pkgCount += 1
+  }
+  console.log(
+    `[stage-native-deps] node_modules/${rootName} tree: ${pkgCount} packages, ${fileCount} files`
+  )
+}
+
 function main() {
   rmrf(STAGE_ROOT)
   ensureDir(STAGE_ROOT)
   for (const spec of NATIVE_DEPS) {
     stageOne(spec)
+  }
+  for (const rootName of MODULE_TREES) {
+    stageModuleTree(rootName)
   }
 }
 

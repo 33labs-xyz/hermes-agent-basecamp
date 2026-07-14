@@ -9,6 +9,7 @@
 // background, then a native dialog offers "Restart Now" -> quitAndInstall().
 
 const { app, dialog } = require('electron')
+const path = require('node:path')
 
 let autoUpdater = null
 let initialized = false
@@ -20,7 +21,22 @@ function loadUpdater() {
   try {
     autoUpdater = require('electron-updater').autoUpdater
   } catch {
-    autoUpdater = null
+    // Packaged builds don't ship node_modules (the build.files whitelist keeps
+    // it out of the asar), so the bare require above fails. electron-updater and
+    // its dependency tree are staged into resources/native-deps/node_modules by
+    // scripts/stage-native-deps.cjs and shipped via extraResources; resolve it
+    // from there. Mirrors the node-pty resourcesPath fallback in main.cjs.
+    // Without this fallback autoUpdater stays null and every update path silently
+    // no-ops -- packaged testers could never auto-update.
+    try {
+      const resourcesPath = process.resourcesPath
+      const staged = resourcesPath
+        ? path.join(resourcesPath, 'native-deps', 'node_modules', 'electron-updater')
+        : null
+      autoUpdater = staged ? require(staged).autoUpdater : null
+    } catch {
+      autoUpdater = null
+    }
   }
   return autoUpdater
 }
