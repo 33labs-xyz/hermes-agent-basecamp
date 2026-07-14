@@ -189,6 +189,9 @@ export function StudioView({ setStatusbarItemGroup }: StudioViewProps) {
   // Files without the vendor studio ever knowing the difference).
   const handleDrop = async (event: DragEvent<HTMLDivElement>) => {
     event.preventDefault()
+    // Keep the drop from bubbling to the file tree's window-level HTML5Backend
+    // (see the onDragOver note below and files/dnd-manager.ts).
+    event.stopPropagation()
 
     if (!isGenerationStudio(active)) {return}
 
@@ -257,6 +260,14 @@ export function StudioView({ setStatusbarItemGroup }: StudioViewProps) {
         className="relative min-h-0 flex-1 overflow-auto"
         onDragOver={event => {
           event.preventDefault()
+          // The file tree mounts a react-dnd HTML5Backend whose global window
+          // `dragover` listener forces dropEffect back to 'none' whenever no
+          // react-dnd drag is active (always true for the tree's native drag -
+          // arborist runs with disableDrag). A final 'none' makes the browser
+          // suppress the `drop`, so this zone must stop the event before it
+          // bubbles to window, then set the effect it wants. See
+          // files/dnd-manager.ts and studio-drop.test.tsx.
+          event.stopPropagation()
           event.dataTransfer.dropEffect = 'copy'
         }}
         onDrop={handleDrop}
