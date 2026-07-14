@@ -71,8 +71,13 @@ export function LearnView({ setStatusbarItemGroup }: LearnViewProps) {
     }
   }, [])
 
+  // The embedded site fills the whole view, so it must reserve the top
+  // titlebar strip (`--titlebar-height`) the same way other full-page views do
+  // (see desktop-controller.tsx / settings). Without it, the remote Portal's
+  // own top nav renders under the floating window-control cluster (globe,
+  // profile chip, settings), which is `fixed` top-right at z-70.
   return (
-    <div className="relative flex h-full min-h-0 flex-1 flex-col">
+    <div className="relative flex h-full min-h-0 flex-1 flex-col pt-(--titlebar-height)">
       <div className="min-h-0 flex-1" ref={hostRef} />
       {loadError ? (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-background/95 text-center">
