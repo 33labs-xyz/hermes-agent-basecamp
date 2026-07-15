@@ -20,6 +20,8 @@ const LEARN_URL = 'https://basecamp-portal-493.netlify.app'
 export const COMING_SOON = false
 
 interface LearnViewProps {
+  // Route the Portal popup's hermes://new-session link back into the app.
+  onGoToNewSession?: () => void
   setStatusbarItemGroup: SetStatusbarItemGroup
 }
 
@@ -29,9 +31,15 @@ interface LearnViewProps {
 // exempt and are the same primitive the preview pane uses for remote content
 // (see chat/right-rail/preview-pane.tsx). Mounted the same way Studio/Staff are
 // (see routes.ts and desktop-controller.tsx).
-export function LearnView({ setStatusbarItemGroup }: LearnViewProps) {
+export function LearnView({ onGoToNewSession, setStatusbarItemGroup }: LearnViewProps) {
   const hostRef = useRef<HTMLDivElement>(null)
   const [loadError, setLoadError] = useState(false)
+
+  // Keep the latest callback in a ref so the webview effect stays mount-once
+  // ([] deps): the callback's identity changing each render must not remount
+  // the webview (which would refetch the Portal).
+  const onGoToNewSessionRef = useRef(onGoToNewSession)
+  onGoToNewSessionRef.current = onGoToNewSession
 
   useEffect(() => {
     setStatusbarItemGroup('learn', [])
@@ -74,13 +82,36 @@ export function LearnView({ setStatusbarItemGroup }: LearnViewProps) {
       setLoadError(true)
     }
 
+    // The remote Portal uses hermes:// links as in-app action triggers (e.g.
+    // the coming-soon popup's "Go to new session"). The webview can't load a
+    // hermes:// URL, so cancel the navigation (it aborts as the benign
+    // ERR_ABORTED -3 that onFail already ignores) and route it back into the
+    // app.
+    const onWillNavigate = (event: Event) => {
+      const detail = event as Event & { url?: string }
+
+      if (!detail.url?.startsWith('hermes://')) {
+        return
+      }
+
+      event.preventDefault()
+
+      const action = detail.url.slice('hermes://'.length).replace(/\/+$/, '')
+
+      if (action === 'new-session') {
+        onGoToNewSessionRef.current?.()
+      }
+    }
+
     webview.addEventListener('did-navigate', onNavigate)
     webview.addEventListener('did-fail-load', onFail)
+    webview.addEventListener('will-navigate', onWillNavigate)
     host.replaceChildren(webview)
 
     return () => {
       webview.removeEventListener('did-navigate', onNavigate)
       webview.removeEventListener('did-fail-load', onFail)
+      webview.removeEventListener('will-navigate', onWillNavigate)
       host.replaceChildren()
     }
   }, [])

@@ -37,4 +37,53 @@ describe('LearnView', () => {
       expect(container.querySelector('webview')).not.toBeNull()
     }
   })
+
+  // The remote Portal's coming-soon popup carries a "Go to new session" link
+  // (href="hermes://new-session"). That href can't load inside the webview, so
+  // the host intercepts the webview's will-navigate for hermes:// URLs, cancels
+  // the navigation (aborts as the benign ERR_ABORTED -3), and routes the
+  // new-session action back into the app via onGoToNewSession.
+  it('intercepts hermes://new-session and routes it in-app', () => {
+    if (COMING_SOON) {
+      return
+    }
+
+    const onGoToNewSession = vi.fn()
+    const { container } = render(
+      <LearnView onGoToNewSession={onGoToNewSession} setStatusbarItemGroup={vi.fn()} />
+    )
+
+    const webview = container.querySelector('webview')
+    expect(webview).not.toBeNull()
+
+    const event = new Event('will-navigate', { cancelable: true })
+    Object.assign(event, { url: 'hermes://new-session' })
+    webview!.dispatchEvent(event)
+
+    expect(event.defaultPrevented).toBe(true)
+    expect(onGoToNewSession).toHaveBeenCalledTimes(1)
+  })
+
+  // Real Portal navigations (the remote site's own https links) must pass
+  // through untouched -- only hermes:// app-action links are intercepted.
+  it('lets normal https navigations through without routing in-app', () => {
+    if (COMING_SOON) {
+      return
+    }
+
+    const onGoToNewSession = vi.fn()
+    const { container } = render(
+      <LearnView onGoToNewSession={onGoToNewSession} setStatusbarItemGroup={vi.fn()} />
+    )
+
+    const webview = container.querySelector('webview')
+    expect(webview).not.toBeNull()
+
+    const event = new Event('will-navigate', { cancelable: true })
+    Object.assign(event, { url: 'https://basecamp-portal-493.netlify.app/courses' })
+    webview!.dispatchEvent(event)
+
+    expect(event.defaultPrevented).toBe(false)
+    expect(onGoToNewSession).not.toHaveBeenCalled()
+  })
 })

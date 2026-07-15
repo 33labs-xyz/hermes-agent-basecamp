@@ -42,6 +42,7 @@ import { $filePreviewTarget, $previewTarget, closeActiveRightRailTab } from '../
 import {
   $activeGatewayProfile,
   $freshSessionRequest,
+  $newChatProfile,
   $profileScope,
   ALL_PROFILES,
   normalizeProfileKey,
@@ -1155,7 +1156,15 @@ export function DesktopController() {
           <Route
             element={
               <Suspense fallback={null}>
-                <LearnView setStatusbarItemGroup={setStatusbarItemGroup} />
+                <LearnView
+                  onGoToNewSession={() => {
+                    // Match the ⌘N (use-keybinds session.new) semantics so the
+                    // Portal popup's "Go to new session" lands in a clean draft.
+                    $newChatProfile.set(null)
+                    startFreshSessionDraft()
+                  }}
+                  setStatusbarItemGroup={setStatusbarItemGroup}
+                />
               </Suspense>
             }
             path="learn"

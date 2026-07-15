@@ -128,16 +128,17 @@ const NON_SESSION_LOAD_STEP = 10
 const NEW_SESSION_KBD = comboTokens('mod+n')
 
 const SIDEBAR_NAV: SidebarNavItem[] = [
+  // Portal is pinned as the topmost nav destination: embeds the external
+  // Basecamp portal site (courses + services + product updates) in a webview.
+  // First so it is the most reachable rail item.
+  { id: 'learn', label: 'Portal', icon: props => <Codicon name="book" {...props} />, route: LEARN_ROUTE },
+  // New Session sits directly below Portal.
   {
     id: 'new-session',
     label: '',
     icon: props => <Codicon name="robot" {...props} />,
     action: 'new-session'
   },
-  // Portal is pinned as the top nav destination (directly below New Session):
-  // embeds the external Basecamp portal site (courses + services + product
-  // updates) in a webview. First so it is the most reachable rail item.
-  { id: 'learn', label: 'Portal', icon: props => <Codicon name="book" {...props} />, route: LEARN_ROUTE },
   // Projects on the always-visible nav rail so it is reachable on a fresh
   // install regardless of session state. Routes to the same /projects page the
   // in-list section links to.
