@@ -3196,6 +3196,13 @@ OPTIONAL_ENV_VARS = {
         "password": True,
         "category": "tool",
     },
+    "COMPOSIO_API_KEY": {
+        "description": "Composio API key — connect your own app accounts (Gmail, Slack, GitHub…) for staff and agent tools",
+        "prompt": "Composio API key",
+        "url": "https://app.composio.dev/developers",
+        "password": True,
+        "category": "tool",
+    },
 
     # ── Bundled skills (opt-in: only needed if the user uses that skill) ──
     # These use category="skill" (distinct from "tool") so the sandbox

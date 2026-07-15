@@ -167,6 +167,25 @@ def test_mode_direct_wins_when_both_set(monkeypatch):
     assert composio.mode() == "direct"
 
 
+def test_saved_key_activates_direct_mode_without_restart(tmp_path, monkeypatch):
+    """Saving the key through the backend flips ``mode()`` to direct live.
+
+    Settings → Keys writes via ``PUT /api/env`` → ``save_env_value``, which
+    runs inside the same backend process that serves the staff routes and sets
+    ``os.environ`` in-process. Since ``composio.api_key()`` reads ``os.environ``
+    directly, the BYOK key takes effect with no backend restart.
+    """
+    from hermes_cli.config import save_env_value
+
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    assert composio.mode() == "none"
+
+    save_env_value("COMPOSIO_API_KEY", "ck_live_test")
+
+    assert composio.api_key() == "ck_live_test"
+    assert composio.mode() == "direct"
+
+
 def test_relay_base_url_strips_trailing_slash(monkeypatch):
     monkeypatch.setenv("BASECAMP_RELAY_URL", "https://relay.example.com/")
     assert composio.relay_base_url() == "https://relay.example.com"

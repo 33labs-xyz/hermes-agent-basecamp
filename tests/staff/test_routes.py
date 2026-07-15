@@ -212,6 +212,22 @@ def test_default_state_is_free_and_empty(client):
     assert all({"slug", "connected", "source"} <= set(c) for c in payload["connections"])
 
 
+def test_state_reports_composio_unconfigured_by_default(client):
+    # The client fixture clears COMPOSIO_API_KEY and BASECAMP_RELAY_URL, so no
+    # Composio credential is present: the Staff screen needs this flag to know
+    # it should surface the "add your key" callout.
+    payload = client.get("/api/staff/state").json()
+    assert payload["composio_configured"] is False
+
+
+def test_state_reports_composio_configured_when_key_present(client, monkeypatch):
+    # A live-set key flips composio.is_configured() same-process (no restart),
+    # so the state flag must reflect it on the very next request.
+    monkeypatch.setenv("COMPOSIO_API_KEY", "sk-live-abc123")
+    payload = client.get("/api/staff/state").json()
+    assert payload["composio_configured"] is True
+
+
 def test_entitlement_purchase_url_from_env(client, monkeypatch):
     monkeypatch.setenv("BASECAMP_STAFF_PURCHASE_URL", "https://33labs.xyz/basecamp-pro")
     payload = client.get("/api/staff/state").json()

@@ -620,6 +620,27 @@ class TestOptionalEnvVarsRegistry:
             all_vars.extend(vars_list)
         assert "TAVILY_API_KEY" in all_vars
 
+    def test_composio_api_key_registered(self):
+        """COMPOSIO_API_KEY is listed in OPTIONAL_ENV_VARS (BYOK staff connect)."""
+        from hermes_cli.config import OPTIONAL_ENV_VARS
+        assert "COMPOSIO_API_KEY" in OPTIONAL_ENV_VARS
+
+    def test_composio_api_key_is_tool_category(self):
+        """COMPOSIO_API_KEY is in the 'tool' category so it stays out of agent
+        tool subprocesses (backend staff routes read it directly)."""
+        from hermes_cli.config import OPTIONAL_ENV_VARS
+        assert OPTIONAL_ENV_VARS["COMPOSIO_API_KEY"]["category"] == "tool"
+
+    def test_composio_api_key_is_password(self):
+        """COMPOSIO_API_KEY is marked as password so the Keys panel masks it."""
+        from hermes_cli.config import OPTIONAL_ENV_VARS
+        assert OPTIONAL_ENV_VARS["COMPOSIO_API_KEY"]["password"] is True
+
+    def test_composio_api_key_has_url(self):
+        """COMPOSIO_API_KEY links to the Composio developer dashboard."""
+        from hermes_cli.config import OPTIONAL_ENV_VARS
+        assert OPTIONAL_ENV_VARS["COMPOSIO_API_KEY"]["url"] == "https://app.composio.dev/developers"
+
     def test_max_iterations_not_offered_as_env_var(self):
         """HERMES_MAX_ITERATIONS must NOT be in OPTIONAL_ENV_VARS (issue #17534).
 

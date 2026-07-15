@@ -975,6 +975,7 @@ export interface StaffState {
   entitlement: StaffEntitlement
   roster: StaffRosterEntry[]
   connections: StaffConnectionStatus[]
+  composio_configured: boolean
 }
 
 export interface StaffLicenseResult {

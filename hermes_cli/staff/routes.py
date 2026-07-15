@@ -390,6 +390,7 @@ def register_staff_routes(app: FastAPI, db_factory: Optional[Callable] = None) -
                 "entitlement": _entitlement(state),
                 "roster": roster,
                 "connections": _connections(state),
+                "composio_configured": composio.is_configured(),
             }
         except Exception:
             return _internal_err()

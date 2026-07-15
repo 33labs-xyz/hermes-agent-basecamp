@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom'
 
 import { Button } from '@/components/ui/button'
 import type { StaffCatalogEntry, StaffRosterEntry } from '@/hermes'
-import { Plus, Users } from '@/lib/icons'
+import { KeyRound, Plus, Users } from '@/lib/icons'
 import { cn } from '@/lib/utils'
 import { notify, notifyError } from '@/store/notifications'
 import {
@@ -160,6 +160,10 @@ export function StaffView({ setStatusbarItemGroup }: StaffViewProps) {
 
       <div className="relative min-h-0 flex-1 overflow-y-auto">
         <div className={cn('mx-auto max-w-5xl space-y-8 py-6', PAGE_INSET_X)}>
+          {state && !state.composio_configured && (
+            <ComposioByokCallout onAddKey={() => navigate('/settings?tab=keys&kview=tools')} />
+          )}
+
           {stillLoading ? (
             <div className="py-10 text-center text-sm text-(--ui-text-tertiary)">…</div>
           ) : roster.length === 0 ? (
@@ -213,6 +217,29 @@ export function StaffView({ setStatusbarItemGroup }: StaffViewProps) {
 
 function SectionHeading({ children }: { children: ReactNode }) {
   return <h3 className="text-[0.7rem] font-semibold uppercase tracking-[0.14em] text-muted-foreground">{children}</h3>
+}
+
+// Shown until the user adds their own Composio API key (BYOK). Staff and agent
+// tools reach the user's connected apps (Gmail, Slack, GitHub…) through
+// Composio; without a key the directory's Connect chips have nothing to bind
+// to, so point the user straight at the Keys field in Settings.
+function ComposioByokCallout({ onAddKey }: { onAddKey: () => void }) {
+  return (
+    <div className="flex flex-col items-start gap-3 rounded-2xl border border-dashed border-(--ui-divider) p-5 sm:flex-row sm:items-center">
+      <KeyRound className="size-6 shrink-0 text-(--ui-text-tertiary)" />
+      <div className="space-y-1">
+        <h3 className="text-sm font-medium text-foreground">Connect your Composio account</h3>
+        <p className="max-w-xl text-xs text-(--ui-text-tertiary)">
+          Add your own Composio API key to let staff and agents use your connected apps — Gmail, Slack, GitHub and
+          more. You bring your own key, so your connections and usage stay yours.
+        </p>
+      </div>
+      <Button className="sm:ml-auto" onClick={onAddKey} size="sm" variant="textStrong">
+        <Plus className="size-3.5" />
+        Add your Composio key
+      </Button>
+    </div>
+  )
 }
 
 function StaffEmptyState({ onHire }: { onHire: () => void }) {
