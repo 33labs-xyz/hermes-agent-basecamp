@@ -134,9 +134,13 @@ const SIDEBAR_NAV: SidebarNavItem[] = [
     icon: props => <Codicon name="robot" {...props} />,
     action: 'new-session'
   },
-  // Projects promoted to the always-visible nav rail (directly below New
-  // Session) so it is reachable on a fresh install regardless of session
-  // state. Routes to the same /projects page the in-list section links to.
+  // Portal is pinned as the top nav destination (directly below New Session):
+  // embeds the external Basecamp portal site (courses + services + product
+  // updates) in a webview. First so it is the most reachable rail item.
+  { id: 'learn', label: 'Portal', icon: props => <Codicon name="book" {...props} />, route: LEARN_ROUTE },
+  // Projects on the always-visible nav rail so it is reachable on a fresh
+  // install regardless of session state. Routes to the same /projects page the
+  // in-list section links to.
   { id: 'projects', label: 'Projects', icon: props => <Codicon name="project" {...props} />, route: PROJECTS_ROUTE },
   {
     id: 'skills',
@@ -147,10 +151,7 @@ const SIDEBAR_NAV: SidebarNavItem[] = [
   { id: 'messaging', label: '', icon: props => <Codicon name="comment" {...props} />, route: MESSAGING_ROUTE },
   { id: 'artifacts', label: '', icon: props => <Codicon name="files" {...props} />, route: ARTIFACTS_ROUTE },
   // Studio: the local generative-AI studio (Muapi BYOK).
-  { id: 'studio', label: 'Studio', icon: props => <Codicon name="sparkle" {...props} />, route: STUDIO_ROUTE },
-  // Portal is the last nav item: embeds the external Basecamp portal site
-  // (courses + services + product updates) in a webview.
-  { id: 'learn', label: 'Portal', icon: props => <Codicon name="book" {...props} />, route: LEARN_ROUTE }
+  { id: 'studio', label: 'Studio', icon: props => <Codicon name="sparkle" {...props} />, route: STUDIO_ROUTE }
 ]
 
 const WORKSPACE_PAGE = 5

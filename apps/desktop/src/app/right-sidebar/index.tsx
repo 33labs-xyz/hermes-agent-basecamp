@@ -19,8 +19,6 @@ import { SidebarPanelLabel } from '../shell/sidebar-label'
 import { RemoteFolderPicker } from './files/remote-picker'
 import { ProjectTree } from './files/tree'
 import { useProjectTree } from './files/use-project-tree'
-import { $rightSidebarView, setRightSidebarView } from './store'
-import { SessionsPanel } from './terminal/sessions-panel'
 
 interface RightSidebarPaneProps {
   onActivateFile: (path: string) => void
@@ -33,7 +31,6 @@ export function RightSidebarPane({ onActivateFile, onActivateFolder, onChangeCwd
   const r = t.rightSidebar
   const panesFlipped = useStore($panesFlipped)
   const currentCwd = useStore($currentCwd).trim()
-  const sidebarView = useStore($rightSidebarView)
   const hasCwd = currentCwd.length > 0
 
   const {
@@ -97,34 +94,10 @@ export function RightSidebarPane({ onActivateFile, onActivateFolder, onChangeCwd
     >
       <RemoteFolderPicker />
 
-      {/* Files/Sessions toggle. Hardcoded copy (tester-scoped; not i18n). */}
-      <div className="flex h-7 shrink-0 items-center gap-1 px-2.5">
-        <button
-          className={cn(
-            'rounded px-1.5 py-0.5 text-[0.66rem] font-semibold uppercase tracking-[0.06em]',
-            sidebarView === 'files' ? 'text-(--ui-text-secondary)' : 'text-muted-foreground/55'
-          )}
-          onClick={() => setRightSidebarView('files')}
-          type="button"
-        >
-          Files
-        </button>
-        <button
-          className={cn(
-            'rounded px-1.5 py-0.5 text-[0.66rem] font-semibold uppercase tracking-[0.06em]',
-            sidebarView === 'sessions' ? 'text-(--ui-text-secondary)' : 'text-muted-foreground/55'
-          )}
-          onClick={() => setRightSidebarView('sessions')}
-          type="button"
-        >
-          Sessions
-        </button>
-      </div>
-
-      {sidebarView === 'sessions' ? (
-        <SessionsPanel />
-      ) : (
-
+      {/* Claude Sessions tab removed: `claude --resume` from the built-in
+          terminal was failing ("No conversation found" / "No transcript on
+          disk") and spamming the terminal. The panel, store, and electron
+          machinery are kept dormant (still unit-tested) for a future fix. */}
       <FilesystemTab
         canCollapse={canCollapse}
         collapseNonce={collapseNonce}
@@ -144,7 +117,6 @@ export function RightSidebarPane({ onActivateFile, onActivateFolder, onChangeCwd
         onRefresh={() => void refreshRoot()}
         openState={openState}
       />
-      )}
     </aside>
   )
 }
