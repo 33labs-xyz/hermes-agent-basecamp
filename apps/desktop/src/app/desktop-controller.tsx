@@ -127,6 +127,7 @@ import type { StatusbarItem } from './shell/statusbar-controls'
 import type { TitlebarTool } from './shell/titlebar-controls'
 import { useGroupRegistry } from './shell/use-group-registry'
 import { UpdatesOverlay } from './updates-overlay'
+import { usePortalFirstLanding } from './use-portal-first-landing'
 
 const AgentsView = lazy(async () => ({ default: (await import('./agents')).AgentsView }))
 const ArtifactsView = lazy(async () => ({ default: (await import('./artifacts')).ArtifactsView }))
@@ -197,6 +198,9 @@ export function DesktopController() {
   const queryClient = useQueryClient()
   const location = useLocation()
   const navigate = useNavigate()
+
+  // Cold start lands on the Portal (Learn) view. Fires once at first mount.
+  usePortalFirstLanding()
 
   const busyRef = useRef(false)
   const creatingSessionRef = useRef(false)
