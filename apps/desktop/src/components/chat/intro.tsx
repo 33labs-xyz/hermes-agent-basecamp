@@ -1,5 +1,6 @@
 import { type CSSProperties, useState } from 'react'
 
+import { BrandMark } from '@/components/brand-mark'
 import introCopyJsonl from './intro-copy.jsonl?raw'
 
 type IntroCopy = {
@@ -163,6 +164,8 @@ export function Intro({ personality, seed }: IntroProps) {
       className="pointer-events-none flex w-full min-w-0 flex-col items-center justify-center px-0.5 py-6 text-center text-muted-foreground sm:px-6 lg:px-8"
       data-slot="aui_intro"
     >
+      <BrandMark className="mb-4 size-16" />
+
       <div className="w-full min-w-0">
         <p
           aria-label={WORDMARK}
