@@ -21,6 +21,18 @@
   src: url('./fonts/Collapse-Bold.woff2') format('woff2');
 }
 
+/* Poppins Black — the brand wordmark face on the empty chat state. Its heavy
+   geometric "B" matches the app icon's mark. Vendored locally (latin subset)
+   for the same reason as Collapse: a packaged Electron app has no guaranteed
+   network, so a webfont CDN would 404 and fall back to a plain system face. */
+@font-face {
+  font-family: 'Poppins';
+  font-style: normal;
+  font-weight: 900;
+  font-display: swap;
+  src: url('./fonts/Poppins-Black.woff2') format('woff2');
+}
+
 /* JetBrains Mono — bundled terminal font (Apache-2.0) so bold/italic share the
    regular face's metrics instead of squeezing against a system fallback. */
 @font-face {
