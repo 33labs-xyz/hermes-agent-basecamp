@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 
+import { BrandMark } from '@/components/brand-mark'
 import { Button } from '@/components/ui/button'
 import { openExternalLink } from '@/lib/external-link'
-import { Sparkles } from '@/lib/icons'
 
 import type { SetStatusbarItemGroup } from '../shell/statusbar-controls'
 
@@ -11,12 +11,13 @@ import type { SetStatusbarItemGroup } from '../shell/statusbar-controls'
 // be embedded in the webview below.
 const LEARN_URL = 'https://basecamp-portal-493.netlify.app'
 
-// The Portal content is still being finished, so the tab is gated behind a
-// coming-soon overlay for now. While gated we skip mounting the webview
-// entirely, so the unfinished remote site is never fetched or shown. Flip to
-// `false` (and update index.test.tsx) to re-enable the embedded Portal once
-// it's ready for public use.
-export const COMING_SOON = true
+// Portal is live: the tab mounts the embedded webview against LEARN_URL. The
+// remote Portal site renders in full; its own click-triggered "coming soon"
+// popup gracefully handles the course/service actions that aren't wired up
+// yet. Set back to `true` to re-gate behind the native overlay (skips mounting
+// the webview so the remote site is never fetched); the index.test.tsx guard
+// branches on this value and stays valid either way.
+export const COMING_SOON = false
 
 interface LearnViewProps {
   setStatusbarItemGroup: SetStatusbarItemGroup
@@ -95,9 +96,7 @@ export function LearnView({ setStatusbarItemGroup }: LearnViewProps) {
       {COMING_SOON ? (
         <div className="absolute inset-0 flex items-center justify-center bg-background/95 px-6">
           <div className="flex max-w-sm flex-col items-center gap-4 rounded-2xl border border-border bg-card p-8 text-center shadow-lg">
-            <div className="flex size-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-              <Sparkles className="size-7" />
-            </div>
+            <BrandMark className="size-14 rounded-2xl" />
             <span className="rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-medium uppercase tracking-wide text-primary">
               Coming soon
             </span>
