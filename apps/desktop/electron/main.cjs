@@ -25,6 +25,7 @@ const { pathToFileURL } = require('node:url')
 const { execFileSync, spawn } = require('node:child_process')
 const { detectRemoteDisplay, isWindowsBinaryPathInWsl, isWslEnvironment } = require('./bootstrap-platform.cjs')
 const { runBootstrap } = require('./bootstrap-runner.cjs')
+const { isBackendStale } = require('./backend-staleness.cjs')
 const {
   buildSessionWindowUrl,
   createSessionWindowRegistry,
@@ -2333,6 +2334,31 @@ function createActiveBackend(dashboardArgs) {
   }
 }
 
+// makeBootstrapNeeded — the "no runnable backend; drive the installer" sentinel.
+// resolveHermesBackend returns this both when nothing is installed yet (step 6)
+// and when an installed backend is present but pinned to an older commit than
+// the shell ships (step 3 staleSync). ensureRuntime consumes it and runs the
+// (idempotent) bootstrap installer; extra fields let ensureRuntime tell the two
+// cases apart -- staleSync must fall back to the still-runnable stale backend
+// on failure instead of dead-ending a working install.
+function makeBootstrapNeeded(dashboardArgs, extra = {}) {
+  return {
+    kind: 'bootstrap-needed',
+    label: 'Basecamp backend not installed yet; bootstrap required',
+    command: null,
+    args: dashboardArgs,
+    bootstrap: true,
+    env: {},
+    shell: false,
+    // Hints for the bootstrap runner / UI layer:
+    activeRoot: ACTIVE_HERMES_ROOT,
+    installStamp: INSTALL_STAMP, // may be null in dev
+    isPackaged: IS_PACKAGED,
+    platform: process.platform,
+    ...extra
+  }
+}
+
 function resolveHermesBackend(dashboardArgs) {
   // 1. Explicit override -- HERMES_DESKTOP_HERMES_ROOT points at a developer
   //    checkout. Honour it as-is (no bootstrap; the user is driving).
@@ -2358,6 +2384,21 @@ function resolveHermesBackend(dashboardArgs) {
   //    to spawning hermes. Updates flow through the in-app update path
   //    (applyUpdates -> git pull) or `hermes update` from the CLI.
   if (isBootstrapComplete()) {
+    // The shell auto-updates itself from GitHub Releases, but the Python
+    // backend under ~/.basecamp only moves when a bootstrap run fires. When
+    // this shell was built at a newer commit than the backend was last pinned
+    // to, re-run the (idempotent) bootstrap to fast-forward the checkout so
+    // backend-catalog changes (e.g. the Composio toolkit) reach existing
+    // installs -- not just fresh ones. staleSync routes straight to the
+    // installer and, on failure, falls back to the still-runnable stale backend.
+    const marker = readBootstrapMarker()
+    if (isBackendStale({ installStamp: INSTALL_STAMP, marker })) {
+      rememberLog(
+        `[bootstrap] backend stale: marker pinned ${marker.pinnedCommit.slice(0, 12)} ` +
+          `but this shell ships ${INSTALL_STAMP.commit.slice(0, 12)}; re-syncing backend to the shell commit.`
+      )
+      return makeBootstrapNeeded(dashboardArgs, { staleSync: true })
+    }
     return createActiveBackend(dashboardArgs)
   }
 
@@ -2453,20 +2494,7 @@ function resolveHermesBackend(dashboardArgs) {
   //    resolveHermesBackend was the old "no payload" path and forced the
   //    user into a dead end. With the bootstrap protocol, "no install yet"
   //    is a recoverable state the GUI can drive through.
-  return {
-    kind: 'bootstrap-needed',
-    label: 'Basecamp backend not installed yet; bootstrap required',
-    command: null,
-    args: dashboardArgs,
-    bootstrap: true,
-    env: {},
-    shell: false,
-    // Hints for the bootstrap runner / UI layer:
-    activeRoot: ACTIVE_HERMES_ROOT,
-    installStamp: INSTALL_STAMP, // may be null in dev
-    isPackaged: IS_PACKAGED,
-    platform: process.platform
-  }
+  return makeBootstrapNeeded(dashboardArgs)
 }
 
 async function ensureRuntime(backend) {
@@ -2485,9 +2513,33 @@ async function ensureRuntime(backend) {
   // will rewire startup to spawn the window first and route bootstrap events
   // to a renderer-side install overlay.
   if (backend.kind === 'bootstrap-needed') {
-    rememberLog('[bootstrap] no Basecamp install found; starting first-launch bootstrap')
+    // staleSync: an install already exists and runs; we're only fast-forwarding
+    // its checkout to the shell's commit (see resolveHermesBackend step 3).
+    const staleSync = backend.staleSync === true
 
-    if (await handOffWindowsBootstrapRecovery('bootstrap-needed')) {
+    rememberLog(
+      staleSync
+        ? '[bootstrap] backend behind the shell commit; re-syncing the existing install'
+        : '[bootstrap] no Basecamp install found; starting first-launch bootstrap'
+    )
+
+    // On a staleSync cancel/failure the existing (older) backend is still
+    // installed and runnable, so spawn it rather than dead-ending a working
+    // install; the sync retries on the next launch. createActiveBackend returns
+    // bootstrap=true with a non-'bootstrap-needed' kind, so re-entering
+    // ensureRuntime lands on the venv-wiring path below (no bootstrap re-entry).
+    const fallBackToStaleBackend = reason => {
+      rememberLog(
+        `[bootstrap] staleSync ${reason}; falling back to the existing backend (retry next launch).`
+      )
+      return ensureRuntime(createActiveBackend(backend.args))
+    }
+
+    // A staleSync runs against an already-working install, so never hand off to
+    // the heavyweight Windows "Basecamp Setup" recovery -- that path is for a
+    // missing/broken backend. Sync in-process; fall back to the stale backend
+    // on failure (below).
+    if (!staleSync && (await handOffWindowsBootstrapRecovery('bootstrap-needed'))) {
       const handoffError = new Error('Basecamp recovery was handed off to Basecamp Setup. The desktop will restart when recovery completes.')
       handoffError.isBootstrapFailure = true
       handoffError.bootstrapHandedOff = true
@@ -2542,6 +2594,7 @@ async function ensureRuntime(backend) {
     bootstrapAbortController = null
 
     if (bootstrapResult.cancelled) {
+      if (staleSync) return fallBackToStaleBackend('cancelled')
       const cancelledError = new Error('Basecamp install was cancelled.')
       cancelledError.isBootstrapFailure = true
       cancelledError.bootstrapCancelled = true
@@ -2550,6 +2603,11 @@ async function ensureRuntime(backend) {
     }
 
     if (!bootstrapResult.ok) {
+      if (staleSync) {
+        return fallBackToStaleBackend(
+          `failed${bootstrapResult.failedStage ? ` at stage '${bootstrapResult.failedStage}'` : ''}`
+        )
+      }
       const bootstrapError = new Error(
         `Basecamp bootstrap failed${bootstrapResult.failedStage ? ` at stage '${bootstrapResult.failedStage}'` : ''}: ` +
           `${bootstrapResult.error || 'unknown error'}. ` +
