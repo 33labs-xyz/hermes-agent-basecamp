@@ -7,6 +7,7 @@ import { useI18n } from '@/i18n'
 import { type ChatMessage, chatMessageText, preserveLocalAssistantErrors, toChatMessages } from '@/lib/chat-messages'
 import { normalizePersonalityValue } from '@/lib/chat-runtime'
 import { embeddedImageUrls, textWithoutEmbeddedImages } from '@/lib/embedded-images'
+import { isSessionNotFoundError } from '@/lib/session-errors'
 import { setSessionYolo } from '@/lib/yolo-session'
 import { clearQueuedPrompts } from '@/store/composer-queue'
 import { $pinnedSessionIds } from '@/store/layout'
@@ -784,7 +785,29 @@ export function useSessionActions({
           return
         }
 
-        const fallback = await getSessionMessages(storedSessionId, sessionProfile)
+        let fallback
+
+        try {
+          fallback = await getSessionMessages(storedSessionId, sessionProfile)
+        } catch (fallbackErr) {
+          if (!isCurrentResume()) {
+            return
+          }
+
+          // A brand-new chat whose session row is not persisted yet 404s on
+          // both resume and this fallback fetch. The optimistic local messages
+          // already render, so there is nothing to recover and nothing worth
+          // alarming the user about. Swallow it silently.
+          if (isSessionNotFoundError(fallbackErr)) {
+            return
+          }
+
+          // Any other fallback failure is a genuine problem - surface the
+          // same friendly resume-failed toast the success path uses.
+          notifyError(err, copy.resumeFailed)
+
+          return
+        }
 
         if (!isCurrentResume()) {
           return
