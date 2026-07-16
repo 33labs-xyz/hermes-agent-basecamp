@@ -144,6 +144,12 @@ contextBridge.exposeInMainWorld('hermesDesktop', {
   },
   getVersion: () => ipcRenderer.invoke('hermes:version'),
   checkForUpdates: () => ipcRenderer.invoke('hermes:updates:run-auto-check'),
+  onAutoUpdate: callback => {
+    const listener = (_event, payload) => callback(payload)
+    ipcRenderer.on('hermes:auto-update', listener)
+    return () => ipcRenderer.removeListener('hermes:auto-update', listener)
+  },
+  quitAndInstall: () => ipcRenderer.invoke('hermes:updates:quit-and-install'),
   uninstall: {
     summary: () => ipcRenderer.invoke('hermes:uninstall:summary'),
     run: mode => ipcRenderer.invoke('hermes:uninstall:run', { mode })

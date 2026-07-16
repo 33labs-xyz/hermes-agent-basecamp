@@ -109,6 +109,8 @@ declare global {
       onBootstrapEvent: (callback: (payload: DesktopBootstrapEvent) => void) => () => void
       getVersion: () => Promise<DesktopVersionInfo>
       checkForUpdates: () => Promise<{ ok: boolean; current?: string; latest?: string; reason?: string }>
+      onAutoUpdate?: (cb: (payload: DesktopAutoUpdatePayload) => void) => () => void
+      quitAndInstall?: () => Promise<void>
       updates: {
         check: () => Promise<DesktopUpdateStatus>
         apply: (opts?: DesktopUpdateApplyOptions) => Promise<DesktopUpdateApplyResult>
@@ -318,6 +320,21 @@ export interface DesktopUpdateProgress {
   percent: number | null
   error: string | null
   at: number
+}
+
+export type DesktopAutoUpdateStage =
+  | 'checking'
+  | 'available'
+  | 'none'
+  | 'downloading'
+  | 'error'
+  | 'downloaded'
+
+export interface DesktopAutoUpdatePayload {
+  stage: DesktopAutoUpdateStage
+  version?: string
+  percent?: number
+  message?: string
 }
 
 export interface HermesConnection {

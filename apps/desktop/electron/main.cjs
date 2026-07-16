@@ -39,7 +39,12 @@ const { waitForDashboardPort } = require('./backend-ready.cjs')
 const { serializeJsonBody, setJsonRequestHeaders } = require('./oauth-net-request.cjs')
 const { fetchMarketplaceThemes, searchMarketplaceThemes } = require('./vscode-marketplace.cjs')
 const { buildDesktopBackendEnv, normalizeHermesHomeRoot } = require('./backend-env.cjs')
-const { initAutoUpdater, checkForUpdatesManual } = require('./auto-updater.cjs')
+const {
+  initAutoUpdater,
+  checkForUpdatesManual,
+  checkForUpdatesAuto,
+  triggerQuitAndInstall
+} = require('./auto-updater.cjs')
 const { readWindowsUserEnvVar } = require('./windows-user-env.cjs')
 const { readDirForIpc } = require('./fs-read-dir.cjs')
 const { gitRootForIpc } = require('./git-root.cjs')
@@ -6412,6 +6417,10 @@ ipcMain.handle('hermes:version', async () => ({
 // electron-updater; native dialogs report "up to date" / restart prompt.
 ipcMain.handle('hermes:updates:run-auto-check', async () => checkForUpdatesManual())
 
+// Relaunch-to-update pill "Restart now": quits and installs the already
+// downloaded update. Backed by electron-updater; a no-op reason if unavailable.
+ipcMain.handle('hermes:updates:quit-and-install', async () => triggerQuitAndInstall())
+
 // ===========================================================================
 // Uninstall — remove the Chat GUI (and optionally the agent / user data).
 // ===========================================================================
@@ -6806,3 +6815,7 @@ app.on('before-quit', () => {
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()
 })
+
+// Re-check for updates whenever any window regains focus. checkForUpdatesAuto
+// is silent, throttled, and a no-op in dev, so this is safe on every build.
+app.on('browser-window-focus', () => { checkForUpdatesAuto() })
