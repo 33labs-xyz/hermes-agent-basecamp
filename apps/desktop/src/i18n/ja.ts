@@ -1315,6 +1315,7 @@ export const ja = defineLocale({
       deleteConfirm: name => `「${name}」を削除しますか？チャットは保持され、プロジェクトのみ削除されます。`,
       deleted: 'プロジェクトを削除しました',
       deleteFailed: 'プロジェクトを削除できませんでした',
+      fileFailed: 'チャットを移動できませんでした',
       addToProject: 'プロジェクトに追加',
       removeFromProject: 'プロジェクトから削除',
       assignTitle: 'プロジェクトに追加',
@@ -1355,6 +1356,23 @@ export const ja = defineLocale({
         fileTooLarge: 'ファイルが大きすぎます（最大200,000文字）',
         fileBytes: chars => `${chars.toLocaleString()} 文字`
       }
+    },
+    groups: {
+      add: '新規グループ',
+      create: '作成',
+      createFailed: 'グループを作成できませんでした',
+      createTitle: '新規グループ',
+      created: 'グループを作成しました',
+      deleteAction: 'グループを削除',
+      deleteConfirm: name => `「${name}」を削除しますか？チャットは保持され、グループのみ削除されます。`,
+      deleteFailed: 'グループを削除できませんでした',
+      deleteTitle: 'グループを削除',
+      deleted: 'グループを削除しました',
+      fileFailed: 'チャットを移動できませんでした',
+      label: 'グループ',
+      nameLabel: '名前',
+      namePlaceholder: 'グループ名',
+      noChats: 'チャットはまだありません'
     },
     groupAriaGrouped: 'セッションを単一リストとして表示',
     groupAriaUngrouped: 'ワークスペースごとにセッションをグループ化',

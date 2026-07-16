@@ -1394,6 +1394,7 @@ export const zh: Translations = {
       deleteConfirm: name => `删除“${name}”？其中的聊天会保留，仅删除项目。`,
       deleted: '已删除项目',
       deleteFailed: '无法删除项目',
+      fileFailed: '无法移动聊天',
       addToProject: '加入项目',
       removeFromProject: '移出项目',
       assignTitle: '加入项目',
@@ -1489,6 +1490,23 @@ export const zh: Translations = {
         memoryAgentBadge: '助手',
         memoryTooLong: '备注过长（最多 4,000 个字符）'
       }
+    },
+    groups: {
+      add: '新建分组',
+      create: '创建',
+      createFailed: '无法创建分组',
+      createTitle: '新建分组',
+      created: '已创建分组',
+      deleteAction: '删除分组',
+      deleteConfirm: name => `删除“${name}”？其中的聊天会保留，仅删除分组。`,
+      deleteFailed: '无法删除分组',
+      deleteTitle: '删除分组',
+      deleted: '已删除分组',
+      fileFailed: '无法移动聊天',
+      label: '分组',
+      nameLabel: '名称',
+      namePlaceholder: '分组名称',
+      noChats: '还没有聊天'
     },
     groupAriaGrouped: '以单一列表显示会话',
     groupAriaUngrouped: '按工作区分组会话',

@@ -1208,6 +1208,7 @@ export const en: Translations = {
       deleteConfirm: name => `Delete “${name}”? Chats in it are kept, only the project is removed.`,
       deleted: 'Project deleted',
       deleteFailed: 'Could not delete project',
+      fileFailed: 'Could not move chat',
       addToProject: 'Add to project',
       removeFromProject: 'Remove from project',
       assignTitle: 'Add to project',
@@ -1303,6 +1304,23 @@ export const en: Translations = {
         memoryAgentBadge: 'agent',
         memoryTooLong: 'Note too long (max 4,000 characters)'
       }
+    },
+    groups: {
+      add: 'New group',
+      create: 'Create',
+      createFailed: 'Could not create group',
+      createTitle: 'New group',
+      created: 'Group created',
+      deleteAction: 'Delete group',
+      deleteConfirm: name => `Delete “${name}”? Chats in it are kept, only the group is removed.`,
+      deleteFailed: 'Could not delete group',
+      deleteTitle: 'Delete group',
+      deleted: 'Group deleted',
+      fileFailed: 'Could not move chat',
+      label: 'Groups',
+      nameLabel: 'Name',
+      namePlaceholder: 'Group name',
+      noChats: 'No chats yet'
     },
     groupAriaGrouped: 'Show sessions as a single list',
     groupAriaUngrouped: 'Group sessions by workspace',

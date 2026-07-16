@@ -1269,6 +1269,7 @@ export const zhHant = defineLocale({
       deleteConfirm: name => `刪除「${name}」？其中的聊天會保留，僅刪除專案。`,
       deleted: '已刪除專案',
       deleteFailed: '無法刪除專案',
+      fileFailed: '無法移動聊天',
       addToProject: '加入專案',
       removeFromProject: '移出專案',
       assignTitle: '加入專案',
@@ -1309,6 +1310,23 @@ export const zhHant = defineLocale({
         fileTooLarge: '檔案過大（最多 200,000 個字元）',
         fileBytes: chars => `${chars.toLocaleString()} 個字元`
       }
+    },
+    groups: {
+      add: '新增群組',
+      create: '建立',
+      createFailed: '無法建立群組',
+      createTitle: '新增群組',
+      created: '已建立群組',
+      deleteAction: '刪除群組',
+      deleteConfirm: name => `刪除「${name}」？其中的聊天會保留，僅刪除群組。`,
+      deleteFailed: '無法刪除群組',
+      deleteTitle: '刪除群組',
+      deleted: '已刪除群組',
+      fileFailed: '無法移動聊天',
+      label: '群組',
+      nameLabel: '名稱',
+      namePlaceholder: '群組名稱',
+      noChats: '尚無聊天'
     },
     groupAriaGrouped: '以單一清單顯示工作階段',
     groupAriaUngrouped: '依工作區分組工作階段',

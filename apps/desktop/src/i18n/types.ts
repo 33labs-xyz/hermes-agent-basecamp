@@ -935,6 +935,7 @@ export interface Translations {
       deleteConfirm: (name: string) => string
       deleted: string
       deleteFailed: string
+      fileFailed: string
       addToProject: string
       removeFromProject: string
       assignTitle: string
@@ -1030,6 +1031,23 @@ export interface Translations {
         memoryAgentBadge: string
         memoryTooLong: string
       }
+    }
+    groups: {
+      add: string
+      create: string
+      createFailed: string
+      createTitle: string
+      created: string
+      deleteAction: string
+      deleteConfirm: (name: string) => string
+      deleteFailed: string
+      deleteTitle: string
+      deleted: string
+      fileFailed: string
+      label: string
+      nameLabel: string
+      namePlaceholder: string
+      noChats: string
     }
     groupAriaGrouped: string
     groupAriaUngrouped: string
