@@ -12,6 +12,7 @@ import {
   updateChatGroup
 } from '@/hermes'
 import { persistBoolean, storedBoolean } from '@/lib/storage'
+import { forgetGroupKind, markGroupKind } from '@/store/group-kind'
 
 const SIDEBAR_PROJECTS_OPEN_STORAGE_KEY = 'hermes.desktop.sidebarProjectsOpen'
 
@@ -29,6 +30,16 @@ $sidebarProjectsOpen.subscribe(open => persistBoolean(SIDEBAR_PROJECTS_OPEN_STOR
 
 export function setSidebarProjectsOpen(open: boolean) {
   $sidebarProjectsOpen.set(open)
+}
+
+const SIDEBAR_GROUPS_OPEN_STORAGE_KEY = 'hermes.desktop.sidebarGroupsOpen'
+
+export const $sidebarGroupsOpen = atom(storedBoolean(SIDEBAR_GROUPS_OPEN_STORAGE_KEY, true))
+
+$sidebarGroupsOpen.subscribe(open => persistBoolean(SIDEBAR_GROUPS_OPEN_STORAGE_KEY, open))
+
+export function setSidebarGroupsOpen(open: boolean) {
+  $sidebarGroupsOpen.set(open)
 }
 
 // "New chat in this project" arms a one-shot assignment: the project page sets
@@ -180,6 +191,17 @@ export async function createProject(input: {
   return created
 }
 
+// Lightweight sibling of createProject: a group is just a named bucket, so we
+// create it name-only and stamp the client-side "group" marker. No description,
+// instructions, or knowledge — those stay Projects-only.
+export async function createGroup(name: string): Promise<ChatGroup> {
+  const created = await createChatGroup({ name })
+  markGroupKind(created.id, 'group')
+  await refreshProjects()
+
+  return created
+}
+
 export async function updateProject(
   id: string,
   updates: { description?: string; instructions?: string; name?: string }
@@ -192,22 +214,32 @@ export async function updateProject(
 
 export async function deleteProject(id: string): Promise<void> {
   await deleteChatGroup(id)
+  forgetGroupKind(id)
   await refreshProjects()
 }
 
-// Persist a new project order from a sidebar drag. Reorder $projects optimistically
-// (the drag should feel instant) then write each row's position to the backend.
-// position = array index, so the list re-renders in the dragged order and the
-// next refresh returns it in the same order. A failed persist refreshes back to
-// the server's truth rather than leaving the UI lying.
+// Persist a new bucket order from a sidebar drag. `orderedIds` may be a SUBSET
+// of all buckets (each sidebar section reorders only its own kind), so we
+// substitute the reordered subset back into the slots its members currently
+// occupy and leave every other bucket untouched. Optimistic set first (the drag
+// should feel instant), then write each moved row's position; a failed persist
+// refreshes back to the server's truth rather than leaving the UI lying.
 export async function reorderProjects(orderedIds: string[]): Promise<void> {
   const current = $projects.get()
-  const byId = new Map(current.map(project => [project.id, project]))
-  const reordered = orderedIds.map(id => byId.get(id)).filter((p): p is ChatGroup => p !== undefined)
+  const idSet = new Set(orderedIds)
 
-  if (reordered.length !== current.length) {
+  const orderedSubset = orderedIds
+    .map(id => current.find(project => project.id === id))
+    .filter((project): project is ChatGroup => project !== undefined)
+
+  if (orderedSubset.length !== orderedIds.length) {
     return
   }
+
+  let next = 0
+  const reordered = current.map(project =>
+    idSet.has(project.id) ? orderedSubset[next++] : project
+  )
 
   $projects.set(reordered.map((project, index) => ({ ...project, position: index })))
 
