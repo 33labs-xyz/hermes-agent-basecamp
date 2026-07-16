@@ -177,7 +177,7 @@ export function SidebarSessionRow({
               />
               <Codicon
                 className={cn(
-                  'absolute text-(--ui-text-quaternary) opacity-0 transition-opacity group-hover/handle:opacity-80 group-focus-within/handle:opacity-80 hover:text-(--ui-text-secondary)',
+                  'absolute text-(--ui-text-quaternary) opacity-0 transition-opacity group-hover:opacity-30 group-hover/handle:opacity-80 group-focus-within/handle:opacity-80 hover:text-(--ui-text-secondary)',
                   dragging && 'text-(--ui-text-secondary) opacity-100'
                 )}
                 name="grabber"
