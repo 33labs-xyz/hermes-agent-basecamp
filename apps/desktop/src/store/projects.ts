@@ -96,7 +96,7 @@ export function addOptimisticMembership(groupId: string, sessionId: string) {
   )
 }
 
-function removeOptimisticMembership(groupId: string, sessionId: string) {
+export function removeOptimisticMembership(groupId: string, sessionId: string) {
   $projects.set(
     $projects.get().map(group =>
       group.id === groupId

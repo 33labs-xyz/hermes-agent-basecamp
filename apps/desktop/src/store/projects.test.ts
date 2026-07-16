@@ -41,6 +41,7 @@ const {
   consumePendingProjectAssignment,
   createGroup,
   deleteProject,
+  removeOptimisticMembership,
   reorderProjects,
   setPendingProjectForNewChat,
   setProjectHandoffSend,
@@ -107,6 +108,21 @@ describe('addOptimisticMembership', () => {
     addOptimisticMembership('grp-1', 'sess-new')
 
     expect($projects.get()[0].session_ids).toEqual(['x'])
+  })
+})
+
+describe('removeOptimisticMembership', () => {
+  it('reverses an optimistic add, restoring the original session_ids', () => {
+    $projects.set([group({ session_ids: ['a'] })])
+
+    addOptimisticMembership('grp-1', 'sess-new')
+    const withAdd = $projects.get()[0]
+    expect(withAdd.session_ids).toEqual(['a', 'sess-new'])
+
+    removeOptimisticMembership('grp-1', 'sess-new')
+    const afterRemove = $projects.get()[0]
+    expect(afterRemove.session_ids).toEqual(['a'])
+    expect(afterRemove).not.toBe(withAdd)
   })
 })
 

@@ -14,17 +14,6 @@ export function groupedSessionIdSet(buckets: ChatGroup[]): Set<string> {
   return ids
 }
 
-// Drop grouped sessions from a flat list. Identity fast-path (same array
-// reference) when nothing is grouped, so the common no-groups case adds zero
-// render churn downstream.
-export function excludeGrouped<T extends { id: string }>(sessions: T[], grouped: Set<string>): T[] {
-  if (grouped.size === 0) {
-    return sessions
-  }
-
-  return sessions.filter(session => !grouped.has(session.id))
-}
-
 // Split buckets into the two sidebar sections by their client-side kind marker.
 // Same rule as groupKindOf: only an explicit 'group' marker routes to groups;
 // unmarked and garbage values fall through to projects. Input order (backend

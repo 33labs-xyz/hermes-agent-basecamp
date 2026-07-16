@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import type { ChatGroup } from '@/hermes'
 
-import { excludeGrouped, groupedSessionIdSet, partitionGroups } from './session-grouping'
+import { groupedSessionIdSet, partitionGroups } from './session-grouping'
 
 const bucket = (over: Partial<ChatGroup> = {}): ChatGroup => ({
   created_at: 0,
@@ -27,18 +27,6 @@ describe('groupedSessionIdSet', () => {
 
   it('is empty for no buckets', () => {
     expect(groupedSessionIdSet([]).size).toBe(0)
-  })
-})
-
-describe('excludeGrouped', () => {
-  it('removes sessions that live in a bucket', () => {
-    const sessions = [{ id: 's1' }, { id: 's2' }, { id: 's3' }]
-    expect(excludeGrouped(sessions, new Set(['s2']))).toEqual([{ id: 's1' }, { id: 's3' }])
-  })
-
-  it('returns the same array reference when nothing is grouped (no render churn)', () => {
-    const sessions = [{ id: 's1' }]
-    expect(excludeGrouped(sessions, new Set<string>())).toBe(sessions)
   })
 })
 

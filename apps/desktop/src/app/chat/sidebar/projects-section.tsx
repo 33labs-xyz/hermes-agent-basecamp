@@ -35,6 +35,7 @@ import { notify, notifyError } from '@/store/notifications'
 import {
   $projectSessionMeta,
   addOptimisticMembership,
+  removeOptimisticMembership,
   addSessionToProject,
   deleteProject,
   ensureProjectMemberSessions,
@@ -305,7 +306,10 @@ function ProjectRow({
             return
           }
           addOptimisticMembership(project.id, payload.id)
-          addSessionToProject(project.id, payload.id).catch(err => notifyError(err, strings.fileFailed))
+          addSessionToProject(project.id, payload.id).catch(err => {
+            removeOptimisticMembership(project.id, payload.id)
+            notifyError(err, strings.fileFailed)
+          })
         }}
       >
         <button
