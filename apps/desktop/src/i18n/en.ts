@@ -1535,6 +1535,12 @@ export const en: Translations = {
     }
   },
 
+  autoUpdate: {
+    relaunchToUpdate: 'Relaunch to update',
+    updateReadyVersion: version => `Version ${version} ready`,
+    dismiss: 'Dismiss'
+  },
+
   install: {
     stageStates: {
       pending: 'Pending',

@@ -1720,6 +1720,12 @@ export const zh: Translations = {
     }
   },
 
+  autoUpdate: {
+    relaunchToUpdate: '重启以更新',
+    updateReadyVersion: version => `版本 ${version} 已就绪`,
+    dismiss: '关闭'
+  },
+
   install: {
     stageStates: {
       pending: '等待中',

@@ -1588,6 +1588,12 @@ export const ja = defineLocale({
     }
   },
 
+  autoUpdate: {
+    relaunchToUpdate: '再起動して更新',
+    updateReadyVersion: version => `バージョン ${version} の準備完了`,
+    dismiss: '閉じる'
+  },
+
   install: {
     stageStates: {
       pending: '待機中',

@@ -1204,6 +1204,12 @@ export interface Translations {
     }
   }
 
+  autoUpdate: {
+    relaunchToUpdate: string
+    updateReadyVersion: (version: string) => string
+    dismiss: string
+  }
+
   install: {
     stageStates: Record<string, string>
     oneTimeTitle: string
