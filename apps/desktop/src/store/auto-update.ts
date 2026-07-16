@@ -4,10 +4,17 @@ import type { DesktopAutoUpdatePayload } from '@/global'
 
 export const $autoUpdate = atom<DesktopAutoUpdatePayload>({ stage: 'none' })
 export const $autoUpdateDismissed = atom<boolean>(false)
+// Latches the last 'downloaded' payload and never clears on a later 'checking'
+// re-emit. electron-updater re-emits 'checking-for-update' then 'update-downloaded'
+// from cache on every re-check (30-minute timer, window focus), so keying
+// visibility on the live $autoUpdate.stage makes an already-visible pill unmount
+// and remount on every re-check. Keying on this latch instead keeps the pill
+// calm and persistent across re-check churn.
+export const $downloadedUpdate = atom<DesktopAutoUpdatePayload | null>(null)
 
 export const $updateReady = computed(
-  [$autoUpdate, $autoUpdateDismissed],
-  (update, dismissed) => update.stage === 'downloaded' && !dismissed
+  [$downloadedUpdate, $autoUpdateDismissed],
+  (downloaded, dismissed) => downloaded !== null && !dismissed
 )
 
 let active = false
@@ -35,6 +42,9 @@ export function startAutoUpdateListener(): () => void {
     if (payload.stage === 'downloaded' && payload.version !== lastShownVersion) {
       lastShownVersion = payload.version
       $autoUpdateDismissed.set(false)
+    }
+    if (payload.stage === 'downloaded') {
+      $downloadedUpdate.set(payload)
     }
   })
   return stop

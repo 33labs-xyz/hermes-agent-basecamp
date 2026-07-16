@@ -1,13 +1,13 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { $autoUpdate, $autoUpdateDismissed } from '@/store/auto-update'
+import { $autoUpdateDismissed, $downloadedUpdate } from '@/store/auto-update'
 
 import { UpdateReadyPill } from './update-ready-pill'
 
 describe('UpdateReadyPill', () => {
   beforeEach(() => {
-    $autoUpdate.set({ stage: 'none' })
+    $downloadedUpdate.set(null)
     $autoUpdateDismissed.set(false)
     delete (window as unknown as { hermesDesktop?: unknown }).hermesDesktop
   })
@@ -20,7 +20,7 @@ describe('UpdateReadyPill', () => {
   })
 
   it('shows the label and version when an update is ready', () => {
-    $autoUpdate.set({ stage: 'downloaded', version: '0.17.14' })
+    $downloadedUpdate.set({ stage: 'downloaded', version: '0.17.14' })
     render(<UpdateReadyPill />)
     expect(screen.getByText(/relaunch to update/i)).toBeDefined()
     expect(screen.getByText(/0\.17\.14/)).toBeDefined()
@@ -30,7 +30,7 @@ describe('UpdateReadyPill', () => {
     const quitAndInstall = vi.fn(async () => {})
 
     ;(window as unknown as { hermesDesktop: unknown }).hermesDesktop = { quitAndInstall }
-    $autoUpdate.set({ stage: 'downloaded', version: '0.17.14' })
+    $downloadedUpdate.set({ stage: 'downloaded', version: '0.17.14' })
     render(<UpdateReadyPill />)
     fireEvent.click(screen.getByRole('button', { name: /relaunch to update/i }))
     expect(quitAndInstall).toHaveBeenCalledOnce()
@@ -40,7 +40,7 @@ describe('UpdateReadyPill', () => {
     const quitAndInstall = vi.fn(async () => {})
 
     ;(window as unknown as { hermesDesktop: unknown }).hermesDesktop = { quitAndInstall }
-    $autoUpdate.set({ stage: 'downloaded', version: '0.17.14' })
+    $downloadedUpdate.set({ stage: 'downloaded', version: '0.17.14' })
     render(<UpdateReadyPill />)
     fireEvent.click(screen.getByRole('button', { name: /dismiss/i }))
     expect(quitAndInstall).not.toHaveBeenCalled()

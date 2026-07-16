@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   $autoUpdate,
   $autoUpdateDismissed,
+  $downloadedUpdate,
   $updateReady,
   dismissAutoUpdate,
   relaunchForUpdate,
@@ -25,6 +26,7 @@ describe('auto-update store', () => {
   beforeEach(() => {
     $autoUpdate.set({ stage: 'none' })
     $autoUpdateDismissed.set(false)
+    $downloadedUpdate.set(null)
     delete (window as unknown as { hermesDesktop?: unknown }).hermesDesktop
   })
 
@@ -68,5 +70,16 @@ describe('auto-update store', () => {
     const bridge = mockBridge()
     await relaunchForUpdate()
     expect(bridge.quitAndInstall).toHaveBeenCalledOnce()
+  })
+
+  it('stays ready through a re-check churn (checking-for-update re-emitted after downloaded)', () => {
+    const bridge = mockBridge()
+    const stop = startAutoUpdateListener()
+    bridge.emit({ stage: 'downloaded', version: '0.18.0' })
+    expect($updateReady.get()).toBe(true)
+    bridge.emit({ stage: 'checking' })
+    expect($updateReady.get()).toBe(true)
+    expect($downloadedUpdate.get()?.version).toBe('0.18.0')
+    stop()
   })
 })

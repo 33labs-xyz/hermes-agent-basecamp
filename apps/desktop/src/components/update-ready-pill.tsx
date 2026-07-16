@@ -4,18 +4,18 @@ import { createPortal } from 'react-dom'
 import { BrandMark } from '@/components/brand-mark'
 import { useI18n } from '@/i18n'
 import { cn } from '@/lib/utils'
-import { $autoUpdate, $updateReady, dismissAutoUpdate, relaunchForUpdate } from '@/store/auto-update'
+import { $downloadedUpdate, $updateReady, dismissAutoUpdate, relaunchForUpdate } from '@/store/auto-update'
 
 export function UpdateReadyPill() {
   const { t } = useI18n()
   const ready = useStore($updateReady)
-  const state = useStore($autoUpdate)
+  const downloaded = useStore($downloadedUpdate)
 
   if (!ready) {
     return null
   }
 
-  const version = state.version
+  const version = downloaded?.version
 
   return createPortal(
     <div
