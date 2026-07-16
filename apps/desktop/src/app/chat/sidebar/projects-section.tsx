@@ -29,9 +29,9 @@ import { useI18n } from '@/i18n'
 import { triggerHaptic } from '@/lib/haptics'
 import { projectMemberTitle } from '@/lib/project-session-title'
 import { cn } from '@/lib/utils'
+import type { GroupKind } from '@/store/group-kind'
 import { notify, notifyError } from '@/store/notifications'
 import {
-  $projects,
   $projectSessionMeta,
   deleteProject,
   ensureProjectMemberSessions,
@@ -44,38 +44,58 @@ import { SidebarPanelLabel } from '../../shell/sidebar-label'
 
 import { ProjectSettingsDialog } from './project-dialog'
 
-interface SidebarProjectsSectionProps {
+export interface SectionStrings {
+  add: string
+  deleteAction: string
+  deleteConfirm: (name: string) => string
+  deleteFailed: string
+  deleteTitle: string
+  deleted: string
+  fileFailed: string
+  noChats: string
+}
+
+export interface SidebarProjectsSectionProps {
+  buckets: ChatGroup[]
+  kind: GroupKind
   label: string
   onOpenChat: (sessionId: string) => void
   onToggle: () => void
   open: boolean
+  strings: SectionStrings
 }
 
-export function SidebarProjectsSection({ label, onOpenChat, onToggle, open }: SidebarProjectsSectionProps) {
-  const { t } = useI18n()
-  const p = t.sidebar.projects
+export function SidebarProjectsSection({
+  buckets,
+  kind,
+  label,
+  onOpenChat,
+  onToggle,
+  open,
+  strings
+}: SidebarProjectsSectionProps) {
   const navigate = useNavigate()
+  const isProject = kind === 'project'
   // Clicking a project name opens its full page; navigate from the leaf instead
   // of prop-drilling through the sidebar (mirrors profile-switcher).
-  const onOpenProject = (groupId: string) => navigate(projectRoute(groupId))
-  const projects = useStore($projects)
+  const handleOpenProject = (groupId: string) => navigate(projectRoute(groupId))
   const sessions = useStore($sessions)
   const cronSessions = useStore($cronSessions)
   // Distance constraint so a tap-to-open click on a row isn't swallowed by the
   // drag sensor; only a real drag past 4px starts a reorder.
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }))
-  const projectIds = useMemo(() => projects.map(project => project.id), [projects])
+  const bucketIds = useMemo(() => buckets.map(b => b.id), [buckets])
 
   const handleDragEnd = ({ active, over }: DragEndEvent) => {
     if (!over || active.id === over.id) {
       return
     }
 
-    const from = projectIds.indexOf(String(active.id))
-    const to = projectIds.indexOf(String(over.id))
+    const from = bucketIds.indexOf(String(active.id))
+    const to = bucketIds.indexOf(String(over.id))
 
     if (from >= 0 && to >= 0) {
-      void reorderProjects(arrayMove(projectIds, from, to))
+      void reorderProjects(arrayMove(bucketIds, from, to))
     }
   }
 
@@ -104,10 +124,10 @@ export function SidebarProjectsSection({ label, onOpenChat, onToggle, open }: Si
 
   useEffect(() => {
     ensureProjectMemberSessions(
-      projects.flatMap(project => project.session_ids),
+      buckets.flatMap(bucket => bucket.session_ids),
       knownIds
     )
-  }, [projects, knownIds])
+  }, [buckets, knownIds])
 
   return (
     <SidebarGroup className="shrink-0 p-0 pb-1">
@@ -115,12 +135,12 @@ export function SidebarProjectsSection({ label, onOpenChat, onToggle, open }: Si
         <div className="group/section-label flex w-fit items-center gap-1 leading-none">
           <button
             className="flex items-center gap-1 bg-transparent text-left leading-none"
-            onClick={() => navigate(PROJECTS_ROUTE)}
+            onClick={() => (isProject ? navigate(PROJECTS_ROUTE) : onToggle())}
             title={label}
             type="button"
           >
             <SidebarPanelLabel>{label}</SidebarPanelLabel>
-            <span className="text-[0.6875rem] font-medium text-(--ui-text-quaternary)">{projects.length}</span>
+            <span className="text-[0.6875rem] font-medium text-(--ui-text-quaternary)">{buckets.length}</span>
           </button>
           <button
             aria-expanded={open}
@@ -135,10 +155,10 @@ export function SidebarProjectsSection({ label, onOpenChat, onToggle, open }: Si
             />
           </button>
         </div>
-        <Tip label={p.add}>
+        <Tip label={strings.add}>
           <Button
-            aria-label={p.add}
-            className="text-(--ui-text-tertiary) opacity-0 transition hover:bg-(--ui-control-hover-background) hover:text-foreground group-hover/section:opacity-100"
+            aria-label={strings.add}
+            className="text-(--ui-text-tertiary) transition hover:bg-(--ui-control-hover-background) hover:text-foreground"
             onClick={() => {
               triggerHaptic('selection')
               setCreateOpen(true)
@@ -152,23 +172,32 @@ export function SidebarProjectsSection({ label, onOpenChat, onToggle, open }: Si
       </div>
       {open && (
         <SidebarGroupContent className="flex max-h-72 shrink-0 flex-col gap-px overflow-y-auto overscroll-contain pb-1.75">
-          {projects.length === 0 ? (
-            <div className="py-1 pl-2 text-[0.6875rem] text-(--ui-text-tertiary)">{p.empty}</div>
+          {buckets.length === 0 ? (
+            <button
+              className="flex items-center gap-1 py-1 pl-6 pr-2 text-left text-[0.6875rem] text-(--ui-text-tertiary) transition hover:text-foreground"
+              onClick={() => setCreateOpen(true)}
+              type="button"
+            >
+              <Codicon name="add" size="0.6875rem" />
+              {strings.add}
+            </button>
           ) : (
             <DndContext collisionDetection={closestCenter} onDragEnd={handleDragEnd} sensors={sensors}>
-              <SortableContext items={projectIds} strategy={verticalListSortingStrategy}>
-                {projects.map(project => (
+              <SortableContext items={bucketIds} strategy={verticalListSortingStrategy}>
+                {buckets.map(bucket => (
                   <ProjectRow
-                    expanded={expandedId === project.id}
-                    key={project.id}
-                    onDelete={() => setDeleteTarget(project)}
+                    expanded={expandedId === bucket.id}
+                    key={bucket.id}
+                    kind={kind}
+                    onDelete={() => setDeleteTarget(bucket)}
                     onOpenChat={onOpenChat}
-                    onOpenProject={onOpenProject}
-                    onSettings={() => setEditProject(project)}
-                    onToggle={() => setExpandedId(prev => (prev === project.id ? null : project.id))}
-                    project={project}
+                    onOpenProject={handleOpenProject}
+                    onSettings={() => setEditProject(bucket)}
+                    onToggle={() => setExpandedId(prev => (prev === bucket.id ? null : bucket.id))}
+                    project={bucket}
                     sessionById={sessionById}
                     sessionMeta={sessionMeta}
+                    strings={strings}
                   />
                 ))}
               </SortableContext>
@@ -177,23 +206,30 @@ export function SidebarProjectsSection({ label, onOpenChat, onToggle, open }: Si
         </SidebarGroupContent>
       )}
 
-      <ProjectSettingsDialog onOpenChange={setCreateOpen} open={createOpen} project={null} />
-      <ProjectSettingsDialog
-        onOpenChange={openValue => {
-          if (!openValue) {
-            setEditProject(null)
-          }
-        }}
-        open={editProject !== null}
-        project={editProject}
+      <ProjectSettingsDialog kind={kind} onOpenChange={setCreateOpen} open={createOpen} project={null} />
+      {isProject && (
+        <ProjectSettingsDialog
+          onOpenChange={openValue => {
+            if (!openValue) {
+              setEditProject(null)
+            }
+          }}
+          open={editProject !== null}
+          project={editProject}
+        />
+      )}
+      <DeleteProjectDialog
+        onOpenChange={openValue => !openValue && setDeleteTarget(null)}
+        project={deleteTarget}
+        strings={strings}
       />
-      <DeleteProjectDialog onOpenChange={openValue => !openValue && setDeleteTarget(null)} project={deleteTarget} />
     </SidebarGroup>
   )
 }
 
 function ProjectRow({
   expanded,
+  kind,
   onDelete,
   onOpenChat,
   onOpenProject,
@@ -201,9 +237,11 @@ function ProjectRow({
   onToggle,
   project,
   sessionById,
-  sessionMeta
+  sessionMeta,
+  strings
 }: {
   expanded: boolean
+  kind: GroupKind
   onDelete: () => void
   onOpenChat: (sessionId: string) => void
   onOpenProject: (groupId: string) => void
@@ -212,9 +250,11 @@ function ProjectRow({
   project: ChatGroup
   sessionById: Map<string, SessionInfo>
   sessionMeta: Record<string, null | SessionInfo>
+  strings: SectionStrings
 }) {
   const { t } = useI18n()
   const p = t.sidebar.projects
+  const isProject = kind === 'project'
   const selectedSessionId = useStore($selectedStoredSessionId)
   const count = project.session_ids.length
   // Whole row is the drag handle (distance-constrained sensor keeps clicks working).
@@ -240,7 +280,7 @@ function ProjectRow({
       >
         <button
           className="flex min-w-0 items-center gap-1.5 bg-transparent py-0.5 pl-2 pr-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
-          onClick={() => onOpenProject(project.id)}
+          onClick={() => (isProject ? onOpenProject(project.id) : onToggle())}
           title={project.name}
           type="button"
         >
@@ -265,19 +305,21 @@ function ProjectRow({
             >
               <DisclosureCaret open={expanded} />
             </button>
-            <Tip label={p.settings}>
+            {isProject && (
+              <Tip label={p.settings}>
+                <button
+                  aria-label={p.settings}
+                  className="grid size-5 place-items-center rounded-sm text-(--ui-text-tertiary) hover:bg-(--ui-control-hover-background) hover:text-foreground"
+                  onClick={onSettings}
+                  type="button"
+                >
+                  <Codicon name="gear" size="0.75rem" />
+                </button>
+              </Tip>
+            )}
+            <Tip label={strings.deleteAction}>
               <button
-                aria-label={p.settings}
-                className="grid size-5 place-items-center rounded-sm text-(--ui-text-tertiary) hover:bg-(--ui-control-hover-background) hover:text-foreground"
-                onClick={onSettings}
-                type="button"
-              >
-                <Codicon name="gear" size="0.75rem" />
-              </button>
-            </Tip>
-            <Tip label={p.deleteAction}>
-              <button
-                aria-label={p.deleteAction}
+                aria-label={strings.deleteAction}
                 className="grid size-5 place-items-center rounded-sm text-(--ui-text-tertiary) hover:bg-(--ui-control-hover-background) hover:text-destructive"
                 onClick={onDelete}
                 type="button"
@@ -291,7 +333,7 @@ function ProjectRow({
       {expanded && (
         <div className="mb-1 ml-[1.375rem] flex flex-col gap-px">
           {count === 0 ? (
-            <div className="py-1 pl-1 text-[0.6875rem] text-(--ui-text-tertiary)">{p.noChats}</div>
+            <div className="py-1 pl-1 text-[0.6875rem] text-(--ui-text-tertiary)">{strings.noChats}</div>
           ) : (
             project.session_ids.map(sessionId => {
               const session = sessionById.get(sessionId)
@@ -327,13 +369,14 @@ function ProjectRow({
 
 function DeleteProjectDialog({
   onOpenChange,
-  project
+  project,
+  strings
 }: {
   onOpenChange: (open: boolean) => void
   project: ChatGroup | null
+  strings: SectionStrings
 }) {
   const { t } = useI18n()
-  const p = t.sidebar.projects
   const [submitting, setSubmitting] = useState(false)
 
   const confirm = async () => {
@@ -345,10 +388,10 @@ function DeleteProjectDialog({
 
     try {
       await deleteProject(project.id)
-      notify({ durationMs: 2_000, kind: 'success', message: p.deleted })
+      notify({ durationMs: 2_000, kind: 'success', message: strings.deleted })
       onOpenChange(false)
     } catch (err) {
-      notifyError(err, p.deleteFailed)
+      notifyError(err, strings.deleteFailed)
     } finally {
       setSubmitting(false)
     }
@@ -358,8 +401,8 @@ function DeleteProjectDialog({
     <Dialog onOpenChange={onOpenChange} open={project !== null}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>{p.deleteTitle}</DialogTitle>
-          <DialogDescription>{project ? p.deleteConfirm(project.name) : ''}</DialogDescription>
+          <DialogTitle>{strings.deleteTitle}</DialogTitle>
+          <DialogDescription>{project ? strings.deleteConfirm(project.name) : ''}</DialogDescription>
         </DialogHeader>
         <DialogFooter>
           <Button disabled={submitting} onClick={() => onOpenChange(false)} type="button" variant="ghost">
