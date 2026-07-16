@@ -3827,6 +3827,76 @@ class TestModelInfoEndpoint:
         assert data["auto_context_length"] == 0
 
 
+class TestRecommendedDefaultModel:
+    """Tests for the GET /api/model/recommended-default provider overrides.
+
+    The endpoint function is called directly rather than through TestClient:
+    the route is auth-gated by middleware, so an unauthenticated HTTP call
+    just 401s. The resolver logic under test is plain and synchronous, and it
+    imports build_models_payload / load_picker_context from hermes_cli.inventory
+    at call time - so patching those module attributes intercepts them."""
+
+    def _patch_payload(self, monkeypatch, slug, models):
+        """Stub the inventory so no live catalog / network is hit."""
+        import hermes_cli.inventory as inv
+
+        monkeypatch.setattr(inv, "load_picker_context", lambda: None)
+        monkeypatch.setattr(
+            inv,
+            "build_models_payload",
+            lambda ctx, **kwargs: {
+                "providers": [{"slug": slug, "models": list(models)}]
+            },
+        )
+
+    def test_openrouter_prefers_deepseek_flash_when_available(self, monkeypatch):
+        # Flash sits at index 1, so a plain models[0] would return sonnet. The
+        # override must pick deepseek/deepseek-v4-flash instead.
+        from hermes_cli.web_server import get_recommended_default_model
+
+        self._patch_payload(
+            monkeypatch,
+            "openrouter",
+            ["anthropic/claude-sonnet-4.6", "deepseek/deepseek-v4-flash", "openai/gpt-5"],
+        )
+
+        data = get_recommended_default_model(provider="openrouter")
+
+        assert data["provider"] == "openrouter"
+        assert data["model"] == "deepseek/deepseek-v4-flash"
+        assert data["free_tier"] is None
+
+    def test_openrouter_falls_back_to_first_when_flash_absent(self, monkeypatch):
+        # If the picker doesn't surface the override model, never return a model
+        # the catalog omitted - fall back to the first curated entry.
+        from hermes_cli.web_server import get_recommended_default_model
+
+        self._patch_payload(
+            monkeypatch,
+            "openrouter",
+            ["anthropic/claude-sonnet-4.6", "openai/gpt-5"],
+        )
+
+        data = get_recommended_default_model(provider="openrouter")
+
+        assert data["model"] == "anthropic/claude-sonnet-4.6"
+
+    def test_non_openrouter_provider_ignores_override(self, monkeypatch):
+        # The override is openrouter-specific. A different provider whose row
+        # happens to contain flash must still take its own first entry.
+        from hermes_cli.web_server import get_recommended_default_model
+
+        self._patch_payload(
+            monkeypatch,
+            "novita",
+            ["novita/qwen-3", "deepseek/deepseek-v4-flash"],
+        )
+
+        data = get_recommended_default_model(provider="novita")
+
+        assert data["model"] == "novita/qwen-3"
+
+
 # ---------------------------------------------------------------------------
 # Gateway health probe tests
 # ---------------------------------------------------------------------------

@@ -3264,6 +3264,16 @@ def get_model_options(profile: Optional[str] = None):
         raise HTTPException(status_code=500, detail="Failed to list model options")
 
 
+# Onboarding-default overrides for non-Nous providers. When a freshly-
+# authenticated provider curates many models, the first curated entry is not
+# always the one we want new users to land on. OpenRouter aggregates hundreds
+# of models; deepseek/deepseek-v4-flash is the cheap, fast, capable default we
+# steer onboarding toward. The override is only applied when the model is
+# actually present in the provider's curated payload, so a catalog change that
+# drops it degrades gracefully back to the first curated entry.
+_RECOMMENDED_DEFAULT_OVERRIDES = {"openrouter": "deepseek/deepseek-v4-flash"}
+
+
 @app.get("/api/model/recommended-default")
 def get_recommended_default_model(provider: str = ""):
     """Return the recommended default model for a freshly-authenticated provider.
@@ -3329,6 +3339,9 @@ def get_recommended_default_model(provider: str = ""):
         for row in payload.get("providers", []):
             if str(row.get("slug", "")).lower() == slug:
                 models = row.get("models") or []
+                override = _RECOMMENDED_DEFAULT_OVERRIDES.get(slug)
+                if override and override in models:
+                    return {"provider": slug, "model": override, "free_tier": None}
                 return {"provider": slug, "model": models[0] if models else "", "free_tier": None}
         return {"provider": slug, "model": "", "free_tier": None}
     except Exception:
