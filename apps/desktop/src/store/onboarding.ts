@@ -317,6 +317,38 @@ async function fetchProviderDefaultModel(
   }
 }
 
+// Cold-catalog fallback for fetchProviderDefaultModel. Right after a key is
+// saved, /api/model/options can momentarily return zero providers (the
+// authenticated-provider list and model catalog have not refreshed yet). The
+// recommended-default endpoint resolves from a different backend source
+// (build_models_payload) and can name a model when options is still empty.
+// Returns the first candidate slug that yields a non-empty recommended model,
+// or null if none do.
+export async function fetchRecommendedDefaultModel(
+  preferredSlugs: string[]
+): Promise<null | { providerSlug: string; defaultModel: string }> {
+  for (const slug of preferredSlugs) {
+    const normalized = slug.trim().toLowerCase()
+
+    if (!normalized) {
+      continue
+    }
+
+    try {
+      const recommended = await getRecommendedDefaultModel(normalized)
+      const model = recommended.model?.trim()
+
+      if (model) {
+        return { providerSlug: normalized, defaultModel: model }
+      }
+    } catch {
+      // This slug did not resolve - try the next candidate.
+    }
+  }
+
+  return null
+}
+
 // Decide the default model shown on the confirm card. The backend's
 // recommendation wins only when the provider's own options list contains it
 // - a recommendation outside that list means the two sources disagree (e.g.
