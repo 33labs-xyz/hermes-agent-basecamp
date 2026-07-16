@@ -15,6 +15,17 @@ let autoUpdater = null
 let initialized = false
 let getWindow = () => null
 let manualCheckInFlight = false
+let recheckTimer = null
+let lastAutoCheckMs = null
+
+const MIN_AUTO_GAP_MS = 5 * 60 * 1000
+const RECHECK_INTERVAL_MS = 30 * 60 * 1000
+
+// Pure throttle predicate (no Electron deps) so the 5-minute gap is unit-testable.
+function shouldRecheck(lastMs, nowMs, minGapMs) {
+  if (lastMs == null) return true
+  return nowMs - lastMs >= minGapMs
+}
 
 function loadUpdater() {
   if (autoUpdater) return autoUpdater
@@ -60,26 +71,6 @@ function showDialog(opts) {
   return win ? dialog.showMessageBoxSync(win, opts) : dialog.showMessageBoxSync(opts)
 }
 
-function promptInstall(info) {
-  const version = info && info.version ? info.version : ''
-  const detail = version
-    ? `Basecamp ${version} has been downloaded. Restart now to update.`
-    : 'An update has been downloaded. Restart now to update.'
-  const choice = showDialog({
-    type: 'info',
-    buttons: ['Restart Now', 'Later'],
-    defaultId: 0,
-    cancelId: 1,
-    title: 'Update Ready',
-    message: 'Update ready to install',
-    detail
-  })
-  if (choice === 0) {
-    const updater = loadUpdater()
-    if (updater) setImmediate(() => updater.quitAndInstall())
-  }
-}
-
 // Wire the electron-updater lifecycle once. windowGetter must return the main
 // BrowserWindow (or null) so progress/prompts target a live window.
 function initAutoUpdater(windowGetter) {
@@ -99,12 +90,20 @@ function initAutoUpdater(windowGetter) {
   updater.on('download-progress', p => notifyRenderer({ stage: 'downloading', percent: p && p.percent }))
   updater.on('error', err => notifyRenderer({ stage: 'error', message: err && err.message }))
   updater.on('update-downloaded', info => {
+    // No native dialog on the auto path: the renderer pill (store/auto-update.ts)
+    // consumes this event and shows a calm bottom-left "Relaunch to update".
     notifyRenderer({ stage: 'downloaded', version: info && info.version })
-    promptInstall(info)
   })
 
-  // Silent check shortly after launch so testers get prompted without clicking.
+  // Silent check shortly after launch so testers learn about updates without clicking.
   updater.checkForUpdates().catch(() => {})
+  lastAutoCheckMs = Date.now()
+
+  // Re-check periodically while the app stays open so a tester who never quits still
+  // gets the pill. Window-focus checks (main.cjs) share this throttle via
+  // checkForUpdatesAuto. unref so the timer never keeps the process alive.
+  recheckTimer = setInterval(() => { checkForUpdatesAuto() }, RECHECK_INTERVAL_MS)
+  if (recheckTimer && typeof recheckTimer.unref === 'function') recheckTimer.unref()
 }
 
 // Manual "Check for Updates" menu action. Surfaces an explicit "up to date"
@@ -144,4 +143,37 @@ async function checkForUpdatesManual() {
   }
 }
 
-module.exports = { initAutoUpdater, checkForUpdatesManual }
+// Silent, dialog-free re-check used by the interval and the window-focus hook.
+// Throttled to at most once per MIN_AUTO_GAP_MS. No-op in dev builds.
+async function checkForUpdatesAuto() {
+  if (!app.isPackaged) return { ok: false, reason: 'dev' }
+  const updater = loadUpdater()
+  if (!updater) return { ok: false, reason: 'unavailable' }
+  const now = Date.now()
+  if (!shouldRecheck(lastAutoCheckMs, now, MIN_AUTO_GAP_MS)) return { ok: true, throttled: true }
+  lastAutoCheckMs = now
+  try {
+    await updater.checkForUpdates()
+    return { ok: true }
+  } catch (err) {
+    return { ok: false, reason: 'error', message: err && err.message }
+  }
+}
+
+// Restart into the downloaded update. injectedUpdater is a test seam; production
+// callers pass nothing and it resolves via loadUpdater(). Deferred on setImmediate
+// so the IPC reply can flush before the app quits.
+function triggerQuitAndInstall(injectedUpdater) {
+  const updater = injectedUpdater || loadUpdater()
+  if (!updater) return { ok: false, reason: 'unavailable' }
+  setImmediate(() => updater.quitAndInstall())
+  return { ok: true }
+}
+
+module.exports = {
+  initAutoUpdater,
+  checkForUpdatesManual,
+  checkForUpdatesAuto,
+  triggerQuitAndInstall,
+  shouldRecheck
+}
