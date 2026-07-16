@@ -11,6 +11,7 @@ import { useStore } from '@nanostores/react'
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
+import { dragHasSession, readSessionDrag, writeSessionDrag } from '@/app/chat/composer/inline-refs'
 import { Button } from '@/components/ui/button'
 import { Codicon } from '@/components/ui/codicon'
 import {
@@ -33,6 +34,8 @@ import type { GroupKind } from '@/store/group-kind'
 import { notify, notifyError } from '@/store/notifications'
 import {
   $projectSessionMeta,
+  addOptimisticMembership,
+  addSessionToProject,
   deleteProject,
   ensureProjectMemberSessions,
   reorderProjects
@@ -260,6 +263,10 @@ function ProjectRow({
   // Whole row is the drag handle (distance-constrained sensor keeps clicks working).
   // Vertical list: translate Y only so a dragged row never drifts sideways.
   const { attributes, isDragging, listeners, setNodeRef, transform, transition } = useSortable({ id: project.id })
+  // Native HTML5 drop target highlight, separate from dnd-kit's pointer-based
+  // reorder drag above. A session dropped from the flat recents list or
+  // another bucket files it here (see onDrop below).
+  const [dropActive, setDropActive] = useState(false)
 
   const sortableStyle = {
     transform: transform ? `translate3d(0px, ${transform.y}px, 0)` : undefined,
@@ -273,10 +280,33 @@ function ProjectRow({
       <div
         className={cn(
           'group/project relative grid min-h-[1.625rem] grid-cols-[minmax(0,1fr)_auto] items-center rounded-md hover:bg-(--chrome-action-hover)',
-          isDragging && 'bg-(--chrome-action-hover) opacity-80'
+          isDragging && 'bg-(--chrome-action-hover) opacity-80',
+          dropActive && 'ring-1 ring-inset ring-(--ui-accent)'
         )}
         {...attributes}
         {...listeners}
+        onDragOver={event => {
+          if (!dragHasSession(event.dataTransfer)) {
+            return
+          }
+          event.preventDefault()
+          event.dataTransfer.dropEffect = 'copy'
+          setDropActive(true)
+        }}
+        onDragLeave={() => setDropActive(false)}
+        onDrop={event => {
+          setDropActive(false)
+          const payload = readSessionDrag(event.dataTransfer)
+          if (!payload) {
+            return
+          }
+          event.preventDefault()
+          if (project.session_ids.includes(payload.id)) {
+            return
+          }
+          addOptimisticMembership(project.id, payload.id)
+          addSessionToProject(project.id, payload.id).catch(err => notifyError(err, strings.fileFailed))
+        }}
       >
         <button
           className="flex min-w-0 items-center gap-1.5 bg-transparent py-0.5 pl-2 pr-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
@@ -352,8 +382,16 @@ function ProjectRow({
                       ? 'bg-(--ui-row-active-background) text-foreground'
                       : 'text-(--ui-text-secondary) hover:bg-(--chrome-action-hover) hover:text-foreground'
                   )}
+                  draggable
                   key={sessionId}
                   onClick={() => onOpenChat(sessionId)}
+                  onDragStart={event =>
+                    writeSessionDrag(event.dataTransfer, {
+                      id: sessionId,
+                      profile: 'default',
+                      title
+                    })
+                  }
                   type="button"
                 >
                   {title}
