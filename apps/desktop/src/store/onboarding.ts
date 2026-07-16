@@ -259,13 +259,10 @@ function notifyGatewayTools(tools: string[] | undefined) {
 // After credentials are persisted, ask the backend which provider+models
 // are now authenticated. Pick the first curated model for the matching
 // provider as a sensible default, persist it via /api/model/set, and
-// transition to the model-confirmation step. If anything goes wrong
-// fetching options (no providers returned, network error), the caller
-// falls through to completing onboarding without showing the confirm
-// card - the user gets the undefined-model auto-selection behaviour
-// we had before, which works but is surprising. The confirm step is
-// opportunistic polish, not a hard requirement for onboarding.
-async function fetchProviderDefaultModel(
+// transition to the model-confirmation step. If options is empty or fails,
+// fall back to the recommended-default endpoint (a different backend source)
+// so a model is still resolved. Only if that also fails do we return null.
+export async function fetchProviderDefaultModel(
   preferredSlugs: string[]
 ): Promise<null | { providerSlug: string; defaultModel: string }> {
   let options
@@ -273,13 +270,13 @@ async function fetchProviderDefaultModel(
   try {
     options = await getGlobalModelOptions()
   } catch {
-    return null
+    return fetchRecommendedDefaultModel(preferredSlugs)
   }
 
   const providers = options?.providers ?? []
 
   if (providers.length === 0) {
-    return null
+    return fetchRecommendedDefaultModel(preferredSlugs)
   }
 
   // Try each preferred slug (lowercased), fall back to the first provider
@@ -293,7 +290,7 @@ async function fetchProviderDefaultModel(
   const models = matched.models ?? []
 
   if (models.length === 0) {
-    return null
+    return fetchRecommendedDefaultModel(preferredSlugs)
   }
 
   // Prefer the backend's recommended default - it mirrors the curation
