@@ -14,9 +14,11 @@ import { Textarea } from '@/components/ui/textarea'
 import type { ChatGroup } from '@/hermes'
 import { useI18n } from '@/i18n'
 import { triggerHaptic } from '@/lib/haptics'
+import type { GroupKind } from '@/store/group-kind'
 import { notify, notifyError } from '@/store/notifications'
 import {
   addSessionToProject,
+  createGroup,
   createProject,
   removeSessionFromProject,
   updateProject
@@ -29,6 +31,7 @@ const DESCRIPTION_MAX = 500
 const INSTRUCTIONS_MAX = 16000
 
 interface ProjectSettingsDialogProps {
+  kind?: GroupKind
   onOpenChange: (open: boolean) => void
   open: boolean
   // Editing an existing project, or null when creating a new one.
@@ -37,9 +40,11 @@ interface ProjectSettingsDialogProps {
 
 // Create-or-edit dialog. `project === null` → create; otherwise edit that
 // project. Name is required; description and instructions are optional.
-export function ProjectSettingsDialog({ onOpenChange, open, project }: ProjectSettingsDialogProps) {
+export function ProjectSettingsDialog({ kind = 'project', onOpenChange, open, project }: ProjectSettingsDialogProps) {
   const { t } = useI18n()
   const p = t.sidebar.projects
+  const g = t.sidebar.groups
+  const isGroup = kind === 'group'
   const editing = project !== null
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
@@ -65,6 +70,20 @@ export function ProjectSettingsDialog({ onOpenChange, open, project }: ProjectSe
     }
 
     setSubmitting(true)
+
+    if (isGroup) {
+      try {
+        await createGroup(trimmedName)
+        notify({ durationMs: 2_000, kind: 'success', message: g.created })
+        onOpenChange(false)
+      } catch (err) {
+        notifyError(err, g.createFailed)
+      } finally {
+        setSubmitting(false)
+      }
+
+      return
+    }
 
     const payload = {
       name: trimmedName,
@@ -93,10 +112,12 @@ export function ProjectSettingsDialog({ onOpenChange, open, project }: ProjectSe
     <Dialog onOpenChange={onOpenChange} open={open}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>{editing ? p.editTitle : p.createTitle}</DialogTitle>
+          <DialogTitle>{isGroup ? g.createTitle : editing ? p.editTitle : p.createTitle}</DialogTitle>
         </DialogHeader>
         <label className="flex flex-col gap-1">
-          <span className="text-[0.75rem] font-medium text-(--ui-text-secondary)">{p.nameLabel}</span>
+          <span className="text-[0.75rem] font-medium text-(--ui-text-secondary)">
+            {isGroup ? g.nameLabel : p.nameLabel}
+          </span>
           <Input
             disabled={submitting}
             maxLength={NAME_MAX}
@@ -107,40 +128,44 @@ export function ProjectSettingsDialog({ onOpenChange, open, project }: ProjectSe
                 void submit()
               }
             }}
-            placeholder={p.namePlaceholder}
+            placeholder={isGroup ? g.namePlaceholder : p.namePlaceholder}
             ref={nameRef}
             value={name}
           />
         </label>
-        <label className="flex flex-col gap-1">
-          <span className="text-[0.75rem] font-medium text-(--ui-text-secondary)">{p.descriptionLabel}</span>
-          <Textarea
-            className="min-h-12"
-            disabled={submitting}
-            maxLength={DESCRIPTION_MAX}
-            onChange={event => setDescription(event.target.value)}
-            placeholder={p.descriptionPlaceholder}
-            value={description}
-          />
-        </label>
-        <label className="flex flex-col gap-1">
-          <span className="text-[0.75rem] font-medium text-(--ui-text-secondary)">{p.instructionsLabel}</span>
-          <Textarea
-            className="min-h-24"
-            disabled={submitting}
-            maxLength={INSTRUCTIONS_MAX}
-            onChange={event => setInstructions(event.target.value)}
-            placeholder={p.instructionsPlaceholder}
-            value={instructions}
-          />
-          <span className="text-[0.6875rem] text-(--ui-text-tertiary)">{p.instructionsHint}</span>
-        </label>
+        {!isGroup && (
+          <label className="flex flex-col gap-1">
+            <span className="text-[0.75rem] font-medium text-(--ui-text-secondary)">{p.descriptionLabel}</span>
+            <Textarea
+              className="min-h-12"
+              disabled={submitting}
+              maxLength={DESCRIPTION_MAX}
+              onChange={event => setDescription(event.target.value)}
+              placeholder={p.descriptionPlaceholder}
+              value={description}
+            />
+          </label>
+        )}
+        {!isGroup && (
+          <label className="flex flex-col gap-1">
+            <span className="text-[0.75rem] font-medium text-(--ui-text-secondary)">{p.instructionsLabel}</span>
+            <Textarea
+              className="min-h-24"
+              disabled={submitting}
+              maxLength={INSTRUCTIONS_MAX}
+              onChange={event => setInstructions(event.target.value)}
+              placeholder={p.instructionsPlaceholder}
+              value={instructions}
+            />
+            <span className="text-[0.6875rem] text-(--ui-text-tertiary)">{p.instructionsHint}</span>
+          </label>
+        )}
         <DialogFooter>
           <Button disabled={submitting} onClick={() => onOpenChange(false)} type="button" variant="ghost">
             {t.common.cancel}
           </Button>
           <Button disabled={!canSubmit} onClick={() => void submit()} type="button">
-            {editing ? t.common.save : p.create}
+            {isGroup ? g.create : editing ? t.common.save : p.create}
           </Button>
         </DialogFooter>
       </DialogContent>
