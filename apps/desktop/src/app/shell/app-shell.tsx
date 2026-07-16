@@ -5,6 +5,7 @@ import { useSyncExternalStore } from 'react'
 import { NotificationStack } from '@/components/notifications'
 import { PaneShell } from '@/components/pane-shell'
 import { SidebarProvider } from '@/components/ui/sidebar'
+import { UpdateReadyPill } from '@/components/update-ready-pill'
 import { useMediaQuery } from '@/hooks/use-media-query'
 import {
   $fileBrowserOpen,
@@ -207,6 +208,7 @@ export function AppShell({
       {/* Mounted at the shell root (after overlays) so success/error toasts
           surface above every route and overlay — not just the chat view. */}
       <NotificationStack />
+      <UpdateReadyPill />
     </SidebarProvider>
   )
 }

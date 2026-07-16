@@ -9,6 +9,7 @@ import { DesktopOnboardingOverlay } from '@/components/desktop-onboarding-overla
 import { GatewayConnectingOverlay } from '@/components/gateway-connecting-overlay'
 import { Pane, PaneMain } from '@/components/pane-shell'
 import { useMediaQuery } from '@/hooks/use-media-query'
+import { startAutoUpdateListener } from '@/store/auto-update'
 import { useSkinCommand } from '@/themes/use-skin-command'
 
 import { formatRefValue } from '../components/assistant-ui/directive-text'
@@ -280,6 +281,11 @@ export function DesktopController() {
       unsubscribe?.()
       stopUpdatePoller()
     }
+  }, [])
+
+  useEffect(() => {
+    const stop = startAutoUpdateListener()
+    return stop
   }, [])
 
   // Notification click: the main process already focused the window; jump to its session.
