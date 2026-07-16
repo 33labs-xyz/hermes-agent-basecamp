@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { queryClient } from '@/lib/query-client'
 
-import { createSkill, deleteEnvVar, getSessionMessages, listAllProfileSessions, listSessions, setApiRequestProfile, setEnvVar } from './hermes'
+import { createSkill, deleteEnvVar, getSessionMessages, listAllProfileSessions, listSessions, setApiRequestProfile, setEnvVar, transcribeAudio } from './hermes'
 
 vi.mock('@/lib/query-client', () => ({ queryClient: { invalidateQueries: vi.fn() } }))
 
@@ -150,5 +150,42 @@ describe('env var writes bust the env-vars cache', () => {
     await deleteEnvVar('OPENROUTER_API_KEY')
 
     expect(queryClient.invalidateQueries).toHaveBeenCalledWith({ queryKey: ['env-vars'] })
+  })
+})
+
+describe('transcribeAudio', () => {
+  let api: ReturnType<typeof vi.fn>
+
+  beforeEach(() => {
+    api = vi.fn().mockResolvedValue({ transcript: 'hello' })
+    Object.defineProperty(window, 'hermesDesktop', {
+      configurable: true,
+      value: { api }
+    })
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+    Reflect.deleteProperty(window, 'hermesDesktop')
+  })
+
+  // Voice transcription runs on-device (local faster-whisper, no API key). On a
+  // machine's FIRST run the backend lazy-installs faster-whisper, downloads a
+  // ~150MB model, then does CPU inference - all inside one HTTP request that
+  // far outlasts the 15s default Electron proxy timeout. That timeout aborts
+  // the request with "Timed out connecting to Basecamp backend after 15000ms",
+  // which surfaces as "Voice transcription failed" even though nothing is
+  // wrong. A generous per-request timeout lets the first-run install finish.
+  it('passes a generous timeout so first-run local Whisper is not aborted', async () => {
+    await transcribeAudio('data:audio/webm;base64,AAAA', 'audio/webm')
+
+    expect(api).toHaveBeenCalledWith(
+      expect.objectContaining({
+        path: '/api/audio/transcribe',
+        method: 'POST',
+        body: { data_url: 'data:audio/webm;base64,AAAA', mime_type: 'audio/webm' },
+        timeoutMs: 180_000
+      })
+    )
   })
 })

@@ -755,6 +755,15 @@ export function getActionStatus(name: string, lines = 200): Promise<ActionStatus
   })
 }
 
+// Voice transcription runs on-device (local faster-whisper, no API key). A
+// machine's FIRST transcription lazy-installs faster-whisper, downloads a
+// ~150MB model, then runs CPU inference - all inside one HTTP request that can
+// take a couple of minutes on a cold machine. The default 15s Electron proxy
+// timeout aborts that as "Timed out connecting to Basecamp backend", which the
+// UI shows as "Voice transcription failed" even though the on-device work is
+// progressing fine. Give it a generous ceiling so first-run install finishes.
+const AUDIO_TRANSCRIBE_TIMEOUT_MS = 180_000
+
 export function transcribeAudio(dataUrl: string, mimeType?: string): Promise<AudioTranscriptionResponse> {
   return window.hermesDesktop.api<AudioTranscriptionResponse>({
     path: '/api/audio/transcribe',
@@ -762,7 +771,8 @@ export function transcribeAudio(dataUrl: string, mimeType?: string): Promise<Aud
     body: {
       data_url: dataUrl,
       mime_type: mimeType
-    }
+    },
+    timeoutMs: AUDIO_TRANSCRIBE_TIMEOUT_MS
   })
 }
 
