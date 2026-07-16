@@ -400,8 +400,14 @@ async function completeWithModelConfirm(
   const defaults = await fetchProviderDefaultModel(preferredSlugs)
 
   if (!defaults) {
-    // Couldn't get a sensible default - proceed without confirm step.
-    notifyReady(providerLabel)
+    // Both the model catalog and the recommended-default endpoint failed to
+    // resolve a model (genuinely offline, or an uncatalogued provider). Don't
+    // claim success - tell the user to pick one. Still complete onboarding so
+    // the runtime gate never hard-blocks (ignoreRuntimeGate is respected).
+    notify({
+      kind: 'warning',
+      message: 'Connected, but Basecamp could not pick a model automatically. Open Settings then Model to choose one.'
+    })
     completeDesktopOnboarding()
     ctx.onCompleted?.()
 
