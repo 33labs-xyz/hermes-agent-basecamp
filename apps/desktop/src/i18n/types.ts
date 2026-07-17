@@ -1223,6 +1223,7 @@ export interface Translations {
   }
 
   autoUpdate: {
+    updateAvailable: string
     relaunchToUpdate: string
     updateReadyVersion: (version: string) => string
     dismiss: string

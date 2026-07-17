@@ -1554,6 +1554,7 @@ export const en: Translations = {
   },
 
   autoUpdate: {
+    updateAvailable: 'Update available',
     relaunchToUpdate: 'Relaunch to update',
     updateReadyVersion: version => `Version ${version} ready`,
     dismiss: 'Dismiss'

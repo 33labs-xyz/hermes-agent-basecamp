@@ -1739,6 +1739,7 @@ export const zh: Translations = {
   },
 
   autoUpdate: {
+    updateAvailable: '有可用更新',
     relaunchToUpdate: '重启以更新',
     updateReadyVersion: version => `版本 ${version} 已就绪`,
     dismiss: '关闭'

@@ -26,6 +26,15 @@ describe('UpdateReadyPill', () => {
     expect(screen.getByText(/0\.17\.14/)).toBeDefined()
   })
 
+  it('leads with a headline so the update prompt is unmissable', () => {
+    // The card wants a plain-language headline above the version line - the old
+    // skinny pill buried the prompt in a single inline label. The headline and
+    // the relaunch action are distinct nodes so the CTA stays a real button.
+    $downloadedUpdate.set({ stage: 'downloaded', version: '0.17.14' })
+    render(<UpdateReadyPill />)
+    expect(screen.getByText(/update available/i)).toBeDefined()
+  })
+
   it('clicking the pill relaunches', () => {
     const quitAndInstall = vi.fn(async () => {})
 

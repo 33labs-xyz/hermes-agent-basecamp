@@ -1607,6 +1607,7 @@ export const ja = defineLocale({
   },
 
   autoUpdate: {
+    updateAvailable: 'アップデートがあります',
     relaunchToUpdate: '再起動して更新',
     updateReadyVersion: version => `バージョン ${version} の準備完了`,
     dismiss: '閉じる'

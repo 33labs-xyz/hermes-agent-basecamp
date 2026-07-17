@@ -2,6 +2,7 @@ import { useStore } from '@nanostores/react'
 import { createPortal } from 'react-dom'
 
 import { BrandMark } from '@/components/brand-mark'
+import { Button } from '@/components/ui/button'
 import { useI18n } from '@/i18n'
 import { cn } from '@/lib/utils'
 import { $downloadedUpdate, $updateReady, dismissAutoUpdate, relaunchForUpdate } from '@/store/auto-update'
@@ -17,38 +18,50 @@ export function UpdateReadyPill() {
 
   const version = downloaded?.version
 
+  // A bottom-left card (not the old skinny pill) modeled on Claude Desktop's
+  // relaunch affordance: an icon tile + headline + version line, then a
+  // full-width primary Relaunch action. max-w keeps it inside a narrow window.
   return createPortal(
     <div
       className={cn(
-        'pointer-events-auto fixed bottom-4 left-4 z-[200] flex items-center gap-2 rounded-full',
-        'border border-(--stroke-nous) bg-popover/95 px-3 py-1.5 shadow-nous backdrop-blur-md'
+        'pointer-events-auto fixed bottom-4 left-4 z-[200] flex w-[19rem] max-w-[calc(100vw-2rem)] flex-col gap-3',
+        'rounded-2xl border border-(--stroke-nous) bg-popover/95 p-4 shadow-nous backdrop-blur-md'
       )}
       role="status"
     >
-      <button
-        className="flex items-center gap-2 text-sm font-medium text-popover-foreground"
+      <div className="flex items-start gap-3">
+        <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-(--ui-bg-quaternary)">
+          <BrandMark className="size-5" />
+        </span>
+        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+          <span className="text-sm font-semibold text-popover-foreground">{t.autoUpdate.updateAvailable}</span>
+          {version ? (
+            <span className="text-xs text-muted-foreground">{t.autoUpdate.updateReadyVersion(version)}</span>
+          ) : null}
+        </div>
+        <Button
+          aria-label={t.autoUpdate.dismiss}
+          className="-mr-1.5 -mt-1.5 shrink-0 text-muted-foreground"
+          onClick={() => {
+            dismissAutoUpdate()
+          }}
+          size="icon-sm"
+          variant="ghost"
+        >
+          <span aria-hidden className="text-base leading-none">
+            &times;
+          </span>
+        </Button>
+      </div>
+      <Button
+        className="w-full"
         onClick={() => {
           void relaunchForUpdate()
         }}
         type="button"
       >
-        <BrandMark className="size-4" />
-        <span>{t.autoUpdate.relaunchToUpdate}</span>
-        {version ? (
-          <span className="text-xs text-muted-foreground">{t.autoUpdate.updateReadyVersion(version)}</span>
-        ) : null}
-      </button>
-      <button
-        aria-label={t.autoUpdate.dismiss}
-        className="rounded-full p-0.5 text-muted-foreground transition-colors hover:text-foreground"
-        onClick={event => {
-          event.stopPropagation()
-          dismissAutoUpdate()
-        }}
-        type="button"
-      >
-        <span aria-hidden>&times;</span>
-      </button>
+        {t.autoUpdate.relaunchToUpdate}
+      </Button>
     </div>,
     document.body
   )

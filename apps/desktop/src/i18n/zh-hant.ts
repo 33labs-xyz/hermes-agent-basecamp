@@ -1558,6 +1558,7 @@ export const zhHant = defineLocale({
   },
 
   autoUpdate: {
+    updateAvailable: '有可用更新',
     relaunchToUpdate: '重新啟動以更新',
     updateReadyVersion: version => `版本 ${version} 已就緒`,
     dismiss: '關閉'
