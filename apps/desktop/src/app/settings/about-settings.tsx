@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { type Translations, useI18n } from '@/i18n'
 import { CheckCircle2, ExternalLink, Loader2, RefreshCw, Sparkles } from '@/lib/icons'
 import { cn } from '@/lib/utils'
+import { $autoUpdate, $autoUpdateCheckedAt, $downloadedUpdate, relaunchForUpdate } from '@/store/auto-update'
 import {
   $desktopVersion,
   $updateApply,
@@ -50,6 +51,9 @@ export function AboutSettings() {
   const status = useStore($updateStatus)
   const apply = useStore($updateApply)
   const checking = useStore($updateChecking)
+  const autoUpdate = useStore($autoUpdate)
+  const downloaded = useStore($downloadedUpdate)
+  const autoCheckedAt = useStore($autoUpdateCheckedAt)
   const [justChecked, setJustChecked] = useState(false)
 
   // The version atom is loaded once at app boot, which makes About show a
@@ -67,6 +71,11 @@ export function AboutSettings() {
   const packaged = version?.isPackaged === true
   const supported = status?.supported !== false
   const applying = apply.applying || apply.stage === 'restart'
+  // Each update flow reports its own progress: the git flow through
+  // $updateChecking/$updateStatus, the packaged flow through the auto-update
+  // event stream. Pick the pair that matches the running build.
+  const busy = checking || (packaged && autoUpdate.stage === 'checking')
+  const checkedAt = packaged ? (autoCheckedAt ?? undefined) : status?.fetchedAt
 
   const handleCheck = async () => {
     setJustChecked(false)
@@ -86,7 +95,25 @@ export function AboutSettings() {
   let statusTone: 'idle' | 'available' | 'error' = 'idle'
 
   if (packaged) {
-    statusLine = a.tapCheck
+    if (downloaded) {
+      statusLine = downloaded.version ? t.autoUpdate.updateReadyVersion(downloaded.version) : t.autoUpdate.updateAvailable
+      statusTone = 'available'
+    } else if (autoUpdate.stage === 'downloading') {
+      statusLine = a.downloadingUpdate(Math.round(autoUpdate.percent ?? 0))
+      statusTone = 'available'
+    } else if (autoUpdate.stage === 'available') {
+      statusLine = t.autoUpdate.updateAvailable
+      statusTone = 'available'
+    } else if (autoUpdate.stage === 'checking') {
+      statusLine = a.checking
+    } else if (autoUpdate.stage === 'error') {
+      statusLine = a.cantReach
+      statusTone = 'error'
+    } else if (autoCheckedAt) {
+      statusLine = a.onLatest
+    } else {
+      statusLine = a.tapCheck
+    }
   } else if (!supported) {
     statusLine = status?.message ?? a.cantUpdate
     statusTone = 'error'
@@ -137,22 +164,28 @@ export function AboutSettings() {
             <div className="min-w-0">
               <p className="font-medium">{statusLine}</p>
               <p className="mt-1 text-xs text-muted-foreground">
-                {a.lastChecked(relativeTime(status?.fetchedAt, a))}
-                {justChecked && !checking ? a.justNowSuffix : ''}
+                {a.lastChecked(relativeTime(checkedAt, a))}
+                {justChecked && !busy ? a.justNowSuffix : ''}
               </p>
             </div>
           </div>
 
           <div className="mt-3 flex flex-wrap items-center gap-4">
             <Button
-              disabled={checking || applying || (!supported && !packaged)}
+              disabled={busy || applying || (!supported && !packaged)}
               onClick={() => void handleCheck()}
               size="sm"
               variant="textStrong"
             >
-              {checking ? <Loader2 className="size-3 animate-spin" /> : <RefreshCw className="size-3" />}
-              {checking ? a.checking : a.checkNow}
+              {busy ? <Loader2 className="size-3 animate-spin" /> : <RefreshCw className="size-3" />}
+              {busy ? a.checking : a.checkNow}
             </Button>
+
+            {packaged && downloaded && (
+              <Button onClick={() => void relaunchForUpdate()} size="sm">
+                {t.autoUpdate.relaunchToUpdate}
+              </Button>
+            )}
 
             {!packaged && behind > 0 && supported && !applying && (
               <Button onClick={() => openUpdatesWindow()} size="sm">

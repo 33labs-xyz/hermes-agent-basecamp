@@ -585,6 +585,7 @@ export const zh: Translations = {
       cantUpdate: '此版本无法在应用内自我更新。',
       cantReach: '无法连接更新服务器。',
       tapCheck: '点击"立即检查"以查找更新。',
+      downloadingUpdate: percent => `正在下载更新：${percent}%`,
       updateReady: count => `已准备好新更新 (包含 ${count} 项更改)。`,
       lastChecked: age => `上次检查:${age}`,
       justNowSuffix: ' · 刚刚',
@@ -1741,8 +1742,7 @@ export const zh: Translations = {
   autoUpdate: {
     updateAvailable: '有可用更新',
     relaunchToUpdate: '重启以更新',
-    updateReadyVersion: version => `版本 ${version} 已就绪`,
-    dismiss: '关闭'
+    updateReadyVersion: version => `版本 ${version} 已就绪`
   },
 
   install: {

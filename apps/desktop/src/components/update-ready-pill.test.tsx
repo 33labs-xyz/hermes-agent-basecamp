@@ -1,14 +1,13 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { $autoUpdateDismissed, $downloadedUpdate } from '@/store/auto-update'
+import { $downloadedUpdate } from '@/store/auto-update'
 
 import { UpdateReadyPill } from './update-ready-pill'
 
 describe('UpdateReadyPill', () => {
   beforeEach(() => {
     $downloadedUpdate.set(null)
-    $autoUpdateDismissed.set(false)
     delete (window as unknown as { hermesDesktop?: unknown }).hermesDesktop
   })
 
@@ -45,14 +44,13 @@ describe('UpdateReadyPill', () => {
     expect(quitAndInstall).toHaveBeenCalledOnce()
   })
 
-  it('clicking dismiss hides without relaunching', () => {
-    const quitAndInstall = vi.fn(async () => {})
-
-    ;(window as unknown as { hermesDesktop: unknown }).hermesDesktop = { quitAndInstall }
+  // Relaunch is the only way out of the card. A dismiss control let testers
+  // hide a downloaded update with no way to bring it back, so the card stays
+  // put until they act on it.
+  it('offers no way to dismiss the card', () => {
     $downloadedUpdate.set({ stage: 'downloaded', version: '0.17.14' })
     render(<UpdateReadyPill />)
-    fireEvent.click(screen.getByRole('button', { name: /dismiss/i }))
-    expect(quitAndInstall).not.toHaveBeenCalled()
-    expect(screen.queryByText(/relaunch to update/i)).toBeNull()
+    expect(screen.queryByRole('button', { name: /dismiss/i })).toBeNull()
+    expect(screen.getAllByRole('button')).toHaveLength(1)
   })
 })

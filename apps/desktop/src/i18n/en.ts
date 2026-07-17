@@ -386,6 +386,7 @@ export const en: Translations = {
       cantUpdate: "This build can't update itself from inside the app.",
       cantReach: "We couldn't reach the update server.",
       tapCheck: 'Tap "Check now" to look for updates.',
+      downloadingUpdate: percent => `Downloading update: ${percent}%`,
       updateReady: count => `A new update is ready (${count} change${count === 1 ? '' : 's'} included).`,
       lastChecked: age => `Last checked ${age}`,
       justNowSuffix: ' · just now',
@@ -1556,8 +1557,7 @@ export const en: Translations = {
   autoUpdate: {
     updateAvailable: 'Update available',
     relaunchToUpdate: 'Relaunch to update',
-    updateReadyVersion: version => `Version ${version} ready`,
-    dismiss: 'Dismiss'
+    updateReadyVersion: version => `Version ${version} ready`
   },
 
   install: {

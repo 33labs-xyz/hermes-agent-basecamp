@@ -508,6 +508,7 @@ export const ja = defineLocale({
       cantUpdate: 'このビルドはアプリ内から更新できません。',
       cantReach: '更新サーバーに接続できませんでした。',
       tapCheck: '更新を探すには「今すぐ確認」を押してください。',
+      downloadingUpdate: percent => `アップデートをダウンロード中: ${percent}%`,
       updateReady: count => `新しい更新の準備ができました (${count} 件の変更を含みます)。`,
       lastChecked: age => `前回確認: ${age}`,
       justNowSuffix: ' · たった今',
@@ -1609,8 +1610,7 @@ export const ja = defineLocale({
   autoUpdate: {
     updateAvailable: 'アップデートがあります',
     relaunchToUpdate: '再起動して更新',
-    updateReadyVersion: version => `バージョン ${version} の準備完了`,
-    dismiss: '閉じる'
+    updateReadyVersion: version => `バージョン ${version} の準備完了`
   },
 
   install: {

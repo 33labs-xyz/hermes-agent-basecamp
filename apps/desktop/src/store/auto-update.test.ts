@@ -1,10 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   $autoUpdate,
-  $autoUpdateDismissed,
+  $autoUpdateCheckedAt,
   $downloadedUpdate,
   $updateReady,
-  dismissAutoUpdate,
   relaunchForUpdate,
   startAutoUpdateListener
 } from './auto-update'
@@ -25,7 +24,7 @@ function mockBridge() {
 describe('auto-update store', () => {
   beforeEach(() => {
     $autoUpdate.set({ stage: 'none' })
-    $autoUpdateDismissed.set(false)
+    $autoUpdateCheckedAt.set(null)
     $downloadedUpdate.set(null)
     delete (window as unknown as { hermesDesktop?: unknown }).hermesDesktop
   })
@@ -45,24 +44,28 @@ describe('auto-update store', () => {
     stop()
   })
 
-  it('hides after dismiss for the same version', () => {
+  // Regression: a dismissable pill plus a version-equality guard made an
+  // ignored update unrecoverable. electron-updater re-emits the SAME version
+  // from cache on every re-check, so the old guard swallowed the only event
+  // that could have brought the prompt back. Readiness now depends on the
+  // download alone, so a re-emit is always enough to keep the pill up.
+  it('stays ready when the same version re-emits from cache', () => {
     const bridge = mockBridge()
     const stop = startAutoUpdateListener()
     bridge.emit({ stage: 'downloaded', version: '0.17.14' })
-    dismissAutoUpdate()
-    expect($updateReady.get()).toBe(false)
     bridge.emit({ stage: 'downloaded', version: '0.17.14' })
-    expect($updateReady.get()).toBe(false)
+    expect($updateReady.get()).toBe(true)
     stop()
   })
 
-  it('returns when a newer version downloads', () => {
+  it('records when a check finishes so About can report it', () => {
     const bridge = mockBridge()
     const stop = startAutoUpdateListener()
-    bridge.emit({ stage: 'downloaded', version: '0.17.14' })
-    dismissAutoUpdate()
-    bridge.emit({ stage: 'downloaded', version: '0.17.15' })
-    expect($updateReady.get()).toBe(true)
+    expect($autoUpdateCheckedAt.get()).toBeNull()
+    bridge.emit({ stage: 'checking' })
+    expect($autoUpdateCheckedAt.get()).toBeNull()
+    bridge.emit({ stage: 'none' })
+    expect($autoUpdateCheckedAt.get()).toBeTypeOf('number')
     stop()
   })
 

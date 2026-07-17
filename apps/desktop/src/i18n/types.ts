@@ -284,6 +284,7 @@ export interface Translations {
       cantUpdate: string
       cantReach: string
       tapCheck: string
+      downloadingUpdate: (percent: number) => string
       updateReady: (count: number) => string
       lastChecked: (age: string) => string
       justNowSuffix: string
@@ -1226,7 +1227,6 @@ export interface Translations {
     updateAvailable: string
     relaunchToUpdate: string
     updateReadyVersion: (version: string) => string
-    dismiss: string
   }
 
   install: {

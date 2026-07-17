@@ -497,6 +497,7 @@ export const zhHant = defineLocale({
       cantUpdate: '此版本無法從應用程式內自行更新。',
       cantReach: '無法連線到更新伺服器。',
       tapCheck: '點選「立即檢查」以尋找更新。',
+      downloadingUpdate: percent => `正在下載更新：${percent}%`,
       updateReady: count => `新更新已就緒（包含 ${count} 項變更）。`,
       lastChecked: age => `上次檢查：${age}`,
       justNowSuffix: ' · 剛剛',
@@ -1560,8 +1561,7 @@ export const zhHant = defineLocale({
   autoUpdate: {
     updateAvailable: '有可用更新',
     relaunchToUpdate: '重新啟動以更新',
-    updateReadyVersion: version => `版本 ${version} 已就緒`,
-    dismiss: '關閉'
+    updateReadyVersion: version => `版本 ${version} 已就緒`
   },
 
   install: {

@@ -5,7 +5,7 @@ import { BrandMark } from '@/components/brand-mark'
 import { Button } from '@/components/ui/button'
 import { useI18n } from '@/i18n'
 import { cn } from '@/lib/utils'
-import { $downloadedUpdate, $updateReady, dismissAutoUpdate, relaunchForUpdate } from '@/store/auto-update'
+import { $downloadedUpdate, $updateReady, relaunchForUpdate } from '@/store/auto-update'
 
 export function UpdateReadyPill() {
   const { t } = useI18n()
@@ -21,6 +21,8 @@ export function UpdateReadyPill() {
   // A bottom-left card (not the old skinny pill) modeled on Claude Desktop's
   // relaunch affordance: an icon tile + headline + version line, then a
   // full-width primary Relaunch action. max-w keeps it inside a narrow window.
+  // Relaunch is the only exit: the card carried a dismiss control until a
+  // tester dismissed it and had no way back, so it now stays until installed.
   return createPortal(
     <div
       className={cn(
@@ -39,19 +41,6 @@ export function UpdateReadyPill() {
             <span className="text-xs text-muted-foreground">{t.autoUpdate.updateReadyVersion(version)}</span>
           ) : null}
         </div>
-        <Button
-          aria-label={t.autoUpdate.dismiss}
-          className="-mr-1.5 -mt-1.5 shrink-0 text-muted-foreground"
-          onClick={() => {
-            dismissAutoUpdate()
-          }}
-          size="icon-sm"
-          variant="ghost"
-        >
-          <span aria-hidden className="text-base leading-none">
-            &times;
-          </span>
-        </Button>
       </div>
       <Button
         className="w-full"
