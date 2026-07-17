@@ -33,6 +33,11 @@ from agent.message_sanitization import (
     _sanitize_surrogates,
     _repair_tool_call_arguments,
 )
+from agent.stale_stream_guard import (
+    DEFAULT_MAX_STALE_KILLS,
+    StaleEscalation,
+    advance_stale_escalation,
+)
 from tools.terminal_tool import is_persistent_env
 from utils import base_url_host_matches, base_url_hostname, env_int
 
@@ -2612,6 +2617,22 @@ def interruptible_streaming_api_call(agent, api_kwargs: dict, *, on_first_delta=
         else:
             _stream_stale_timeout = _stream_stale_timeout_base
 
+    # Bounded stale-stream escalation.  A single stale detection kills the
+    # connection and lets the worker reconnect; but if the worker's blocked
+    # read never unblocks (dead/half-open socket the cross-thread shutdown
+    # can't reach), the detector would re-fire forever, never surfacing an
+    # error and never releasing the gateway's busy flag.  Cap the consecutive
+    # kills, then escalate to a TimeoutError — mirroring the non-streaming
+    # stale path.
+    _max_stale_kills = max(1, env_int("HERMES_STREAM_STALE_MAX_KILLS", DEFAULT_MAX_STALE_KILLS))
+    _stale_hard_ceiling = (
+        None
+        if _stream_stale_timeout == float("inf")
+        else _stream_stale_timeout * (_max_stale_kills + 2)
+    )
+    _stale_state = StaleEscalation()
+    _stale_sentinel: Optional[float] = None
+
     t = threading.Thread(target=_call, daemon=True)
     t.start()
     _last_heartbeat = time.time()
@@ -2635,24 +2656,53 @@ def interruptible_streaming_api_call(agent, api_kwargs: dict, *, on_first_delta=
                 f"waiting for stream response ({_waiting_secs}s, no chunks yet)"
             )
 
-        # Detect stale streams: connections kept alive by SSE pings
-        # but delivering no real chunks.  Kill the client so the
-        # inner retry loop can start a fresh connection.
-        _stale_elapsed = time.time() - last_chunk_time["t"]
-        if _stale_elapsed > _stream_stale_timeout:
+        # Detect stale streams: connections kept alive by SSE pings but
+        # delivering no real chunks.  A single stale tick kills the client so
+        # the worker can start a fresh connection; consecutive kills with no
+        # forward progress escalate to a TimeoutError so a wedged worker (whose
+        # blocked read the cross-thread shutdown can't reach) can never spin
+        # here forever holding the gateway busy flag.
+        _now = time.time()
+        _stale_elapsed = _now - last_chunk_time["t"]
+        _is_stale = _stale_elapsed > _stream_stale_timeout
+        # The worker stamps last_chunk_time["t"] on every real chunk.  If that
+        # value has moved since our last kill-stamp, the stream made genuine
+        # progress and the kill budget resets.
+        _made_progress = (
+            _stale_sentinel is not None and last_chunk_time["t"] != _stale_sentinel
+        )
+        _stale_state, _stale_action = advance_stale_escalation(
+            _stale_state,
+            is_stale=_is_stale,
+            made_progress=_made_progress,
+            now=_now,
+            max_kills=_max_stale_kills,
+            hard_ceiling=_stale_hard_ceiling,
+        )
+        if _made_progress:
+            _stale_sentinel = None
+        if _stale_action in ("kill", "abort"):
             _est_ctx = estimate_request_context_tokens(api_kwargs)
             logger.warning(
                 "Stream stale for %.0fs (threshold %.0fs) — no chunks received. "
-                "model=%s context=~%s tokens. Killing connection.",
+                "model=%s context=~%s tokens. kill %d/%d action=%s.",
                 _stale_elapsed, _stream_stale_timeout,
                 api_kwargs.get("model", "unknown"), f"{_est_ctx:,}",
+                _stale_state.kill_count, _max_stale_kills, _stale_action,
             )
-            agent._buffer_status(
-                f"⚠️ No response from provider for {int(_stale_elapsed)}s "
-                f"(model: {api_kwargs.get('model', 'unknown')}, "
-                f"context: ~{_est_ctx:,} tokens). "
-                f"Reconnecting..."
-            )
+            if _stale_action == "abort":
+                agent._buffer_status(
+                    f"⚠️ No response from provider after {_stale_state.kill_count} "
+                    f"reconnect attempts (model: {api_kwargs.get('model', 'unknown')}, "
+                    f"context: ~{_est_ctx:,} tokens). Giving up."
+                )
+            else:
+                agent._buffer_status(
+                    f"⚠️ No response from provider for {int(_stale_elapsed)}s "
+                    f"(model: {api_kwargs.get('model', 'unknown')}, "
+                    f"context: ~{_est_ctx:,} tokens). "
+                    f"Reconnecting..."
+                )
             try:
                 _close_request_client_once("stale_stream_kill")
             except Exception:
@@ -2663,9 +2713,25 @@ def interruptible_streaming_api_call(agent, api_kwargs: dict, *, on_first_delta=
                 agent._replace_primary_openai_client(reason="stale_stream_pool_cleanup")
             except Exception:
                 pass
-            # Reset the timer so we don't kill repeatedly while
-            # the inner thread processes the closure.
+            if _stale_action == "abort":
+                # Give the worker a brief window to unblock from the forced
+                # close, then surface a TimeoutError so the outer retry loop
+                # and the gateway can recover.  Mirrors the non-streaming
+                # stale path (which sets the same error and breaks).
+                t.join(timeout=2.0)
+                if result["error"] is None and result["response"] is None:
+                    result["error"] = TimeoutError(
+                        f"Streaming stalled: no chunks for {int(_stale_elapsed)}s "
+                        f"across {_stale_state.kill_count} reconnect attempts "
+                        f"(model: {api_kwargs.get('model', 'unknown')})."
+                    )
+                break
+            # kill: reset the timer and record our stamp as the sentinel so the
+            # next tick can tell whether the worker actually made progress or is
+            # still wedged.  We do NOT kill repeatedly while the worker
+            # processes the closure.
             last_chunk_time["t"] = time.time()
+            _stale_sentinel = last_chunk_time["t"]
             agent._touch_activity(
                 f"stale stream detected after {int(_stale_elapsed)}s, reconnecting"
             )
