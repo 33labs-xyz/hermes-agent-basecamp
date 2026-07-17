@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import type { ChatGroup } from '@/hermes'
 
-import { groupedSessionIdSet, partitionGroups } from './session-grouping'
+import { groupedSessionIdSet } from './session-grouping'
 
 const bucket = (over: Partial<ChatGroup> = {}): ChatGroup => ({
   created_at: 0,
@@ -27,26 +27,5 @@ describe('groupedSessionIdSet', () => {
 
   it('is empty for no buckets', () => {
     expect(groupedSessionIdSet([]).size).toBe(0)
-  })
-})
-
-describe('partitionGroups', () => {
-  it('routes group-marked buckets to groups, everything else to projects, order preserved', () => {
-    const buckets = [
-      bucket({ id: 'p1' }),
-      bucket({ id: 'g1' }),
-      bucket({ id: 'p2' }),
-      bucket({ id: 'g2' })
-    ]
-    const { groups, projects } = partitionGroups(buckets, { g1: 'group', g2: 'group' })
-    expect(projects.map(b => b.id)).toEqual(['p1', 'p2'])
-    expect(groups.map(b => b.id)).toEqual(['g1', 'g2'])
-  })
-
-  it('defaults unmarked and garbage-marked buckets to projects', () => {
-    const buckets = [bucket({ id: 'p1' }), bucket({ id: 'x1' })]
-    const { groups, projects } = partitionGroups(buckets, { x1: 'banana' })
-    expect(projects.map(b => b.id)).toEqual(['p1', 'x1'])
-    expect(groups).toEqual([])
   })
 })

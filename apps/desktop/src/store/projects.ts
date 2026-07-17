@@ -12,7 +12,6 @@ import {
   updateChatGroup
 } from '@/hermes'
 import { persistBoolean, storedBoolean } from '@/lib/storage'
-import { forgetGroupKind, markGroupKind } from '@/store/group-kind'
 
 const SIDEBAR_PROJECTS_OPEN_STORAGE_KEY = 'hermes.desktop.sidebarProjectsOpen'
 
@@ -30,16 +29,6 @@ $sidebarProjectsOpen.subscribe(open => persistBoolean(SIDEBAR_PROJECTS_OPEN_STOR
 
 export function setSidebarProjectsOpen(open: boolean) {
   $sidebarProjectsOpen.set(open)
-}
-
-const SIDEBAR_GROUPS_OPEN_STORAGE_KEY = 'hermes.desktop.sidebarGroupsOpen'
-
-export const $sidebarGroupsOpen = atom(storedBoolean(SIDEBAR_GROUPS_OPEN_STORAGE_KEY, true))
-
-$sidebarGroupsOpen.subscribe(open => persistBoolean(SIDEBAR_GROUPS_OPEN_STORAGE_KEY, open))
-
-export function setSidebarGroupsOpen(open: boolean) {
-  $sidebarGroupsOpen.set(open)
 }
 
 // "New chat in this project" arms a one-shot assignment: the project page sets
@@ -191,17 +180,6 @@ export async function createProject(input: {
   return created
 }
 
-// Lightweight sibling of createProject: a group is just a named bucket, so we
-// create it name-only and stamp the client-side "group" marker. No description,
-// instructions, or knowledge — those stay Projects-only.
-export async function createGroup(name: string): Promise<ChatGroup> {
-  const created = await createChatGroup({ name })
-  markGroupKind(created.id, 'group')
-  await refreshProjects()
-
-  return created
-}
-
 export async function updateProject(
   id: string,
   updates: { description?: string; instructions?: string; name?: string }
@@ -214,7 +192,6 @@ export async function updateProject(
 
 export async function deleteProject(id: string): Promise<void> {
   await deleteChatGroup(id)
-  forgetGroupKind(id)
   await refreshProjects()
 }
 

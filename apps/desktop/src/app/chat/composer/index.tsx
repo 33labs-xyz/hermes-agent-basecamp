@@ -1636,7 +1636,12 @@ export function ChatBar({
       return
     }
 
-    if (draftRef.current.trim() && takeProjectHandoffSend()) {
+    // Attachments alone are a valid handoff payload: the user attached a file
+    // in the project launchpad and hit send with no text. submitDraft() already
+    // treats attachments as a payload, so only the arm gate needs to see them.
+    const hasHandoffPayload = draftRef.current.trim().length > 0 || $composerAttachments.get().length > 0
+
+    if (hasHandoffPayload && takeProjectHandoffSend()) {
       submitDraft()
     }
   }, [activeQueueSessionKey]) // eslint-disable-line react-hooks/exhaustive-deps

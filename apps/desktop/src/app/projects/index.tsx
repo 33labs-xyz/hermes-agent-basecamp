@@ -3,6 +3,7 @@ import type * as React from 'react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 
+import { formatRefValue } from '@/components/assistant-ui/directive-text'
 import { PageLoader } from '@/components/page-loader'
 import { Button } from '@/components/ui/button'
 import {
@@ -45,7 +46,7 @@ import { ArrowUp, Brain, ChevronDown, ChevronLeft, FolderOpen, MoreHorizontal, P
 import { formatModelStatusLabel } from '@/lib/model-status-label'
 import { projectMemberTitle } from '@/lib/project-session-title'
 import { cn } from '@/lib/utils'
-import { stashSessionDraft } from '@/store/composer'
+import { $composerAttachments, clearComposerAttachments, stashSessionDraft } from '@/store/composer'
 import { notify, notifyError } from '@/store/notifications'
 import {
   $projects,
@@ -58,6 +59,7 @@ import {
 } from '@/store/projects'
 import {
   $cronSessions,
+  $currentCwd,
   $currentFastMode,
   $currentModel,
   $currentReasoningEffort,
@@ -65,10 +67,17 @@ import {
   setModelPickerOpen
 } from '@/store/session'
 
+import { AttachmentList } from '../chat/composer/attachments'
+import { ContextMenu } from '../chat/composer/context-menu'
+import type { ChatBarState } from '../chat/composer/types'
+import { UrlDialog } from '../chat/composer/url-dialog'
+import { useComposerActions } from '../chat/hooks/use-composer-actions'
 import { ProjectSettingsDialog } from '../chat/sidebar/project-dialog'
 import { PageSearchShell } from '../page-search-shell'
 import { NEW_CHAT_ROUTE, projectRoute, PROJECTS_ROUTE, sessionRoute } from '../routes'
 import type { SetStatusbarItemGroup } from '../shell/statusbar-controls'
+
+import { buildProjectHandoff } from './project-handoff'
 
 // Mirror the backend per-file content cap (_FILE_CONTENT_MAX). Validate here so
 // an oversized paste/upload fails fast with a friendly message instead of a 4xx.
@@ -257,10 +266,11 @@ function ProjectWorkspace({ onEdit, project }: { onEdit: () => void; project: Ch
   )
 }
 
-// Launchpad composer: type a prompt, hit send, and the real chat (with full
-// attachments/voice composer) opens inside this project via the pending-assign
-// arm + a stashed new-session draft. No fake buttons here — the affordances that
-// can't act on this page (attach, voice) live in the chat we hand off to.
+// Launchpad composer: type a prompt and/or attach files, hit send, and the real
+// chat opens inside this project via the pending-assign arm + a stashed
+// new-session draft. Attachments ride the SAME global $composerAttachments atom
+// the chat composer uses, so the plus-menu here funnels through useComposerActions
+// exactly like the real composer; the handoff carries them into the fresh chat.
 function ProjectComposer({ project }: { project: ChatGroup }) {
   const { t } = useI18n()
   const p = t.sidebar.projects.page
@@ -269,18 +279,64 @@ function ProjectComposer({ project }: { project: ChatGroup }) {
   const currentModel = useStore($currentModel)
   const fastMode = useStore($currentFastMode)
   const reasoningEffort = useStore($currentReasoningEffort)
+  const currentCwd = useStore($currentCwd)
+  const attachments = useStore($composerAttachments)
+  const [urlOpen, setUrlOpen] = useState(false)
+  const [urlValue, setUrlValue] = useState('')
+  const urlInputRef = useRef<HTMLInputElement | null>(null)
+
+  // The composer-attachments atom is global and shared with the chat composer.
+  // Clear it on mount so files left over from an earlier chat don't leak into
+  // the launchpad before the user attaches anything of their own.
+  useEffect(() => {
+    clearComposerAttachments()
+  }, [])
+
+  // No active session on the launchpad, so removeAttachment never touches the
+  // gateway (it's guarded by activeSessionId). A rejecting stub is safe here.
+  const composer = useComposerActions({
+    activeSessionId: null,
+    currentCwd,
+    requestGateway: (async () => undefined) as <T>(method: string, params?: Record<string, unknown>) => Promise<T>
+  })
+
+  // ContextMenu only reads tools.enabled/label; model/voice are filled to satisfy
+  // the shared ChatBarState shape.
+  const attachState: ChatBarState = {
+    model: { canSwitch: false, model: currentModel, provider: '' },
+    tools: { enabled: true, label: t.composer.attachLabel },
+    voice: { active: false, enabled: false }
+  }
+
+  function insertSnippet(snippet: string) {
+    setText(prev => (prev ? `${prev}\n\n${snippet}` : snippet))
+  }
+
+  function submitUrl() {
+    const url = urlValue.trim()
+
+    if (!url) {
+      return
+    }
+
+    composer.addContextRefAttachment(`@url:${formatRefValue(url)}`, url)
+    setUrlValue('')
+    setUrlOpen(false)
+  }
 
   function submit() {
-    const draft = text.trim()
+    const handoff = buildProjectHandoff(text, $composerAttachments.get())
     setPendingProjectForNewChat(project.id)
-    // Auto-send only when there's a draft: the handed-off chat sends it on
-    // arrival instead of parking a prefilled draft in a blank chat (the "leads
-    // me outside to a normal chat box" bug). An empty submit just opens the
-    // project's new chat, same as the "New chat" button.
-    setProjectHandoffSend(Boolean(draft))
+    // Auto-send when there's a draft OR attachments: the handed-off chat sends
+    // on arrival instead of parking a prefilled composer in a blank chat. An
+    // empty submit just opens the project's new chat, same as "New chat".
+    setProjectHandoffSend(handoff.shouldSend)
 
-    if (draft) {
-      stashSessionDraft(null, draft, [])
+    if (handoff.shouldSend) {
+      stashSessionDraft(null, handoff.draft, handoff.attachments)
+      // The stashed draft owns the attachments now; clear the live atom so they
+      // don't double-apply or linger if the user returns to the launchpad.
+      clearComposerAttachments()
     }
 
     navigate(NEW_CHAT_ROUTE)
@@ -302,7 +358,21 @@ function ProjectComposer({ project }: { project: ChatGroup }) {
         placeholder={p.composerPlaceholder}
         value={text}
       />
+      {attachments.length > 0 && (
+        <div className="px-1 pb-1">
+          <AttachmentList attachments={attachments} onRemove={composer.removeAttachment} />
+        </div>
+      )}
       <div className="mt-2 flex items-center gap-2">
+        <ContextMenu
+          onInsertText={insertSnippet}
+          onOpenUrlDialog={() => setUrlOpen(true)}
+          onPasteClipboardImage={composer.pasteClipboardImage}
+          onPickFiles={() => composer.pickContextPaths('file')}
+          onPickFolders={() => composer.pickContextPaths('folder')}
+          onPickImages={composer.pickImages}
+          state={attachState}
+        />
         <button
           className="flex items-center gap-1 rounded-md px-1.5 py-1 text-xs text-(--ui-text-tertiary) transition-colors hover:bg-(--chrome-action-hover) hover:text-foreground"
           onClick={() => setModelPickerOpen(true)}

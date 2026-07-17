@@ -44,7 +44,6 @@ import { sessionMatchesSearch } from '@/lib/session-search'
 import { normalizeSessionSource, sessionSourceLabel } from '@/lib/session-source'
 import { cn } from '@/lib/utils'
 import { $cronJobs } from '@/store/cron'
-import { $groupKind } from '@/store/group-kind'
 import {
   $panesFlipped,
   $pinnedSessionIds,
@@ -84,9 +83,7 @@ import {
 } from '@/store/profile'
 import {
   $projects,
-  $sidebarGroupsOpen,
   $sidebarProjectsOpen,
-  setSidebarGroupsOpen,
   setSidebarProjectsOpen
 } from '@/store/projects'
 import {
@@ -120,7 +117,7 @@ import { SidebarLoadMoreRow } from './load-more-row'
 import { resolveManualSessionOrderIds } from './order'
 import { ProfileRail } from './profile-switcher'
 import { SidebarProjectsSection } from './projects-section'
-import { groupedSessionIdSet, partitionGroups } from './session-grouping'
+import { groupedSessionIdSet } from './session-grouping'
 import { SidebarSessionRow } from './session-row'
 import { VirtualSessionList } from './virtual-session-list'
 import { type SidebarSessionGroup, type SidebarWorkspaceTree, workspaceTreeFor } from './workspace-groups'
@@ -366,13 +363,7 @@ export function ChatSidebar({
   const agentsOpen = useStore($sidebarRecentsOpen)
   const cronOpen = useStore($sidebarCronOpen)
   const projectsOpen = useStore($sidebarProjectsOpen)
-  const groupsOpen = useStore($sidebarGroupsOpen)
   const allBuckets = useStore($projects)
-  const groupKindMap = useStore($groupKind)
-  const { groups: groupBuckets, projects: projectBuckets } = useMemo(
-    () => partitionGroups(allBuckets, groupKindMap),
-    [allBuckets, groupKindMap]
-  )
   const groupedIds = useMemo(() => groupedSessionIdSet(allBuckets), [allBuckets])
   const selectedSessionId = useStore($selectedStoredSessionId)
   const sessions = useStore($sessions)
@@ -954,8 +945,7 @@ export function ChatSidebar({
 
             {!trimmedQuery && (
               <SidebarProjectsSection
-                buckets={projectBuckets}
-                kind="project"
+                buckets={allBuckets}
                 label={s.projects.label}
                 onOpenChat={onResumeSession}
                 onToggle={() => setSidebarProjectsOpen(!projectsOpen)}
@@ -983,18 +973,6 @@ export function ChatSidebar({
                 sessions={pinnedSessions}
                 sortable={pinnedSessions.length > 1}
                 workingSessionIdSet={workingSessionIdSet}
-              />
-            )}
-
-            {!trimmedQuery && (
-              <SidebarProjectsSection
-                buckets={groupBuckets}
-                kind="group"
-                label={s.groups.label}
-                onOpenChat={onResumeSession}
-                onToggle={() => setSidebarGroupsOpen(!groupsOpen)}
-                open={groupsOpen}
-                strings={s.groups}
               />
             )}
 

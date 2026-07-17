@@ -9,9 +9,6 @@ const createChatGroup = vi.fn(async (..._args: unknown[]) => undefined as unknow
 const deleteChatGroup = vi.fn(async (..._args: unknown[]) => undefined)
 const updateChatGroup = vi.fn(async (..._args: unknown[]) => undefined as unknown)
 
-const markGroupKind = vi.fn()
-const forgetGroupKind = vi.fn()
-
 vi.mock('@/hermes', () => ({
   assignConversation: (...a: unknown[]) => assignConversation(...a),
   createChatGroup: (...a: unknown[]) => createChatGroup(...a),
@@ -25,27 +22,19 @@ vi.mock('@/lib/storage', () => ({
   persistBoolean: vi.fn(),
   storedBoolean: (_key: string, fallback: boolean) => fallback
 }))
-vi.mock('@/store/group-kind', () => ({
-  forgetGroupKind: (...a: unknown[]) => forgetGroupKind(...a),
-  groupKindOf: () => 'project',
-  markGroupKind: (...a: unknown[]) => markGroupKind(...a)
-}))
 
 const {
   $pendingProjectGroupId,
   $pendingProjectHandoffSend,
   $projects,
-  $sidebarGroupsOpen,
   addOptimisticMembership,
   clearPendingProjectAssignment,
   consumePendingProjectAssignment,
-  createGroup,
   deleteProject,
   removeOptimisticMembership,
   reorderProjects,
   setPendingProjectForNewChat,
   setProjectHandoffSend,
-  setSidebarGroupsOpen,
   takeProjectHandoffSend
 } = await import('./projects')
 
@@ -70,8 +59,6 @@ beforeEach(() => {
   createChatGroup.mockClear().mockResolvedValue(group())
   deleteChatGroup.mockClear().mockResolvedValue(undefined)
   updateChatGroup.mockClear().mockResolvedValue(undefined)
-  markGroupKind.mockClear()
-  forgetGroupKind.mockClear()
 })
 
 describe('project handoff auto-send arm', () => {
@@ -179,36 +166,11 @@ describe('clearPendingProjectAssignment', () => {
   })
 })
 
-describe('createGroup', () => {
-  it('creates a name-only bucket, stamps it as a group, and refreshes', async () => {
-    const created = group({ id: 'grp-new', name: 'Reading' })
-    createChatGroup.mockResolvedValue(created)
-    listChatGroups.mockResolvedValue([created])
-
-    const result = await createGroup('Reading')
-
-    expect(createChatGroup).toHaveBeenCalledWith({ name: 'Reading' })
-    expect(markGroupKind).toHaveBeenCalledWith('grp-new', 'group')
-    expect(result).toBe(created)
-    expect($projects.get()).toEqual([created])
-  })
-})
-
-describe('deleteProject forgets the kind marker', () => {
-  it('drops the client-side marker so a future bucket reusing the id is not mis-typed', async () => {
+describe('deleteProject', () => {
+  it('deletes the bucket and refreshes', async () => {
     await deleteProject('grp-1')
 
     expect(deleteChatGroup).toHaveBeenCalledWith('grp-1')
-    expect(forgetGroupKind).toHaveBeenCalledWith('grp-1')
-  })
-})
-
-describe('setSidebarGroupsOpen', () => {
-  it('toggles the groups-section open atom', () => {
-    setSidebarGroupsOpen(false)
-    expect($sidebarGroupsOpen.get()).toBe(false)
-    setSidebarGroupsOpen(true)
-    expect($sidebarGroupsOpen.get()).toBe(true)
   })
 })
 

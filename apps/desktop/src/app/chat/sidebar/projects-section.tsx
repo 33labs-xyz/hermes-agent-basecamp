@@ -30,7 +30,6 @@ import { useI18n } from '@/i18n'
 import { triggerHaptic } from '@/lib/haptics'
 import { projectMemberTitle } from '@/lib/project-session-title'
 import { cn } from '@/lib/utils'
-import type { GroupKind } from '@/store/group-kind'
 import { notify, notifyError } from '@/store/notifications'
 import {
   $projectSessionMeta,
@@ -61,7 +60,6 @@ export interface SectionStrings {
 
 export interface SidebarProjectsSectionProps {
   buckets: ChatGroup[]
-  kind: GroupKind
   label: string
   onOpenChat: (sessionId: string) => void
   onToggle: () => void
@@ -71,7 +69,6 @@ export interface SidebarProjectsSectionProps {
 
 export function SidebarProjectsSection({
   buckets,
-  kind,
   label,
   onOpenChat,
   onToggle,
@@ -79,7 +76,6 @@ export function SidebarProjectsSection({
   strings
 }: SidebarProjectsSectionProps) {
   const navigate = useNavigate()
-  const isProject = kind === 'project'
   // Clicking a project name opens its full page; navigate from the leaf instead
   // of prop-drilling through the sidebar (mirrors profile-switcher).
   const handleOpenProject = (groupId: string) => navigate(projectRoute(groupId))
@@ -139,7 +135,7 @@ export function SidebarProjectsSection({
         <div className="group/section-label flex w-fit items-center gap-1 leading-none">
           <button
             className="flex items-center gap-1 bg-transparent text-left leading-none"
-            onClick={() => (isProject ? navigate(PROJECTS_ROUTE) : onToggle())}
+            onClick={() => navigate(PROJECTS_ROUTE)}
             title={label}
             type="button"
           >
@@ -192,7 +188,6 @@ export function SidebarProjectsSection({
                   <ProjectRow
                     expanded={expandedId === bucket.id}
                     key={bucket.id}
-                    kind={kind}
                     onDelete={() => setDeleteTarget(bucket)}
                     onOpenChat={onOpenChat}
                     onOpenProject={handleOpenProject}
@@ -210,18 +205,16 @@ export function SidebarProjectsSection({
         </SidebarGroupContent>
       )}
 
-      <ProjectSettingsDialog kind={kind} onOpenChange={setCreateOpen} open={createOpen} project={null} />
-      {isProject && (
-        <ProjectSettingsDialog
-          onOpenChange={openValue => {
-            if (!openValue) {
-              setEditProject(null)
-            }
-          }}
-          open={editProject !== null}
-          project={editProject}
-        />
-      )}
+      <ProjectSettingsDialog onOpenChange={setCreateOpen} open={createOpen} project={null} />
+      <ProjectSettingsDialog
+        onOpenChange={openValue => {
+          if (!openValue) {
+            setEditProject(null)
+          }
+        }}
+        open={editProject !== null}
+        project={editProject}
+      />
       <DeleteProjectDialog
         onOpenChange={openValue => !openValue && setDeleteTarget(null)}
         project={deleteTarget}
@@ -233,7 +226,6 @@ export function SidebarProjectsSection({
 
 function ProjectRow({
   expanded,
-  kind,
   onDelete,
   onOpenChat,
   onOpenProject,
@@ -245,7 +237,6 @@ function ProjectRow({
   strings
 }: {
   expanded: boolean
-  kind: GroupKind
   onDelete: () => void
   onOpenChat: (sessionId: string) => void
   onOpenProject: (groupId: string) => void
@@ -258,7 +249,6 @@ function ProjectRow({
 }) {
   const { t } = useI18n()
   const p = t.sidebar.projects
-  const isProject = kind === 'project'
   const selectedSessionId = useStore($selectedStoredSessionId)
   const count = project.session_ids.length
   // Whole row is the drag handle (distance-constrained sensor keeps clicks working).
@@ -314,7 +304,7 @@ function ProjectRow({
       >
         <button
           className="flex min-w-0 items-center gap-1.5 bg-transparent py-0.5 pl-2 pr-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
-          onClick={() => (isProject ? onOpenProject(project.id) : onToggle())}
+          onClick={() => onOpenProject(project.id)}
           title={project.name}
           type="button"
         >
@@ -339,18 +329,16 @@ function ProjectRow({
             >
               <DisclosureCaret open={expanded} />
             </button>
-            {isProject && (
-              <Tip label={p.settings}>
-                <button
-                  aria-label={p.settings}
-                  className="grid size-5 place-items-center rounded-sm text-(--ui-text-tertiary) hover:bg-(--ui-control-hover-background) hover:text-foreground"
-                  onClick={onSettings}
-                  type="button"
-                >
-                  <Codicon name="gear" size="0.75rem" />
-                </button>
-              </Tip>
-            )}
+            <Tip label={p.settings}>
+              <button
+                aria-label={p.settings}
+                className="grid size-5 place-items-center rounded-sm text-(--ui-text-tertiary) hover:bg-(--ui-control-hover-background) hover:text-foreground"
+                onClick={onSettings}
+                type="button"
+              >
+                <Codicon name="gear" size="0.75rem" />
+              </button>
+            </Tip>
             <Tip label={strings.deleteAction}>
               <button
                 aria-label={strings.deleteAction}
