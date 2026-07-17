@@ -965,18 +965,6 @@ export function ChatSidebar({
             )}
 
             {!trimmedQuery && (
-              <SidebarProjectsSection
-                buckets={groupBuckets}
-                kind="group"
-                label={s.groups.label}
-                onOpenChat={onResumeSession}
-                onToggle={() => setSidebarGroupsOpen(!groupsOpen)}
-                open={groupsOpen}
-                strings={s.groups}
-              />
-            )}
-
-            {!trimmedQuery && (
               <SidebarSessionsSection
                 activeSessionId={activeSidebarSessionId}
                 contentClassName={cn('flex max-h-44 flex-col gap-px rounded-lg pb-2 pt-1', GROUP_BODY)}
@@ -995,6 +983,18 @@ export function ChatSidebar({
                 sessions={pinnedSessions}
                 sortable={pinnedSessions.length > 1}
                 workingSessionIdSet={workingSessionIdSet}
+              />
+            )}
+
+            {!trimmedQuery && (
+              <SidebarProjectsSection
+                buckets={groupBuckets}
+                kind="group"
+                label={s.groups.label}
+                onOpenChat={onResumeSession}
+                onToggle={() => setSidebarGroupsOpen(!groupsOpen)}
+                open={groupsOpen}
+                strings={s.groups}
               />
             )}
 
