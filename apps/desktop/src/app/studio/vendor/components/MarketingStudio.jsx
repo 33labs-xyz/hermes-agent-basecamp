@@ -172,7 +172,7 @@ function Dropdown({ isOpen, title, items, selectedId, onSelect, onClose, isVideo
         {items.map(item => (
           <div 
             key={item.id}
-            onClick={() => onSelect(item)}
+            onClick={() => { onSelect(item); onClose(); }}
             className={`relative rounded overflow-hidden border-2 transition-all group cursor-pointer ${
               selectedId === item.id || selectedId === item.url ? 'border-primary shadow-glow' : 'border-white/5 hover:border-white/20'
             }`}
