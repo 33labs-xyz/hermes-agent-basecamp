@@ -51,6 +51,20 @@ export function titlebarControlsReservation(measuredWidth: number, fallbackButto
   return `calc(${fallbackButtonCount} * (var(--titlebar-control-size) + ${TITLEBAR_TOOL_GAP_REM}rem))`
 }
 
+// Resolve the left titlebar control cluster position from the authoritative
+// window connection. Only a genuine main-process fullscreen (reported as
+// `connection.isFullscreen`) hides the macOS traffic lights; a *maximized*
+// window fills the whole screen yet keeps the lights visible. The renderer must
+// therefore derive fullscreen solely from this signal, never from viewport
+// size, which can't tell maximized from fullscreen and would slide the cluster
+// on top of the still-visible lights. A null/undefined connection (bootstrap,
+// before the first state lands) falls back to the macOS lights-visible layout.
+export function titlebarControlsForConnection(
+  connection: Pick<HermesConnection, 'isFullscreen' | 'windowButtonPosition'> | null | undefined
+) {
+  return titlebarControlsPosition(connection?.windowButtonPosition, Boolean(connection?.isFullscreen))
+}
+
 export function titlebarControlsPosition(
   windowButtonPosition: HermesConnection['windowButtonPosition'] | undefined,
   isFullscreen = false

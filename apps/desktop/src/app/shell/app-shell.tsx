@@ -1,6 +1,5 @@
 import { useStore } from '@nanostores/react'
 import type { CSSProperties, ReactNode } from 'react'
-import { useSyncExternalStore } from 'react'
 
 import { NotificationStack } from '@/components/notifications'
 import { PaneShell } from '@/components/pane-shell'
@@ -24,7 +23,7 @@ import { SIDEBAR_COLLAPSE_MEDIA_QUERY } from '../layout-constants'
 
 import { KeybindPanel } from './keybind-panel'
 import { StatusbarControls, type StatusbarItem } from './statusbar-controls'
-import { TITLEBAR_HEIGHT, titlebarControlsPosition, titlebarControlsReservation } from './titlebar'
+import { TITLEBAR_HEIGHT, titlebarControlsForConnection, titlebarControlsReservation } from './titlebar'
 import { TitlebarControls, type TitlebarTool } from './titlebar-controls'
 
 interface AppShellProps {
@@ -47,21 +46,6 @@ interface AppShellProps {
   titlebarTools?: readonly TitlebarTool[]
 }
 
-// Renderer-side fallback so layout snaps even when the main-process fullscreen event
-// hasn't landed yet (e.g. dev reloads, before the IPC bridge is wired).
-function subscribeWindowSize(cb: () => void) {
-  window.addEventListener('resize', cb)
-  window.addEventListener('fullscreenchange', cb)
-
-  return () => {
-    window.removeEventListener('resize', cb)
-    window.removeEventListener('fullscreenchange', cb)
-  }
-}
-
-const viewportIsFullscreen = () =>
-  window.innerWidth >= window.screen.width && window.innerHeight >= window.screen.height
-
 export function AppShell({
   children,
   leftStatusbarItems,
@@ -81,13 +65,11 @@ export function AppShell({
   const fileBrowserWidthOverride = useStore($paneWidthOverride(FILE_BROWSER_PANE_ID))
   const titlebarControlsWidthPx = useStore($titlebarControlsWidth)
   const connection = useStore($connection)
-  const viewportFullscreen = useSyncExternalStore(subscribeWindowSize, viewportIsFullscreen, () => false)
-  const isFullscreen = Boolean(connection?.isFullscreen) || viewportFullscreen
   // Every secondary window (new-session scratch, subagent watch, cmd-click
   // pop-out) is a compact side panel — none of them carry the full titlebar
   // tool cluster. Gate on isSecondaryWindow, never the narrower new-session flag.
   const hideTitlebarControls = isSecondaryWindow()
-  const titlebarControls = titlebarControlsPosition(connection?.windowButtonPosition, isFullscreen)
+  const titlebarControls = titlebarControlsForConnection(connection)
   // Width Windows/Linux reserve for the OS-painted min/max/close overlay (zero
   // on macOS, where window controls sit on the left and are reported via
   // windowButtonPosition instead). The right tool cluster has to clear them.

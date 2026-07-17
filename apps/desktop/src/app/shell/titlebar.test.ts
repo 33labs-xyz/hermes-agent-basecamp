@@ -4,6 +4,7 @@ import {
   TITLEBAR_CONTROL_OFFSET_X,
   TITLEBAR_EDGE_INSET,
   TITLEBAR_FALLBACK_WINDOW_BUTTON_X,
+  titlebarControlsForConnection,
   titlebarControlsPosition,
   titlebarControlsReservation
 } from './titlebar'
@@ -23,6 +24,35 @@ describe('titlebarControlsPosition', () => {
 
   it('uses the macOS fallback while the initial window state is unknown', () => {
     expect(titlebarControlsPosition(undefined).left).toBe(TITLEBAR_FALLBACK_WINDOW_BUTTON_X + TITLEBAR_CONTROL_OFFSET_X)
+  })
+})
+
+describe('titlebarControlsForConnection', () => {
+  it('dodges the visible traffic lights for a maximized (non-fullscreen) macOS window', () => {
+    // A maximized window fills the whole screen but is NOT fullscreen, so the
+    // macOS traffic lights stay visible. The cluster position must come from the
+    // authoritative connection.isFullscreen (false here), never from viewport
+    // size - inferring fullscreen from a screen-filling viewport is exactly what
+    // slid the cluster onto the still-visible lights.
+    expect(
+      titlebarControlsForConnection({ windowButtonPosition: { x: 24, y: 10 }, isFullscreen: false }).left
+    ).toBe(24 + TITLEBAR_CONTROL_OFFSET_X)
+  })
+
+  it('pins to the edge only when the window is genuinely fullscreen', () => {
+    expect(
+      titlebarControlsForConnection({ windowButtonPosition: { x: 24, y: 10 }, isFullscreen: true }).left
+    ).toBe(TITLEBAR_EDGE_INSET)
+  })
+
+  it('uses the macOS fallback while the connection is still unknown', () => {
+    expect(titlebarControlsForConnection(null).left).toBe(TITLEBAR_FALLBACK_WINDOW_BUTTON_X + TITLEBAR_CONTROL_OFFSET_X)
+  })
+
+  it('pins to the edge on Windows/Linux where native controls render on the right', () => {
+    expect(titlebarControlsForConnection({ windowButtonPosition: null, isFullscreen: false }).left).toBe(
+      TITLEBAR_EDGE_INSET
+    )
   })
 })
 
