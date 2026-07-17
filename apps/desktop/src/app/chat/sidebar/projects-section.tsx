@@ -40,12 +40,13 @@ import {
   ensureProjectMemberSessions,
   reorderProjects
 } from '@/store/projects'
-import { $cronSessions, $selectedStoredSessionId, $sessions } from '@/store/session'
+import { $cronSessions, $selectedStoredSessionId, $sessions, $workingSessionIds } from '@/store/session'
 
 import { projectRoute, PROJECTS_ROUTE } from '../../routes'
 import { SidebarPanelLabel } from '../../shell/sidebar-label'
 
 import { ProjectSettingsDialog } from './project-dialog'
+import { SidebarRowDot } from './session-row'
 
 export interface SectionStrings {
   add: string
@@ -81,6 +82,8 @@ export function SidebarProjectsSection({
   const handleOpenProject = (groupId: string) => navigate(projectRoute(groupId))
   const sessions = useStore($sessions)
   const cronSessions = useStore($cronSessions)
+  const workingSessionIds = useStore($workingSessionIds)
+  const workingSessionIdSet = useMemo(() => new Set(workingSessionIds), [workingSessionIds])
   // Distance constraint so a tap-to-open click on a row isn't swallowed by the
   // drag sensor; only a real drag past 4px starts a reorder.
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }))
@@ -197,6 +200,7 @@ export function SidebarProjectsSection({
                     sessionById={sessionById}
                     sessionMeta={sessionMeta}
                     strings={strings}
+                    workingSessionIdSet={workingSessionIdSet}
                   />
                 ))}
               </SortableContext>
@@ -234,7 +238,8 @@ function ProjectRow({
   project,
   sessionById,
   sessionMeta,
-  strings
+  strings,
+  workingSessionIdSet
 }: {
   expanded: boolean
   onDelete: () => void
@@ -246,11 +251,13 @@ function ProjectRow({
   sessionById: Map<string, SessionInfo>
   sessionMeta: Record<string, null | SessionInfo>
   strings: SectionStrings
+  workingSessionIdSet: Set<string>
 }) {
   const { t } = useI18n()
   const p = t.sidebar.projects
   const selectedSessionId = useStore($selectedStoredSessionId)
   const count = project.session_ids.length
+  const hasWorkingSession = project.session_ids.some(id => workingSessionIdSet.has(id))
   // Whole row is the drag handle (distance-constrained sensor keeps clicks working).
   // Vertical list: translate Y only so a dragged row never drifts sideways.
   const { attributes, isDragging, listeners, setNodeRef, transform, transition } = useSortable({ id: project.id })
@@ -308,8 +315,13 @@ function ProjectRow({
           title={project.name}
           type="button"
         >
-          <span className="grid w-3.5 shrink-0 place-items-center">
+          <span className="relative grid w-3.5 shrink-0 place-items-center">
             <Codicon className="text-(--ui-text-tertiary)" name="folder" size="0.75rem" />
+            {hasWorkingSession && (
+              <span className="absolute -bottom-0.5 -right-0.5">
+                <SidebarRowDot isWorking />
+              </span>
+            )}
           </span>
           <span className="min-w-0 truncate text-[0.8125rem] text-(--ui-text-secondary) group-hover/project:text-foreground">
             {project.name}
@@ -367,10 +379,12 @@ function ProjectRow({
                 t.sidebar.row.untitledPlaceholder
               )
 
+              const isSessionWorking = workingSessionIdSet.has(sessionId)
+
               return (
                 <button
                   className={cn(
-                    'truncate rounded-md px-1.5 py-0.5 text-left text-[0.6875rem] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40',
+                    'flex min-w-0 items-center gap-1.5 rounded-md px-1.5 py-0.5 text-left text-[0.6875rem] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40',
                     sessionId === selectedSessionId
                       ? 'bg-(--ui-row-active-background) text-foreground'
                       : 'text-(--ui-text-secondary) hover:bg-(--chrome-action-hover) hover:text-foreground'
@@ -387,7 +401,10 @@ function ProjectRow({
                   }
                   type="button"
                 >
-                  {title}
+                  <span className="grid w-2 shrink-0 place-items-center">
+                    {isSessionWorking && <SidebarRowDot isWorking />}
+                  </span>
+                  <span className="min-w-0 truncate">{title}</span>
                 </button>
               )
             })

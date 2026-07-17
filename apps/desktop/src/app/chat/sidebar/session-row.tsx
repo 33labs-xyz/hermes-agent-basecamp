@@ -238,7 +238,7 @@ export function SidebarSessionRow({
   )
 }
 
-function SidebarRowDot({
+export function SidebarRowDot({
   isWorking,
   needsInput = false,
   className

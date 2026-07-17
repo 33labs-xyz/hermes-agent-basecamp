@@ -1,14 +1,25 @@
 import { useEffect, useMemo, useState } from 'react'
 
+import { ZoomableImage } from '@/components/chat/zoomable-image'
 import { Button } from '@/components/ui/button'
 import { Codicon } from '@/components/ui/codicon'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
+import { Dialog, DialogContent } from '@/components/ui/dialog'
 import type { StudioGenerationEntry } from '@/global'
+import { useImageDownload } from '@/hooks/use-image-download'
 import { cn } from '@/lib/utils'
 
 import { PAGE_INSET_X } from '../../layout-constants'
 
 import { loadGenerationDataUrl, useGenerations } from './use-generations'
+
+// Reveal the generation's file in the OS file manager, same action Artifacts
+// offers for local files.
+function revealGeneration(entry: StudioGenerationEntry) {
+  if (entry.path) {
+    void window.hermesDesktop?.showItemInFolder?.(entry.path)
+  }
+}
 
 // Local generation manager. Auto-saved results land here grouped by folder.
 // Easy delete = archive (reversible); permanent delete is archive-gated behind
@@ -132,6 +143,8 @@ interface GenerationCardProps {
 function GenerationCard({ entry, archived, onArchive, onRestore, onDeleteForever }: GenerationCardProps) {
   const dataUrl = useGenerationPreview(entry.path)
   const [promptCopied, setPromptCopied] = useState(false)
+  const [videoLightboxOpen, setVideoLightboxOpen] = useState(false)
+  const { download: downloadVideo } = useImageDownload(entry.kind === 'video' ? dataUrl : undefined)
 
   const copyPrompt = () => {
     if (!entry.prompt) {return}
@@ -144,10 +157,30 @@ function GenerationCard({ entry, archived, onArchive, onRestore, onDeleteForever
   return (
     <div className="group relative overflow-hidden rounded-[4px] border border-border bg-(--ui-bg-tertiary)">
       <div className="flex aspect-square items-center justify-center overflow-hidden">
-        <GenerationMedia dataUrl={dataUrl} kind={entry.kind} />
+        <GenerationMedia dataUrl={dataUrl} entry={entry} />
       </div>
 
       <div className="pointer-events-none absolute inset-x-0 top-0 flex justify-end gap-1 p-1 opacity-0 transition-opacity group-hover:opacity-100">
+        {entry.kind === 'video' && dataUrl && (
+          <button
+            aria-label="Expand video"
+            className="pointer-events-auto rounded-[3px] bg-black/60 p-1 text-white hover:bg-black/80"
+            onClick={() => setVideoLightboxOpen(true)}
+            type="button"
+          >
+            <Codicon name="screen-full" />
+          </button>
+        )}
+        {entry.path && (
+          <button
+            aria-label="Show in folder"
+            className="pointer-events-auto rounded-[3px] bg-black/60 p-1 text-white hover:bg-black/80"
+            onClick={() => revealGeneration(entry)}
+            type="button"
+          >
+            <Codicon name="folder-opened" />
+          </button>
+        )}
         {entry.prompt && (
           <button
             aria-label="Copy prompt"
@@ -194,11 +227,27 @@ function GenerationCard({ entry, archived, onArchive, onRestore, onDeleteForever
           {entry.prompt}
         </div>
       )}
+
+      {entry.kind === 'video' && dataUrl && (
+        <Dialog onOpenChange={setVideoLightboxOpen} open={videoLightboxOpen}>
+          <DialogContent className="max-w-3xl gap-3 p-4">
+            <video autoPlay className="max-h-[70vh] w-full rounded-md" controls src={dataUrl} />
+            <div className="flex justify-end gap-2">
+              <Button onClick={() => void downloadVideo()} size="xs" type="button" variant="textStrong">
+                <Codicon name="cloud-download" />
+                Download
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   )
 }
 
-function GenerationMedia({ dataUrl, kind }: { dataUrl: string; kind: StudioGenerationEntry['kind'] }) {
+function GenerationMedia({ dataUrl, entry }: { dataUrl: string; entry: StudioGenerationEntry }) {
+  const { kind } = entry
+
   if (!dataUrl) {
     return <Codicon className="text-(--ui-text-tertiary)" name={iconForKind(kind)} />
   }
@@ -216,7 +265,14 @@ function GenerationMedia({ dataUrl, kind }: { dataUrl: string; kind: StudioGener
     )
   }
 
-  return <img alt="" className="size-full object-cover" src={dataUrl} />
+  return (
+    <ZoomableImage
+      alt={entry.prompt || ''}
+      className="size-full cursor-zoom-in object-cover"
+      containerClassName="size-full"
+      src={dataUrl}
+    />
+  )
 }
 
 function iconForKind(kind: StudioGenerationEntry['kind']): string {
