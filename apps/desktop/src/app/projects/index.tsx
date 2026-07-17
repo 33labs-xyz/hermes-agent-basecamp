@@ -1338,7 +1338,8 @@ function ChatsSection({ project }: { project: ChatGroup }) {
             {p.noChats}
           </p>
         ) : (
-          project.session_ids.map(sessionId => {
+          // Newest membership last in session_ids (appended on assign); show newest first.
+          [...project.session_ids].reverse().map(sessionId => {
             const session = sessionById.get(sessionId)
 
             const title = projectMemberTitle(

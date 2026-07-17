@@ -357,7 +357,8 @@ function ProjectRow({
           {count === 0 ? (
             <div className="py-1 pl-1 text-[0.6875rem] text-(--ui-text-tertiary)">{strings.noChats}</div>
           ) : (
-            project.session_ids.map(sessionId => {
+            // Newest membership last in session_ids (appended on assign); show newest first.
+            [...project.session_ids].reverse().map(sessionId => {
               const session = sessionById.get(sessionId)
 
               const title = projectMemberTitle(
