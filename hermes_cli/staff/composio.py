@@ -43,7 +43,41 @@ class ComposioError(RuntimeError):
     """Any failure talking to the Composio API or relay (network, auth, bad payload)."""
 
 
+def _settings_env_value(name: str) -> Optional[str]:
+    """Read a value straight from the Settings ``.env`` at HERMES_HOME.
+
+    The pasted-in-Settings key is authoritative: the dashboard process writes
+    it to ``.env`` via ``save_env_value``, but long-lived subprocesses (e.g.
+    ``tui_gateway.slash_worker``) keep their boot-time ``os.environ`` snapshot
+    and never see the save. Reading the file at call time makes the key the
+    user pasted the one Basecamp actually references, regardless of any stale
+    snapshot a worker still holds. Returns None if the file is missing,
+    unreadable, or has no such entry.
+    """
+    try:
+        from hermes_constants import get_hermes_home
+
+        env_path = get_hermes_home() / ".env"
+        text = env_path.read_text(encoding="utf-8")
+    except (OSError, ImportError):
+        return None
+
+    for line in text.splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        if key.strip() == name:
+            value = value.strip()
+            return value or None
+    return None
+
+
 def api_key() -> Optional[str]:
+    # Settings file wins over any stale os.environ snapshot a worker holds.
+    key = _settings_env_value("COMPOSIO_API_KEY")
+    if key:
+        return key
     key = os.environ.get("COMPOSIO_API_KEY", "").strip()
     return key or None
 

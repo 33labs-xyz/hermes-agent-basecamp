@@ -20,9 +20,12 @@ from hermes_cli.staff import composio
 
 
 @pytest.fixture(autouse=True)
-def _clean_env(monkeypatch):
+def _clean_env(monkeypatch, tmp_path):
     monkeypatch.delenv("COMPOSIO_API_KEY", raising=False)
     monkeypatch.delenv("BASECAMP_RELAY_URL", raising=False)
+    # Isolate HERMES_HOME so api_key()'s Settings-file read never touches the
+    # developer's real ~/.basecamp/.env during unit tests.
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
 
 
 class FakeRequest:
@@ -184,6 +187,50 @@ def test_saved_key_activates_direct_mode_without_restart(tmp_path, monkeypatch):
 
     assert composio.api_key() == "ck_live_test"
     assert composio.mode() == "direct"
+
+
+def test_settings_file_key_wins_over_stale_env(tmp_path, monkeypatch):
+    """The key pasted into Settings (on disk) beats a stale process-env value.
+
+    The agent runtime runs in a long-lived worker subprocess that snapshots
+    ``os.environ`` at spawn. When the user pastes a new Composio key into
+    Settings, only the dashboard process's ``os.environ`` is updated; the
+    worker keeps its boot-time snapshot ("another hardcoded key"). Reading the
+    Settings .env fresh makes the pasted key authoritative so the stale
+    snapshot is never used.
+    """
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    (tmp_path / ".env").write_text("COMPOSIO_API_KEY=ck_from_settings\n")
+    # Simulate the worker's stale/other snapshot key living in os.environ.
+    monkeypatch.setenv("COMPOSIO_API_KEY", "ck_stale_snapshot")
+
+    assert composio.api_key() == "ck_from_settings"
+
+
+def test_settings_file_key_used_when_env_absent(tmp_path, monkeypatch):
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    (tmp_path / ".env").write_text("COMPOSIO_API_KEY=ck_from_settings\n")
+    monkeypatch.delenv("COMPOSIO_API_KEY", raising=False)
+
+    assert composio.api_key() == "ck_from_settings"
+
+
+def test_env_key_used_when_no_settings_file_entry(tmp_path, monkeypatch):
+    """With no Settings key on disk, the process env is the fallback source."""
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    (tmp_path / ".env").write_text("OTHER_VAR=1\n")
+    monkeypatch.setenv("COMPOSIO_API_KEY", "ck_from_env")
+
+    assert composio.api_key() == "ck_from_env"
+
+
+def test_blank_settings_file_key_falls_back_to_env(tmp_path, monkeypatch):
+    """A blank ``COMPOSIO_API_KEY=`` in Settings is not treated as an override."""
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    (tmp_path / ".env").write_text("COMPOSIO_API_KEY=\n")
+    monkeypatch.setenv("COMPOSIO_API_KEY", "ck_from_env")
+
+    assert composio.api_key() == "ck_from_env"
 
 
 def test_relay_base_url_strips_trailing_slash(monkeypatch):
