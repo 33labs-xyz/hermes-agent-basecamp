@@ -3032,7 +3032,17 @@ def _wire_callbacks(sid: str):
     from tools.terminal_tool import set_sudo_password_callback
     from tools.skills_tool import set_secret_capture_callback
 
-    set_sudo_password_callback(lambda: _block("sudo.request", sid, {}, timeout=120))
+    # SECURITY: the desktop gateway drives an agent that runs unsupervised on
+    # the tester's machine. It must NEVER interactively harvest the tester's
+    # real OS admin password. A refusing callback (returns "") keeps
+    # _transform_sudo_command from prompting AND stops it piping a password to
+    # sudo -S, so a privileged command fails gracefully ("sudo: a password is
+    # required") instead of running. A callback is still registered (rather
+    # than left None) so headless sudo can't fall through to the /dev/tty
+    # prompt and hang the gateway. Testers who deliberately opt in via a
+    # SUDO_PASSWORD env var or NOPASSWD sudoers are unaffected: both are
+    # consulted before this callback in _transform_sudo_command.
+    set_sudo_password_callback(lambda: "")
 
     def secret_cb(env_var, prompt, metadata=None):
         pl = {"prompt": prompt, "env_var": env_var}
