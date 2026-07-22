@@ -72,6 +72,7 @@ import { ContextMenu } from '../chat/composer/context-menu'
 import type { ChatBarState } from '../chat/composer/types'
 import { UrlDialog } from '../chat/composer/url-dialog'
 import { useComposerActions } from '../chat/hooks/use-composer-actions'
+import { extractComposerDropCandidates } from './composer-drop'
 import { ProjectSettingsDialog } from '../chat/sidebar/project-dialog'
 import { PageSearchShell } from '../page-search-shell'
 import { NEW_CHAT_ROUTE, projectRoute, PROJECTS_ROUTE, sessionRoute } from '../routes'
@@ -283,6 +284,7 @@ function ProjectComposer({ project }: { project: ChatGroup }) {
   const attachments = useStore($composerAttachments)
   const [urlOpen, setUrlOpen] = useState(false)
   const [urlValue, setUrlValue] = useState('')
+  const [dragActive, setDragActive] = useState(false)
   const urlInputRef = useRef<HTMLInputElement | null>(null)
 
   // The composer-attachments atom is global and shared with the chat composer.
@@ -349,8 +351,36 @@ function ProjectComposer({ project }: { project: ChatGroup }) {
     }
   }
 
+  // Electron detaches the drop DataTransfer the moment the handler returns, so
+  // candidates MUST be pulled out synchronously here before the async attach.
+  function onDrop(event: React.DragEvent<HTMLDivElement>) {
+    const candidates = extractComposerDropCandidates(event.dataTransfer)
+    setDragActive(false)
+
+    if (!candidates) {
+      return
+    }
+
+    event.preventDefault()
+    void composer.attachDroppedItems(candidates)
+  }
+
+  function onDragOver(event: React.DragEvent<HTMLDivElement>) {
+    if (extractComposerDropCandidates(event.dataTransfer)) {
+      event.preventDefault()
+    }
+  }
+
   return (
-    <div className="rounded-3xl border border-(--ui-divider) bg-(--ui-control-background) px-4 py-3.5 shadow-sm transition-colors focus-within:border-(--ui-stroke-tertiary)">
+    <div
+      className={cn(
+        'rounded-3xl border border-(--ui-divider) bg-(--ui-control-background) px-4 py-3.5 shadow-sm transition-colors focus-within:border-(--ui-stroke-tertiary)',
+        dragActive && 'border-(--ui-stroke-tertiary) ring-2 ring-(--ui-stroke-tertiary)'
+      )}
+      onDragEnter={() => setDragActive(true)}
+      onDragLeave={() => setDragActive(false)}
+      onDragOver={onDragOver}
+      onDrop={onDrop}>
       <Textarea
         className="min-h-[4.5rem] resize-none border-0 bg-transparent px-1 text-[0.9375rem] shadow-none focus-visible:ring-0"
         onChange={event => setText(event.target.value)}
