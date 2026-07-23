@@ -57,7 +57,7 @@ jobs:
         # of GH_TOKEN ("artifactCreatedWithoutExplicitPublishConfig"). We ship
         # via actions/upload-artifact below, not GitHub Releases, so disable
         # publishing entirely. (dist:win:nsis = build + electron-builder --win nsis.)
-        run: npm run build && npm run builder -- --win nsis --publish never
+        run: npm run build && npm run builder -- --win nsis zip --publish never
         env:
           # Unsigned tester build -- skip code-signing identity discovery so the
           # build never blocks on a missing certificate.
@@ -69,4 +69,13 @@ jobs:
           name: Basecamp-Setup-win-x64
           # electron-builder artifactName: Basecamp-${version}-win-x64.exe
           path: apps/desktop/release/Basecamp-*-win-x64.exe
+          if-no-files-found: error
+
+      # Portable ZIP: no installer step to fail. Testers unzip and run
+      # Basecamp.exe directly -- bypasses the NSIS/AV/lock mid-install failures.
+      - name: Upload portable ZIP
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: Basecamp-portable-win-x64
+          path: apps/desktop/release/Basecamp-*-win-x64.zip
           if-no-files-found: error

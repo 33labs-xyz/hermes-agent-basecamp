@@ -252,7 +252,8 @@
       "legalTrademarks": "Basecamp",
       "target": [
         "nsis",
-        "msi"
+        "msi",
+        "zip"
       ],
       "signAndEditExecutable": false
     },
