@@ -54,6 +54,36 @@ Windows ships unsigned for now (testers click past one SmartScreen warning).
    `latest.yml` metadata files that electron-updater reads. Both OS builds
    publish to the same GitHub release for that version.
 
+   ### Intel (x64) Macs — multi-arch auto-update
+
+   The primary Mac build is arm64 (Apple Silicon). Intel Macs can install the
+   x64 dmg fine, but they can only **auto-update** if `latest-mac.yml` lists an
+   x64 artifact too. electron-builder emits a *single-arch* `latest-mac.yml`
+   (whichever arch built last overwrites it), so an arm64-only build leaves
+   Intel testers stuck. electron-updater picks the correct file per architecture
+   (`MacUpdater.filterFilesForArch` — arm64 Macs keep arm64 files, x64 Macs drop
+   them), so a combined manifest is safe for both.
+
+   To ship both arches, build x64 as a cross-build from the arm64 host, then
+   merge the manifests **without** `--publish` (so electron-builder's single-arch
+   `latest-mac.yml` doesn't clobber the combined one), and upload manually:
+
+   ```bash
+   # arm64 (host) + x64 (cross) + combined latest-mac.yml, all in release/
+   npm run dist:mac:multiarch
+   # -> release/ now has -mac-arm64.{zip,dmg}, -mac-x64.{zip,dmg}, and a
+   #    latest-mac.yml listing BOTH arch zips (arm64 stays the primary path:).
+   # Then upload every release/*-mac-*.{zip,dmg} + latest-mac.yml to the GitHub
+   # release with `gh release upload` (one-shot alongside the Windows assets).
+   ```
+
+   `merge:mac:latest` regenerates `release/latest-mac.yml` from whatever
+   `-mac-*.zip`/`-mac-*.dmg` files are present, recomputing each `sha512`
+   (base64 of the raw SHA-512 digest) + byte size and preserving the existing
+   `version` + `releaseDate`. Run `scripts/merge-mac-latest.mjs --check <zip>
+   <expected-sha512>` to sanity-check the hash algorithm against a known-good
+   entry. Covered by `scripts/merge-mac-latest.test.mjs` (`node --test`).
+
 3. The GitHub release can stay a draft while you test, then **Publish** it. Once
    published, every installed tester app notices on next launch (or via
    "Check for Updates" in the menu) and offers Restart Now.
