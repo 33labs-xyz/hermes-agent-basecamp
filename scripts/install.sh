@@ -43,8 +43,14 @@ NC='\033[0m' # No Color
 BOLD='\033[1m'
 
 # Configuration
-REPO_URL_SSH="git@github.com:33labs-xyz/hermes-agent-basecamp.git"
-REPO_URL_HTTPS="https://github.com/33labs-xyz/hermes-agent-basecamp.git"
+REPO_SLUG="33labs-xyz/hermes-agent-basecamp"
+REPO_URL_SSH="git@github.com:${REPO_SLUG}.git"
+REPO_URL_HTTPS="https://github.com/${REPO_SLUG}.git"
+# Set by check_git(); clone_repo() downloads a source tarball when it's false.
+GIT_AVAILABLE=true
+# Records the ref a tarball install came from, so a later run recognises the
+# directory as ours (a tarball install has no .git to identify it by).
+TARBALL_MARKER=".basecamp-source"
 HERMES_HOME="${HERMES_HOME:-$HOME/.hermes}"
 # INSTALL_DIR is resolved AFTER arg parsing and OS detection so we can pick an
 # FHS-style layout for root installs.  Track whether the user gave us an
@@ -516,7 +522,7 @@ install_uv() {
     local _uv_install_log _uv_installer
     _uv_install_log="$(mktemp 2>/dev/null || echo "/tmp/hermes-uv-install.$$.log")"
     _uv_installer="$(mktemp 2>/dev/null || echo "/tmp/hermes-uv-installer.$$.sh")"
-    if ! curl -LsSf https://astral.sh/uv/install.sh -o "$_uv_installer" 2>"$_uv_install_log"; then
+    if ! curl -LsSf --connect-timeout 30 --max-time 300 https://astral.sh/uv/install.sh -o "$_uv_installer" 2>"$_uv_install_log"; then
         log_error "Failed to download uv installer from https://astral.sh/uv/install.sh"
         log_info "curl output:"
         sed 's/^/    /' "$_uv_install_log" >&2
@@ -594,39 +600,26 @@ check_python() {
 }
 
 # Best-effort automatic git provisioning, mirroring install.ps1's Install-Git
-# (which downloads PortableGit on Windows). git is required to clone the repo,
-# and a fresh "normie" machine with no developer tools won't have it. Returns 0
-# if git is available afterwards, non-zero otherwise (caller prints manual
-# instructions and aborts).
+# (which downloads PortableGit on Windows). Only headless package-manager paths
+# belong here: anything that needs a human to click a dialog blocks the desktop
+# bootstrap runner forever, since it spawns this script with no timeout.
+# Returns 0 if git is available afterwards, non-zero otherwise (the caller then
+# falls back to the git-free tarball download).
 attempt_install_git() {
     case "$OS" in
         macos)
-            # Prefer Homebrew — fully headless when present.
+            # Homebrew only — fully headless when present. We deliberately do
+            # NOT trigger the Apple Command Line Tools installer: it
+            # pops a system dialog Apple gates behind a user click (it cannot
+            # be silenced without MDM). Testers on a bare Mac saw that dialog
+            # open behind the app window, and the installer then burned 15
+            # minutes polling for a git that never arrived. clone_repo()
+            # fetches a tarball with curl + tar instead, both of which ship in
+            # /usr/bin on every macOS and need no developer tools.
             if command -v brew >/dev/null 2>&1; then
                 log_info "Installing Git via Homebrew..."
                 brew install git >/dev/null 2>&1 || true
                 command -v git >/dev/null 2>&1 && return 0
-            fi
-            # Fall back to Apple Command Line Tools, which provide git AND the
-            # compiler some Python wheels need. `xcode-select --install` pops a
-            # system dialog (Apple gates CLT behind it — it cannot be fully
-            # silent without MDM), so we trigger it and poll for git to appear.
-            if command -v xcode-select >/dev/null 2>&1; then
-                log_info "Requesting Apple Command Line Tools (provides git + compiler)..."
-                log_info "If a macOS dialog appears, click \"Install\" and accept the license."
-                xcode-select --install >/dev/null 2>&1 || true
-                local waited=0
-                local timeout=900
-                while [ "$waited" -lt "$timeout" ]; do
-                    if command -v git >/dev/null 2>&1 && git --version >/dev/null 2>&1; then
-                        return 0
-                    fi
-                    sleep 5
-                    waited=$((waited + 5))
-                    if [ $((waited % 60)) -eq 0 ]; then
-                        log_info "Still waiting for Command Line Tools install ($((waited / 60))m)..."
-                    fi
-                done
             fi
             return 1
             ;;
@@ -662,15 +655,17 @@ attempt_install_git() {
 
 check_git() {
     log_info "Checking Git..."
+    GIT_AVAILABLE=false
 
     # On fresh macOS /usr/bin/git is a stub that exits non-zero until CLT is installed.
     if command -v git &> /dev/null && git --version &> /dev/null; then
         GIT_VERSION=$(git --version | awk '{print $3}')
         log_success "Git $GIT_VERSION found"
+        GIT_AVAILABLE=true
         return 0
     fi
 
-    log_error "Git not found"
+    log_warn "Git not found"
 
     if [ "$DISTRO" = "termux" ]; then
         log_info "Installing Git via pkg..."
@@ -678,19 +673,26 @@ check_git() {
         if command -v git >/dev/null 2>&1; then
             GIT_VERSION=$(git --version | awk '{print $3}')
             log_success "Git $GIT_VERSION installed"
+            GIT_AVAILABLE=true
             return 0
         fi
     fi
 
-    # Try to install it automatically before giving up (parity with install.ps1).
+    # Try the headless package-manager paths before giving up (parity with
+    # install.ps1's PortableGit download).
     log_info "Attempting to install Git automatically..."
     if attempt_install_git; then
         GIT_VERSION=$(git --version | awk '{print $3}')
         log_success "Git $GIT_VERSION installed"
+        GIT_AVAILABLE=true
         return 0
     fi
 
-    log_warn "Could not install Git automatically. Please install it manually:"
+    # Missing git is no longer fatal: clone_repo() downloads a source tarball
+    # with curl + tar instead. Installing git later upgrades the install
+    # directory to a real checkout on the next run.
+    log_info "Continuing without Git — the app source will be downloaded directly."
+    log_info "To get incremental updates later, install Git:"
 
     case "$OS" in
         linux)
@@ -718,7 +720,7 @@ check_git() {
             ;;
     esac
 
-    exit 1
+    return 0
 }
 
 # The desktop build runs Vite ^8, which refuses to start on Node outside
@@ -813,13 +815,13 @@ install_node() {
     # Resolve the latest v22.x.x tarball name from the index page
     local index_url="https://nodejs.org/dist/latest-v${NODE_VERSION}.x/"
     local tarball_name
-    tarball_name=$(curl -fsSL "$index_url" \
+    tarball_name=$(curl -fsSL --connect-timeout 30 --max-time 120 "$index_url" \
         | grep -oE "node-v${NODE_VERSION}\.[0-9]+\.[0-9]+-${node_os}-${node_arch}\.tar\.xz" \
         | head -1)
 
     # Fallback to .tar.gz if .tar.xz not available
     if [ -z "$tarball_name" ]; then
-        tarball_name=$(curl -fsSL "$index_url" \
+        tarball_name=$(curl -fsSL --connect-timeout 30 --max-time 120 "$index_url" \
             | grep -oE "node-v${NODE_VERSION}\.[0-9]+\.[0-9]+-${node_os}-${node_arch}\.tar\.gz" \
             | head -1)
     fi
@@ -836,7 +838,7 @@ install_node() {
     tmp_dir=$(mktemp -d)
 
     log_info "Downloading $tarball_name..."
-    if ! curl -fsSL "$download_url" -o "$tmp_dir/$tarball_name"; then
+    if ! curl -fsSL --connect-timeout 30 --max-time 900 "$download_url" -o "$tmp_dir/$tarball_name"; then
         log_warn "Download failed"
         rm -rf "$tmp_dir"
         HAS_NODE=false
@@ -898,7 +900,7 @@ check_network_prerequisites() {
     fi
 
     for url in "${checks[@]}"; do
-        if ! curl -fsSI --max-time 8 "$url" >/dev/null 2>&1; then
+        if ! curl -fsSI --connect-timeout 8 --max-time 8 "$url" >/dev/null 2>&1; then
             failed=true
             log_warn "Could not reach $url"
         fi
@@ -1115,8 +1117,73 @@ show_manual_install_hint() {
 # Installation
 # ============================================================================
 
+# Fetch the repo as a source tarball instead of cloning it. curl and tar live
+# in /usr/bin on every macOS and in the base image of every supported Linux, so
+# this path needs no git and no Xcode Command Line Tools — the difference
+# between a one-click install and a tester stuck on a dialog they can't see.
+# Populates $INSTALL_DIR and drops $TARBALL_MARKER recording the ref.
+download_repo_tarball() {
+    local ref="${INSTALL_COMMIT:-refs/heads/$BRANCH}"
+    local url="https://codeload.github.com/${REPO_SLUG}/tar.gz/${ref}"
+    local tmp_dir
+    tmp_dir=$(mktemp -d) || return 1
+
+    log_info "Downloading source (${ref})..."
+    if ! curl -fsSL --connect-timeout 30 --max-time 900 "$url" -o "$tmp_dir/repo.tar.gz"; then
+        log_error "Failed to download source from $url"
+        rm -rf "$tmp_dir"
+        return 1
+    fi
+
+    # GitHub wraps everything in a single <repo>-<ref>/ directory. Strip it so
+    # the contents land at the root of INSTALL_DIR, matching a git clone.
+    mkdir -p "$tmp_dir/extract"
+    if ! tar -xzf "$tmp_dir/repo.tar.gz" -C "$tmp_dir/extract" --strip-components=1; then
+        log_error "Failed to extract source archive"
+        rm -rf "$tmp_dir"
+        return 1
+    fi
+
+    mkdir -p "$(dirname "$INSTALL_DIR")"
+    rm -rf "$INSTALL_DIR"
+    if ! mv "$tmp_dir/extract" "$INSTALL_DIR"; then
+        log_error "Failed to move source into $INSTALL_DIR"
+        rm -rf "$tmp_dir"
+        return 1
+    fi
+
+    printf '%s\n' "$ref" > "$INSTALL_DIR/$TARBALL_MARKER"
+    rm -rf "$tmp_dir"
+    log_success "Source downloaded"
+    return 0
+}
+
 clone_repo() {
     log_info "Installing to $INSTALL_DIR..."
+
+    # No git: download the source instead. Re-downloading is also how a tarball
+    # install updates — there is no incremental path without a checkout.
+    if [ "$GIT_AVAILABLE" != true ]; then
+        if [ -d "$INSTALL_DIR" ] && [ ! -f "$INSTALL_DIR/$TARBALL_MARKER" ] && [ ! -d "$INSTALL_DIR/.git" ]; then
+            log_error "Directory exists but was not created by this installer: $INSTALL_DIR"
+            log_info "Remove it or choose a different directory with --dir"
+            exit 1
+        fi
+        if ! download_repo_tarball; then
+            exit 1
+        fi
+        cd "$INSTALL_DIR"
+        log_success "Repository ready"
+        return 0
+    fi
+
+    # git is available but the existing directory came from a tarball install
+    # (no .git). Replace it with a real checkout so future updates are
+    # incremental — the tarball carries no local edits worth preserving.
+    if [ -d "$INSTALL_DIR" ] && [ ! -d "$INSTALL_DIR/.git" ] && [ -f "$INSTALL_DIR/$TARBALL_MARKER" ]; then
+        log_info "Upgrading downloaded source at $INSTALL_DIR to a git checkout..."
+        rm -rf "$INSTALL_DIR"
+    fi
 
     # An interrupted previous clone leaves a .git with no initial commit, where
     # the update path's `git stash` / `git checkout` abort with "You do not

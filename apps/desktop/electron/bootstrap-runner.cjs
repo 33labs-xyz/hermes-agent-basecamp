@@ -288,7 +288,7 @@ function resolveWindowsPowerShell() {
   return 'powershell.exe'
 }
 
-function spawnPowerShell(scriptPath, args, { emit, stageName, abortSignal, hermesHome } = {}) {
+function spawnPowerShell(scriptPath, args, { emit, stageName, abortSignal, hermesHome, stallTimeoutMs } = {}) {
   return new Promise((resolve, reject) => {
     const ps = process.platform === 'win32' ? resolveWindowsPowerShell() : 'pwsh'
     const fullArgs = ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', scriptPath, ...args]
@@ -323,12 +323,15 @@ function spawnPowerShell(scriptPath, args, { emit, stageName, abortSignal, herme
       }
     }
 
+    const watchdog = createStallWatchdog({ child, emit, stageName, stallTimeoutMs })
+
     child.stdout.setEncoding('utf8')
     child.stderr.setEncoding('utf8')
 
     // Stream stdout line-by-line so the renderer sees progress in real time.
     let stdoutBuf = ''
     child.stdout.on('data', chunk => {
+      watchdog.touch()
       stdout += chunk
       stdoutBuf += chunk
       let nl
@@ -341,6 +344,7 @@ function spawnPowerShell(scriptPath, args, { emit, stageName, abortSignal, herme
 
     let stderrBuf = ''
     child.stderr.on('data', chunk => {
+      watchdog.touch()
       stderr += chunk
       stderrBuf += chunk
       let nl
@@ -352,21 +356,101 @@ function spawnPowerShell(scriptPath, args, { emit, stageName, abortSignal, herme
     })
 
     child.on('error', err => {
+      watchdog.stop()
       if (abortSignal) abortSignal.removeEventListener('abort', onAbort)
       reject(err)
     })
 
     child.on('close', (code, signal) => {
+      watchdog.stop()
       if (abortSignal) abortSignal.removeEventListener('abort', onAbort)
       // Flush any trailing bytes
       if (stdoutBuf) emit && emit({ type: 'log', stage: stageName, line: stdoutBuf, stream: 'stdout' })
       if (stderrBuf) emit && emit({ type: 'log', stage: stageName, line: stderrBuf, stream: 'stderr' })
-      resolve({ stdout, stderr, code, signal, killed })
+      const result = { stdout, stderr, code, signal, killed: killed || watchdog.stalled }
+      if (watchdog.stalled) result.stalled = true
+      resolve(result)
     })
   })
 }
 
-function spawnBash(scriptPath, args, { emit, stageName, abortSignal, hermesHome } = {}) {
+// How long a stage may go without printing anything before we treat it as
+// wedged. Every stage narrates its work, but a slow link can leave real gaps
+// mid-download, so this is generous: it exists to convert an infinite hang
+// into a legible failure, not to police stage duration.
+const STAGE_STALL_TIMEOUT_MS = 10 * 60 * 1000
+// Grace between SIGTERM and SIGKILL for a child that ignores the polite ask.
+const STALL_KILL_GRACE_MS = 5000
+
+function describeDuration(ms) {
+  const minutes = Math.max(1, Math.round(ms / 60000))
+  return `${minutes} minute${minutes === 1 ? '' : 's'}`
+}
+
+// The message the user reads when a stage is killed for stalling. It has one
+// job: say which stage died, that it died from silence rather than an error,
+// and where the full log is.
+function stallErrorMessage(stageName, stallTimeoutMs, logPath) {
+  const base =
+    `The "${stageName}" step stopped responding — no output for ${describeDuration(stallTimeoutMs)}, so it was cancelled. ` +
+    'This usually means it was waiting on something that never arrived (a system dialog, or a download that never started).'
+  return logPath ? `${base} Full log: ${logPath}` : base
+}
+
+// Watches one bootstrap child for silence. Every stage narrates its work, so a
+// long gap with no output means the child is blocked on something that will
+// never finish (a GUI dialog nobody can see, a socket to a black hole). Without
+// this the spawn promise only settles on `close`, which never comes -- a mute
+// spinner forever. Shared by both spawners so Windows gets the same protection.
+function createStallWatchdog({ child, emit, stageName, stallTimeoutMs }) {
+  const stallMs = stallTimeoutMs || STAGE_STALL_TIMEOUT_MS
+  const watchdog = { stalled: false }
+  let stallTimer = null
+  let killTimer = null
+
+  const onStall = () => {
+    watchdog.stalled = true
+    emit &&
+      emit({
+        type: 'log',
+        stage: stageName,
+        stream: 'stderr',
+        line: `[bootstrap] stage "${stageName}" produced no output for ${describeDuration(stallMs)} — giving up on it`
+      })
+    try {
+      child.kill('SIGTERM')
+    } catch {
+      void 0
+    }
+    // SIGTERM is a request; a wedged child can ignore it.
+    killTimer = setTimeout(() => {
+      try {
+        child.kill('SIGKILL')
+      } catch {
+        void 0
+      }
+    }, STALL_KILL_GRACE_MS)
+    if (killTimer.unref) killTimer.unref()
+  }
+
+  // Called on every chunk of output: the child is alive, restart the clock.
+  watchdog.touch = () => {
+    if (watchdog.stalled) return
+    if (stallTimer) clearTimeout(stallTimer)
+    stallTimer = setTimeout(onStall, stallMs)
+    if (stallTimer.unref) stallTimer.unref()
+  }
+
+  watchdog.stop = () => {
+    if (stallTimer) clearTimeout(stallTimer)
+    if (killTimer) clearTimeout(killTimer)
+  }
+
+  watchdog.touch()
+  return watchdog
+}
+
+function spawnBash(scriptPath, args, { emit, stageName, abortSignal, hermesHome, stallTimeoutMs } = {}) {
   return new Promise((resolve, reject) => {
     const child = spawn('bash', [scriptPath, ...args], {
       stdio: ['ignore', 'pipe', 'pipe'],
@@ -396,11 +480,16 @@ function spawnBash(scriptPath, args, { emit, stageName, abortSignal, hermesHome 
       }
     }
 
+    const watchdog = createStallWatchdog({ child, emit, stageName, stallTimeoutMs })
+    const armStallTimer = watchdog.touch
+    const clearTimers = watchdog.stop
+
     child.stdout.setEncoding('utf8')
     child.stderr.setEncoding('utf8')
 
     let stdoutBuf = ''
     child.stdout.on('data', chunk => {
+      armStallTimer()
       stdout += chunk
       stdoutBuf += chunk
       let nl
@@ -413,6 +502,7 @@ function spawnBash(scriptPath, args, { emit, stageName, abortSignal, hermesHome 
 
     let stderrBuf = ''
     child.stderr.on('data', chunk => {
+      armStallTimer()
       stderr += chunk
       stderrBuf += chunk
       let nl
@@ -424,15 +514,19 @@ function spawnBash(scriptPath, args, { emit, stageName, abortSignal, hermesHome 
     })
 
     child.on('error', err => {
+      clearTimers()
       if (abortSignal) abortSignal.removeEventListener('abort', onAbort)
       reject(err)
     })
 
     child.on('close', (code, signal) => {
+      clearTimers()
       if (abortSignal) abortSignal.removeEventListener('abort', onAbort)
       if (stdoutBuf) emit && emit({ type: 'log', stage: stageName, line: stdoutBuf, stream: 'stdout' })
       if (stderrBuf) emit && emit({ type: 'log', stage: stageName, line: stderrBuf, stream: 'stderr' })
-      resolve({ stdout, stderr, code, signal, killed })
+      const result = { stdout, stderr, code, signal, killed: killed || watchdog.stalled }
+      if (watchdog.stalled) result.stalled = true
+      resolve(result)
     })
   })
 }
@@ -518,7 +612,17 @@ function parseStageResult(stdout) {
   return null
 }
 
-async function runStage({ scriptPath, installerKind, stage, emit, hermesHome, activeRoot, abortSignal, installStamp }) {
+async function runStage({
+  scriptPath,
+  installerKind,
+  stage,
+  emit,
+  hermesHome,
+  activeRoot,
+  abortSignal,
+  installStamp,
+  logPath
+}) {
   const startedAt = Date.now()
   emit({ type: 'stage', name: stage.name, state: 'running' })
 
@@ -540,6 +644,20 @@ async function runStage({ scriptPath, installerKind, stage, emit, hermesHome, ac
   })
 
   const durationMs = Date.now() - startedAt
+
+  // Order matters: a stall kills the child, so `killed` is set too. Report the
+  // real reason rather than blaming the user for a cancel they never made.
+  if (result.stalled) {
+    const ev = {
+      type: 'stage',
+      name: stage.name,
+      state: 'failed',
+      durationMs,
+      error: stallErrorMessage(stage.name, STAGE_STALL_TIMEOUT_MS, logPath)
+    }
+    emit(ev)
+    return ev
+  }
 
   if (result.killed) {
     const ev = { type: 'stage', name: stage.name, state: 'failed', durationMs, error: 'cancelled by user' }
@@ -690,7 +808,8 @@ async function runBootstrap(opts) {
         hermesHome,
         activeRoot,
         abortSignal,
-        installStamp
+        installStamp,
+        logPath: runLog.path
       })
       if (ev.state === 'failed') {
         emit({ type: 'failed', stage: stage.name, error: ev.error || 'stage failed' })
@@ -721,6 +840,9 @@ async function runBootstrap(opts) {
 module.exports = {
   runBootstrap,
   // Exposed for testability
+  spawnBash,
+  stallErrorMessage,
+  STAGE_STALL_TIMEOUT_MS,
   parseStageResult,
   resolveLocalInstallScript,
   resolveInstallScript,
