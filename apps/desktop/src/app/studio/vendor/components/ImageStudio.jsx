@@ -17,6 +17,7 @@ import {
   getI2IModelById,
 } from "../models.js";
 import { libraryImageEntries } from "./library-images";
+import { resolveModeModel } from "./mode-model-memory";
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -954,6 +955,10 @@ export default function ImageStudio({
   // finishes normally (addToHistory and onGenerationComplete are
   // unconditional) — only the visible canvas write respects recency.
   const latestJobIdRef = useRef(null);
+  // Last model the user picked by hand in each mode. Adding or removing a
+  // reference image flips the mode, and without this the flip would silently
+  // hand them the mode's first model instead of the one they chose.
+  const lastPickedModelRef = useRef({ t2i: null, i2i: null });
 
   // ── Close dropdown on outside click ─────────────────────────────────────
   useEffect(() => {
@@ -974,7 +979,12 @@ export default function ImageStudio({
       if (stored) {
         const data = JSON.parse(stored);
         if (data.imageMode !== undefined) setImageMode(data.imageMode);
-        if (data.selectedModelId) setSelectedModelId(data.selectedModelId);
+        if (data.selectedModelId) {
+          setSelectedModelId(data.selectedModelId);
+          // Treat the restored model as that mode's remembered pick, so the
+          // first upload after a restart keeps it too.
+          lastPickedModelRef.current[data.imageMode ? "i2i" : "t2i"] = data.selectedModelId;
+        }
         if (data.selectedModelName) setSelectedModelName(data.selectedModelName);
         if (data.selectedAr) setSelectedAr(data.selectedAr);
         if (data.selectedQuality) setSelectedQuality(data.selectedQuality);
@@ -1114,7 +1124,7 @@ export default function ImageStudio({
       setUploadedImageUrls(newUrls);
 
       if (!imageMode) {
-        const firstI2I = i2iModels[0];
+        const firstI2I = resolveModeModel(lastPickedModelRef.current.i2i, i2iModels);
         const ars = getAspectRatiosForI2IModel(firstI2I.id);
         const resolutions = getResolutionsForI2IModel(firstI2I.id);
         const effects = getEffectsForI2IModel(firstI2I.id);
@@ -1133,7 +1143,7 @@ export default function ImageStudio({
   const handleUploadClear = useCallback(() => {
     setUploadedImageUrls([]);
     setImageMode(false);
-    const firstT2I = t2iModels[0];
+    const firstT2I = resolveModeModel(lastPickedModelRef.current.t2i, t2iModels);
     const ars = getAspectRatiosForModel(firstT2I.id);
     const resolutions = getResolutionsForModel(firstT2I.id);
     setSelectedModelId(firstT2I.id);
@@ -1146,6 +1156,7 @@ export default function ImageStudio({
 
   // ── Model selection ──────────────────────────────────────────────────────
   const handleModelSelect = (m) => {
+    lastPickedModelRef.current[imageMode ? "i2i" : "t2i"] = m.id;
     const ars = imageMode
       ? getAspectRatiosForI2IModel(m.id)
       : getAspectRatiosForModel(m.id);
