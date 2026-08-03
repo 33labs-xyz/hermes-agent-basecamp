@@ -78,7 +78,13 @@ const NATIVE_DEPS = [
 // workspace's hoisted layout) and shipped via the same extraResources copy;
 // auto-updater.cjs falls back to requiring from
 // process.resourcesPath/native-deps/node_modules when the bare require fails.
-const MODULE_TREES = ['electron-updater']
+//
+// tesseract.js is staged the same way: electron/ocr.cjs reads text out of
+// images uploaded as project knowledge, and it runs in the main process
+// because the packaged renderer (file:// + sandbox) cannot load tesseract's
+// worker or wasm.  tesseract.js-core carries the wasm binaries and comes along
+// as a transitive dependency.
+const MODULE_TREES = ['electron-updater', 'tesseract.js']
 
 // node_modules search roots, in resolution order.  Workspace dedup hoists
 // everything flat into the repo root; the app-local dir is a fallback for any

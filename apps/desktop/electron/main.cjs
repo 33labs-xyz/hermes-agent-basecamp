@@ -5886,6 +5886,24 @@ registerStudioIpc({ ipcMain, app, safeStorage })
 
   ipcMain.handle('provider:balance', (_event, slug) => resolveProviderBalance(String(slug || '')))
 
+// Project knowledge is plain text, so an uploaded image only counts for the
+// words inside it. OCR runs here rather than in the renderer, which is sandboxed
+// and loaded from file:// -- tesseract's worker and wasm cannot load there.
+// Returns { text } or { error: <code> }; the renderer maps the code to copy.
+ipcMain.handle('knowledge:ocr', async (_event, bytes) => {
+  const { extractImageText } = require('./ocr.cjs')
+
+  try {
+    const text = await extractImageText(bytes, {
+      cachePath: path.join(app.getPath('userData'), 'ocr')
+    })
+
+    return { text }
+  } catch (error) {
+    return { error: error?.code || 'failed' }
+  }
+})
+
 const terminalSessionsIpc = registerTerminalSessionsIpc({ ipcMain, app })
 
 ipcMain.handle('hermes:saveImageFromUrl', (_event, url) => saveImageFromUrl(String(url || '')))

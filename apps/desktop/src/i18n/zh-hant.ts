@@ -1309,6 +1309,12 @@ export const zhHant = defineLocale({
         knowledgeDeleteFailed: '無法移除知識',
         removeFile: '移除',
         fileTooLarge: '檔案過大（最多 200,000 個字元）',
+        fileUnsupported: '該類型的檔案無法加入為知識。請嘗試文字、Markdown、程式碼、CSV、PDF、Word 或圖片。',
+        fileUnreadable: '無法從該檔案讀取文字',
+        imageScopeHint:
+          '圖片會透過文字辨識讀取，只會保存其中找到的文字。代理看不到圖片本身，因此沒有文字的照片或圖表無法使用。',
+        imageTextAdded: '已保存從該圖片讀取的文字（不含圖片本身）',
+        imageNoText: '該圖片中找不到文字。只能保存圖片中的文字，無法保存圖片本身。',
         fileBytes: chars => `${chars.toLocaleString()} 個字元`
       }
     },

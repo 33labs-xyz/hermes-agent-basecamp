@@ -46,6 +46,25 @@ test('stage-native-deps runs and stages electron-updater with runnable entry cod
   )
 })
 
+test('stage-native-deps stages tesseract.js with its worker and wasm core', () => {
+  // electron/ocr.cjs requires tesseract.js from the staged tree in a packaged
+  // build. The worker script and the wasm core are loaded from disk at runtime,
+  // so a manifest-only copy would fault the first time a user uploads an image.
+  const tesseractDir = path.join(STAGED_MODULES, 'tesseract.js')
+  assert.ok(
+    fs.existsSync(path.join(tesseractDir, 'package.json')),
+    'tesseract.js/package.json is staged'
+  )
+  assert.ok(
+    fs.existsSync(path.join(tesseractDir, 'src', 'worker-script', 'node', 'index.js')),
+    'the tesseract.js node worker script is staged'
+  )
+  assert.ok(
+    fs.existsSync(path.join(STAGED_MODULES, 'tesseract.js-core', 'package.json')),
+    'tesseract.js-core (the wasm engine) is staged'
+  )
+})
+
 test('stage-native-deps stages a representative slice of the transitive tree', () => {
   // If tree resolution regresses to "electron-updater only", these disappear.
   for (const dep of ['builder-util-runtime', 'js-yaml', 'semver', 'lodash.isequal']) {
@@ -60,10 +79,19 @@ test('staged tree has no missing transitive prod dependencies', () => {
   // Every prod dependency named anywhere in the staged tree must itself be
   // present -- otherwise a require() inside electron-updater faults at runtime
   // in the packaged app, which is exactly the class of bug this staging fixes.
+  // A @scope directory is not a package -- its children are, so descend one
+  // level into it to get the real package names.
   const names = fs
     .readdirSync(STAGED_MODULES, { withFileTypes: true })
     .filter(entry => entry.isDirectory())
-    .map(entry => entry.name)
+    .flatMap(entry =>
+      entry.name.startsWith('@')
+        ? fs
+            .readdirSync(path.join(STAGED_MODULES, entry.name), { withFileTypes: true })
+            .filter(scoped => scoped.isDirectory())
+            .map(scoped => `${entry.name}/${scoped.name}`)
+        : [entry.name]
+    )
   const staged = new Set(names)
 
   for (const name of names) {

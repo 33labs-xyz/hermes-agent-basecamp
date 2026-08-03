@@ -133,6 +133,7 @@ declare global {
       // Titlebar credit chip: fetch one configured provider's balance in the main
       // process. Only a number and a status cross the bridge; the key never does.
       providerBalance?: (slug: string) => Promise<{ balance: number | null; status: 'ok' | 'unavailable' | 'unsupported' }>
+      knowledgeOcr?: (bytes: ArrayBuffer) => Promise<{ text?: string; error?: string }>
       // Generative-AI Studio: OS-encrypted Muapi key, CORS-bypass HTTP proxy,
       // and the on-disk local generation library. Optional so non-desktop or
       // older preload builds degrade gracefully.

@@ -1355,6 +1355,13 @@ export const ja = defineLocale({
         knowledgeDeleteFailed: 'ナレッジを削除できませんでした',
         removeFile: '削除',
         fileTooLarge: 'ファイルが大きすぎます（最大200,000文字）',
+        fileUnsupported:
+          'この形式のファイルはナレッジに追加できません。テキスト、Markdown、コード、CSV、PDF、Word、画像をお試しください。',
+        fileUnreadable: 'このファイルからテキストを読み取れませんでした',
+        imageScopeHint:
+          '画像は文字認識で読み取られ、見つかった文字だけが保存されます。エージェントは画像そのものを見ないため、文字のない写真や図は利用できません。',
+        imageTextAdded: '画像から読み取ったテキストを保存しました（画像自体は保存されません）',
+        imageNoText: 'この画像から文字が見つかりませんでした。保存できるのは画像内の文字だけで、画像そのものではありません。',
         fileBytes: chars => `${chars.toLocaleString()} 文字`
       }
     },

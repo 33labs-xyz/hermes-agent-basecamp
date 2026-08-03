@@ -1436,6 +1436,12 @@ export const zh: Translations = {
         knowledgeDeleteFailed: '无法移除知识',
         removeFile: '移除',
         fileTooLarge: '文件过大（最多 200,000 个字符）',
+        fileUnsupported: '该类型的文件无法添加为知识。请尝试文本、Markdown、代码、CSV、PDF、Word 或图片。',
+        fileUnreadable: '无法从该文件中读取文本',
+        imageScopeHint:
+          '图片会通过文字识别读取，只保存其中找到的文字。智能体看不到图片本身，因此没有文字的照片或图表无法使用。',
+        imageTextAdded: '已保存从该图片中读取的文字（不含图片本身）',
+        imageNoText: '该图片中未找到文字。只能保存图片中的文字，无法保存图片本身。',
         fileBytes: chars => `${chars.toLocaleString()} 个字符`,
         subtitle: '将相关聊天归组，再添加每个聊天都会用到的指令和知识。',
         chatCount: count => `${count} 个聊天`,

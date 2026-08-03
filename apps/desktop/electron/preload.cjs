@@ -172,6 +172,9 @@ contextBridge.exposeInMainWorld('hermesDesktop', {
   // Titlebar credit chip: fetch one configured provider's balance in the main
   // process. Returns a number plus a status; the provider key never crosses here.
   providerBalance: slug => ipcRenderer.invoke('provider:balance', slug),
+  // Project knowledge: read the text out of an uploaded image. OCR runs in the
+  // main process because this renderer is sandboxed and file://-loaded.
+  knowledgeOcr: bytes => ipcRenderer.invoke('knowledge:ocr', bytes),
   // Generative-AI Studio: Muapi key + CORS-bypass proxy + local library.
   studio: {
     getKey: () => ipcRenderer.invoke('studio:key:get'),

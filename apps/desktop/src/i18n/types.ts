@@ -977,6 +977,11 @@ export interface Translations {
         knowledgeDeleteFailed: string
         removeFile: string
         fileTooLarge: string
+        fileUnsupported: string
+        fileUnreadable: string
+        imageScopeHint: string
+        imageTextAdded: string
+        imageNoText: string
         fileBytes: (chars: number) => string
         subtitle: string
         chatCount: (count: number) => string

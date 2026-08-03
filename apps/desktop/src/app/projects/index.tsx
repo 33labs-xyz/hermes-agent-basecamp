@@ -43,6 +43,8 @@ import {
 } from '@/hermes'
 import { useI18n } from '@/i18n'
 import { ArrowUp, Brain, ChevronDown, ChevronLeft, FolderOpen, MoreHorizontal, Pencil, Plus, Trash2 } from '@/lib/icons'
+import { knowledgeAddedMessageKey, knowledgeFailureMessageKey } from '@/lib/knowledge-feedback'
+import { KNOWLEDGE_ACCEPT, classifyKnowledgeFile, extractKnowledgeText } from '@/lib/knowledge-files'
 import { formatModelStatusLabel } from '@/lib/model-status-label'
 import { projectMemberTitle } from '@/lib/project-session-title'
 import { cn } from '@/lib/utils'
@@ -1091,7 +1093,7 @@ function KnowledgeSection({
     }
   }, [project.id, p.knowledgeLoadFailed])
 
-  async function add(content: string, fileName: string, contentType?: string) {
+  async function add(content: string, fileName: string, contentType?: string, successMessage?: string) {
     if (content.length > KNOWLEDGE_CONTENT_MAX) {
       notify({ durationMs: 3_000, kind: 'error', message: p.fileTooLarge })
 
@@ -1106,7 +1108,7 @@ function KnowledgeSection({
       setPaste('')
       setName('')
       onAddingChange(false)
-      notify({ durationMs: 2_000, kind: 'success', message: p.knowledgeAdded })
+      notify({ durationMs: 2_000, kind: 'success', message: successMessage ?? p.knowledgeAdded })
     } catch (err) {
       notifyError(err, p.knowledgeAddFailed)
     } finally {
@@ -1133,8 +1135,23 @@ function KnowledgeSection({
       return
     }
 
-    const text = await file.text()
-    await add(text, file.name, file.type || 'text/plain')
+    setBusy(true)
+
+    let text: string
+
+    try {
+      text = await extractKnowledgeText(file)
+    } catch (err) {
+      notify({ durationMs: 4_000, kind: 'error', message: p[knowledgeFailureMessageKey(file.name, file.type, err)] })
+
+      return
+    } finally {
+      setBusy(false)
+    }
+
+    // Extracted PDF/DOCX/image text is stored as plain text, whatever the source was.
+    const contentType = classifyKnowledgeFile(file.name, file.type) === 'text' ? file.type || 'text/plain' : 'text/plain'
+    await add(text, file.name, contentType, p[knowledgeAddedMessageKey(file.name, file.type)])
   }
 
   async function remove(fileId: string) {
@@ -1192,13 +1209,16 @@ function KnowledgeSection({
               {p.addFile}
             </Button>
             <input
-              accept=".txt,.md,.markdown,.mdx,.text,text/*"
+              accept={KNOWLEDGE_ACCEPT}
               className="hidden"
               onChange={event => void onFilePicked(event)}
               ref={fileInputRef}
               type="file"
             />
           </div>
+          <p className="text-[length:var(--conversation-caption-font-size)] leading-(--conversation-caption-line-height) text-(--ui-text-tertiary)">
+            {p.imageScopeHint}
+          </p>
           <Textarea
             aria-label={p.pasteLabel}
             onChange={event => setPaste(event.target.value)}

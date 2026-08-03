@@ -1250,6 +1250,12 @@ export const en: Translations = {
         knowledgeDeleteFailed: 'Could not remove knowledge',
         removeFile: 'Remove',
         fileTooLarge: 'File too large (max 200,000 characters)',
+        fileUnsupported: 'That file type cannot be added as knowledge. Try text, markdown, code, CSV, PDF, Word or an image.',
+        fileUnreadable: 'No text could be read from that file',
+        imageScopeHint:
+          'Images are read with text recognition: only the words found in them are saved. The agent never sees the picture, so photos and diagrams without text will not work.',
+        imageTextAdded: 'Saved the text read from that image (not the image itself)',
+        imageNoText: 'No text was found in that image. Only words in an image can be saved, not the picture.',
         fileBytes: chars => `${chars.toLocaleString()} chars`,
         subtitle: 'Group related chats, then add instructions and knowledge the agent uses in every chat.',
         chatCount: count => `${count} ${count === 1 ? 'chat' : 'chats'}`,
