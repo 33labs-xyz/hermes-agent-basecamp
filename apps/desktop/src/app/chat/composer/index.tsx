@@ -1598,7 +1598,14 @@ export function ChatBar({
     }
 
     const text = draftRef.current
-    const payloadPresent = text.trim().length > 0 || attachments.length > 0
+    // Read the store LIVE, for the same reason the DOM re-sync above exists.
+    // The render-scoped `attachments` lags a store write by a render, and the
+    // project handoff writes it in the draft-swap effect then calls submitDraft
+    // from the auto-send effect in the SAME commit — so the render value is
+    // still the pre-mount empty array and dropped files would vanish between
+    // "attached" and "sent".
+    const liveAttachments = $composerAttachments.get()
+    const payloadPresent = text.trim().length > 0 || liveAttachments.length > 0
 
     if (queueEdit) {
       exitQueuedEdit('save')
@@ -1610,7 +1617,7 @@ export function ChatBar({
       // busy guard for commands that genuinely need an idle session (skill
       // /send directives).  Queuing them would make every slash command wait
       // for the current turn to finish, which is how the TUI never behaves.
-      if (!attachments.length && SLASH_COMMAND_RE.test(text.trim())) {
+      if (!liveAttachments.length && SLASH_COMMAND_RE.test(text.trim())) {
         triggerHaptic('submit')
         clearDraft()
         dispatchSubmit(text)
@@ -1625,7 +1632,7 @@ export function ChatBar({
     } else if (!payloadPresent && queuedPrompts.length > 0) {
       void drainNextQueued()
     } else if (payloadPresent) {
-      const submittedAttachments = cloneAttachments(attachments)
+      const submittedAttachments = cloneAttachments(liveAttachments)
       triggerHaptic('submit')
       resetBrowseState(sessionId)
       clearDraft()
