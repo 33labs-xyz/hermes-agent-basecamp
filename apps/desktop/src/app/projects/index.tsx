@@ -44,20 +44,18 @@ import {
 import { useI18n } from '@/i18n'
 import { ArrowUp, Brain, ChevronDown, ChevronLeft, FolderOpen, MoreHorizontal, Pencil, Plus, Trash2 } from '@/lib/icons'
 import { knowledgeAddedMessageKey, knowledgeFailureMessageKey } from '@/lib/knowledge-feedback'
-import { KNOWLEDGE_ACCEPT, classifyKnowledgeFile, extractKnowledgeText } from '@/lib/knowledge-files'
+import { classifyKnowledgeFile, extractKnowledgeText, KNOWLEDGE_ACCEPT } from '@/lib/knowledge-files'
 import { formatModelStatusLabel } from '@/lib/model-status-label'
 import { projectMemberTitle } from '@/lib/project-session-title'
 import { cn } from '@/lib/utils'
-import { $composerAttachments, clearComposerAttachments, stashSessionDraft } from '@/store/composer'
+import { $composerAttachments, clearComposerAttachments } from '@/store/composer'
 import { notify, notifyError } from '@/store/notifications'
 import {
   $projects,
   $projectSessionMeta,
   $projectsLoading,
   deleteProject,
-  ensureProjectMemberSessions,
-  setPendingProjectForNewChat,
-  setProjectHandoffSend
+  ensureProjectMemberSessions
 } from '@/store/projects'
 import {
   $cronSessions,
@@ -72,15 +70,14 @@ import {
 import { AttachmentList } from '../chat/composer/attachments'
 import { ContextMenu } from '../chat/composer/context-menu'
 import type { ChatBarState } from '../chat/composer/types'
-import { UrlDialog } from '../chat/composer/url-dialog'
 import { useComposerActions } from '../chat/hooks/use-composer-actions'
-import { extractComposerDropCandidates } from './composer-drop'
 import { ProjectSettingsDialog } from '../chat/sidebar/project-dialog'
 import { PageSearchShell } from '../page-search-shell'
 import { NEW_CHAT_ROUTE, projectRoute, PROJECTS_ROUTE, sessionRoute } from '../routes'
 import type { SetStatusbarItemGroup } from '../shell/statusbar-controls'
 
-import { buildProjectHandoff } from './project-handoff'
+import { extractComposerDropCandidates } from './composer-drop'
+import { startProjectChat } from './handoff-actions'
 
 // Mirror the backend per-file content cap (_FILE_CONTENT_MAX). Validate here so
 // an oversized paste/upload fails fast with a friendly message instead of a 4xx.
@@ -163,12 +160,10 @@ export function ProjectsView({ setStatusbarItemGroup: _setStatusbarItemGroup, ..
 }
 
 // Arm the one-shot project assignment, then open a blank chat. The next backend
-// session created for a send consumes the arm and lands in this project.
+// session created for a send consumes the arm and lands in this project. No
+// draft means no auto-send — the user gets an empty composer in the project.
 function startNewChat(projectId: string, navigate: (to: string) => void) {
-  setPendingProjectForNewChat(projectId)
-  // Blank chat: assign to the project but never auto-send (no draft to send).
-  setProjectHandoffSend(false)
-  navigate(NEW_CHAT_ROUTE)
+  startProjectChat({ navigate, projectId })
 }
 
 function ProjectsLanding({
@@ -329,21 +324,10 @@ function ProjectComposer({ project }: { project: ChatGroup }) {
   }
 
   function submit() {
-    const handoff = buildProjectHandoff(text, $composerAttachments.get())
-    setPendingProjectForNewChat(project.id)
     // Auto-send when there's a draft OR attachments: the handed-off chat sends
     // on arrival instead of parking a prefilled composer in a blank chat. An
     // empty submit just opens the project's new chat, same as "New chat".
-    setProjectHandoffSend(handoff.shouldSend)
-
-    if (handoff.shouldSend) {
-      stashSessionDraft(null, handoff.draft, handoff.attachments)
-      // The stashed draft owns the attachments now; clear the live atom so they
-      // don't double-apply or linger if the user returns to the launchpad.
-      clearComposerAttachments()
-    }
-
-    navigate(NEW_CHAT_ROUTE)
+    startProjectChat({ attachments: $composerAttachments.get(), navigate, projectId: project.id, text })
   }
 
   function onKeyDown(event: React.KeyboardEvent<HTMLTextAreaElement>) {

@@ -1581,6 +1581,7 @@ export const zh: Translations = {
     ],
     startVoice: '开始语音对话',
     queueMessage: '排队消息',
+    newChat: '新建聊天',
     steer: '引导当前运行',
     stop: '停止',
     send: '发送',

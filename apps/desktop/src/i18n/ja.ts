@@ -1448,6 +1448,7 @@ export const ja = defineLocale({
     ],
     startVoice: '音声会話を開始',
     queueMessage: 'メッセージをキューに入れる',
+    newChat: '新規チャット',
     stop: '停止',
     send: '送信',
     speaking: '話しています',

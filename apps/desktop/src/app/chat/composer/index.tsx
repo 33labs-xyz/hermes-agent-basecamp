@@ -12,6 +12,7 @@ import {
   useRef,
   useState
 } from 'react'
+import { useNavigate } from 'react-router-dom'
 
 import { hermesDirectiveFormatter, type SlashChipKind } from '@/components/assistant-ui/directive-text'
 import { composerFill, composerSurfaceGlass } from '@/components/chat/composer-dock'
@@ -53,11 +54,12 @@ import {
 } from '@/store/composer-queue'
 import { $statusItemsBySession } from '@/store/composer-status'
 import { notify } from '@/store/notifications'
-import { takeProjectHandoffSend } from '@/store/projects'
+import { $projects, takeProjectHandoffSend } from '@/store/projects'
 import { $gatewayState, $messages, setSessionPickerOpen } from '@/store/session'
 import { $threadScrolledUp } from '@/store/thread-scroll'
 import { useTheme } from '@/themes'
 
+import { startProjectChat } from '../../projects/handoff-actions'
 import { extractDroppedFiles, HERMES_PATHS_MIME, partitionDroppedFiles } from '../hooks/use-composer-actions'
 
 import { AttachmentList } from './attachments'
@@ -186,7 +188,17 @@ export function ChatBar({
   const queuedPromptsBySession = useStore($queuedPromptsBySession)
   const statusItemsBySession = useStore($statusItemsBySession)
   const scrolledUp = useStore($threadScrolledUp)
+  const projects = useStore($projects)
+  const navigate = useNavigate()
   const activeQueueSessionKey = queueSessionKey || sessionId || null
+
+  // Project this chat belongs to, if any. Membership is keyed by the STORED
+  // session id, which is exactly what `queueSessionKey` carries. Starting a
+  // second chat from here keeps the user inside their project.
+  const currentProjectId = useMemo(
+    () => (queueSessionKey ? (projects.find(group => group.session_ids.includes(queueSessionKey))?.id ?? null) : null),
+    [projects, queueSessionKey]
+  )
 
   const queuedPrompts = useMemo(
     () => (activeQueueSessionKey ? (queuedPromptsBySession[activeQueueSessionKey] ?? []) : []),
@@ -1624,6 +1636,23 @@ export function ChatBar({
     focusInput()
   }
 
+  // Start a second chat without waiting for this one to finish. A running turn
+  // owns its own session, and the backend happily runs sessions concurrently —
+  // but the composer's only busy affordance is "queue behind the current turn",
+  // which reads as "the model is busy, wait". This is the escape hatch: carry
+  // whatever is typed into a fresh chat in the same project and send it there.
+  const startNewChat = () => {
+    const text = draftRef.current
+    const carried = cloneAttachments($composerAttachments.get())
+
+    triggerHaptic('open')
+    // Clear before navigating so the draft-swap cleanup stashes an empty draft
+    // under this chat's key instead of duplicating the text we just carried.
+    clearDraft()
+    resetBrowseState(sessionId)
+    startProjectChat({ attachments: carried, navigate, projectId: currentProjectId, text })
+  }
+
   // Project handoff auto-send. When a chat opens from a project's launchpad
   // composer that had a draft, that composer armed a one-shot send flag and
   // stashed the draft. The draft-load effect above is earlier in source order,
@@ -1631,8 +1660,14 @@ export function ChatBar({
   // send it in place so the user stays framed in the project instead of landing
   // on a prefilled blank "normal chat box". takeProjectHandoffSend is an atomic
   // read-and-clear, so a StrictMode double-invoke can't send twice.
+  //
+  // The `busy` gate closes a race: if the handoff lands while the previous
+  // session's create round-trip is still open, `useRouteResume` skips the fresh
+  // draft and busy is still true, so submitDraft() would take the queue branch —
+  // which no-ops on a null queue key and silently eats the armed send. Holding
+  // the arm until busy clears means the send happens a beat later instead.
   useEffect(() => {
-    if (activeQueueSessionKey !== null) {
+    if (activeQueueSessionKey !== null || busy) {
       return
     }
 
@@ -1644,7 +1679,7 @@ export function ChatBar({
     if (hasHandoffPayload && takeProjectHandoffSend()) {
       submitDraft()
     }
-  }, [activeQueueSessionKey]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [activeQueueSessionKey, busy]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const submitUrl = () => {
     const url = urlValue.trim()
@@ -1758,7 +1793,9 @@ export function ChatBar({
       }}
       disabled={disabled}
       hasComposerPayload={hasComposerPayload}
+      inProject={currentProjectId !== null}
       onDictate={dictate}
+      onNewChat={startNewChat}
       onSteer={steerDraft}
       state={state}
       voiceStatus={voiceStatus}

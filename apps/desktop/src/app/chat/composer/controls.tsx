@@ -4,7 +4,7 @@ import { KbdCombo } from '@/components/ui/kbd'
 import { Tip } from '@/components/ui/tooltip'
 import { useI18n } from '@/i18n'
 import { triggerHaptic } from '@/lib/haptics'
-import { AudioLines, Layers3, Loader2, Square, SteeringWheel } from '@/lib/icons'
+import { AudioLines, Layers3, Loader2, Plus, Square, SteeringWheel } from '@/lib/icons'
 import { formatCombo } from '@/lib/keybinds/combo'
 import { cn } from '@/lib/utils'
 
@@ -46,9 +46,11 @@ export function ComposerControls({
   conversation,
   disabled,
   hasComposerPayload,
+  inProject,
   state,
   voiceStatus,
   onDictate,
+  onNewChat,
   onSteer
 }: {
   busy: boolean
@@ -58,13 +60,16 @@ export function ComposerControls({
   conversation: ConversationProps
   disabled: boolean
   hasComposerPayload: boolean
+  inProject: boolean
   state: ChatBarState
   voiceStatus: VoiceStatus
   onDictate: () => void
+  onNewChat: () => void
   onSteer: () => void
 }) {
   const { t } = useI18n()
   const c = t.composer
+  const newChatLabel = inProject ? t.sidebar.projects.page.newChat : c.newChat
   const steerCombo = formatCombo('mod+enter')
   const steerLabel = `${c.steer} (${steerCombo})`
 
@@ -84,6 +89,25 @@ export function ComposerControls({
   return (
     <div className="ml-auto flex shrink-0 items-center gap-(--composer-control-gap)">
       <ModelPill disabled={disabled} model={state.model} />
+      {/* While a turn is running, the send button becomes "queue behind this
+          turn". Sessions run concurrently, so offer the other option too:
+          start a second chat (in the same project, when this chat is in one)
+          and carry whatever is typed over to it. */}
+      {busy && (
+        <Tip label={newChatLabel}>
+          <Button
+            aria-label={newChatLabel}
+            className={GHOST_ICON_BTN}
+            disabled={disabled}
+            onClick={onNewChat}
+            size="icon"
+            type="button"
+            variant="ghost"
+          >
+            <Plus size={16} />
+          </Button>
+        </Tip>
+      )}
       {/* While the agent runs and the user is typing, steer takes over the mic's
           slot rather than crowding the row with an extra button. */}
       {canSteer ? (
