@@ -340,13 +340,30 @@ const StatusRow: FC<{ children: ReactNode; label: string } & React.ComponentProp
 // Fixed label while auto-compaction runs — decoupled from backend status text.
 const COMPACTION_LABEL = 'Summarizing thread'
 
+// Id of the user message that started the in-flight turn. Used to key the
+// turn's elapsed timers so a session switch (which remounts the thread)
+// resumes the count instead of restarting at zero; a new turn always has a
+// new user message id, so the next turn starts a fresh timer.
+const latestUserMessageId = (messages: readonly unknown[]): string | null => {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const message = messages[i] as { id?: string; role?: string }
+
+    if (message.role === 'user') {
+      return message.id ?? null
+    }
+  }
+
+  return null
+}
+
 const CompactionHint: FC = () => (
   <span className="shimmer min-w-0 truncate text-muted-foreground/55">{COMPACTION_LABEL}</span>
 )
 
 const ResponseLoadingIndicator: FC = () => {
   const { t } = useI18n()
-  const elapsed = useElapsedSeconds()
+  const turnUserId = useAuiState(s => latestUserMessageId(s.thread.messages))
+  const elapsed = useElapsedSeconds(true, turnUserId ? `turn:${turnUserId}` : undefined)
   const compacting = useStore($compactionActive)
 
   return (
@@ -375,6 +392,7 @@ const STREAM_STALL_S = 2
 // so that per-token updates re-render only this leaf, not the whole
 // AssistantMessage subtree.
 const StreamStallIndicator: FC = () => {
+  const messageId = useAuiState(s => s.message.id)
   const activity = useAuiState(s => {
     let textLength = 0
 
@@ -400,7 +418,7 @@ const StreamStallIndicator: FC = () => {
   }, [activity])
 
   const active = stalled || compacting
-  const elapsed = useElapsedSeconds(active)
+  const elapsed = useElapsedSeconds(active, `stall:${messageId}`)
 
   if (!active) {
     return null
@@ -864,17 +882,7 @@ const UserMessage: FC<{
   const messageText = messageContentText(content)
   const threadRunning = useAuiState(s => s.thread.isRunning)
 
-  const latestUserId = useAuiState(s => {
-    for (let i = s.thread.messages.length - 1; i >= 0; i--) {
-      const message = s.thread.messages[i] as { id?: string; role?: string }
-
-      if (message.role === 'user') {
-        return message.id ?? null
-      }
-    }
-
-    return null
-  })
+  const latestUserId = useAuiState(s => latestUserMessageId(s.thread.messages))
 
   const attachmentRefs = useAuiState(s => {
     const custom = (s.message.metadata?.custom ?? {}) as { attachmentRefs?: unknown }
