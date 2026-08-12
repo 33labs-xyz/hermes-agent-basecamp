@@ -3430,6 +3430,21 @@ def _make_agent(
     if isinstance(model_override, dict) and model_override.get("model"):
         model = str(model_override.get("model") or "")
         requested_provider = model_override.get("provider") or provider_override or None
+        if not requested_provider:
+            # A provider-less override (the desktop composer keeps a sticky
+            # model but clears its provider when a stored session is opened)
+            # would otherwise inherit config.yaml's provider, POSTing e.g. an
+            # OpenRouter slug to api.anthropic.com -> "HTTP 404: model: ..."
+            # on the first turn. Detect the provider from the model id
+            # instead; detection returns None when the config provider
+            # already serves the model, so the healthy path is unchanged.
+            from hermes_cli.models import detect_provider_for_model
+
+            detected = detect_provider_for_model(
+                model, str((cfg.get("model") or {}).get("provider") or "")
+            )
+            if detected:
+                requested_provider, model = detected
         override_base_url = model_override.get("base_url")
         override_api_key = model_override.get("api_key")
         override_api_mode = model_override.get("api_mode")

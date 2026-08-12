@@ -567,3 +567,102 @@ def test_make_agent_no_project_context_leaves_base_prompt_unchanged():
         _make_agent("sid-plain", "key-plain")
 
         assert mock_agent.call_args.kwargs["ephemeral_system_prompt"] == "base prompt"
+
+
+def test_make_agent_detects_provider_for_provider_less_override():
+    """A session model override with no provider must not fall back to the
+    global config provider.
+
+    Regression for the desktop report: opening a stored session clears the
+    composer's provider but keeps its sticky model, so ``session.create``
+    ships ``{"model": "moonshotai/kimi-k3"}`` with no provider. Without
+    detection, ``resolve_runtime_provider`` falls back to config.yaml's
+    ``provider: anthropic`` and the OpenRouter slug is POSTed to
+    api.anthropic.com, producing "HTTP 404: model: moonshotai/kimi-k3" on the
+    first turn of every new session.
+    """
+
+    fake_runtime = {
+        "provider": "openrouter",
+        "base_url": "https://openrouter.ai/api/v1",
+        "api_key": "sk-or-test",
+        "api_mode": "chat_completions",
+        "command": None,
+        "args": None,
+        "credential_pool": None,
+    }
+    fake_cfg = {
+        "agent": {"system_prompt": ""},
+        "model": {"default": "claude-opus-4-7", "provider": "anthropic"},
+    }
+
+    with (
+        patch("tui_gateway.server._load_cfg", return_value=fake_cfg),
+        patch("tui_gateway.server._get_db", return_value=_ungrouped_db()),
+        patch("tui_gateway.server._load_reasoning_config", return_value=None),
+        patch("tui_gateway.server._load_service_tier", return_value=None),
+        patch("tui_gateway.server._load_enabled_toolsets", return_value=None),
+        patch(
+            "hermes_cli.models.detect_provider_for_model",
+            return_value=("openrouter", "moonshotai/kimi-k3"),
+        ) as mock_detect,
+        patch(
+            "hermes_cli.runtime_provider.resolve_runtime_provider",
+            return_value=fake_runtime,
+        ) as mock_resolve,
+        patch("run_agent.AIAgent") as mock_agent,
+    ):
+        from tui_gateway.server import _make_agent
+
+        _make_agent(
+            "sid-kimi",
+            "key-kimi",
+            model_override={"model": "moonshotai/kimi-k3", "provider": None},
+        )
+
+        mock_detect.assert_called_once_with("moonshotai/kimi-k3", "anthropic")
+        assert mock_resolve.call_args.kwargs.get("requested") == "openrouter"
+        assert mock_agent.call_args.kwargs["provider"] == "openrouter"
+        assert mock_agent.call_args.kwargs["model"] == "moonshotai/kimi-k3"
+
+
+def test_make_agent_keeps_explicit_provider_on_override():
+    """Detection must not override an explicit provider from the override."""
+
+    fake_runtime = {
+        "provider": "anthropic",
+        "base_url": "https://api.anthropic.com",
+        "api_key": "sk-test",
+        "api_mode": "anthropic_messages",
+        "command": None,
+        "args": None,
+        "credential_pool": None,
+    }
+    fake_cfg = {
+        "agent": {"system_prompt": ""},
+        "model": {"default": "claude-opus-4-7", "provider": "anthropic"},
+    }
+
+    with (
+        patch("tui_gateway.server._load_cfg", return_value=fake_cfg),
+        patch("tui_gateway.server._get_db", return_value=_ungrouped_db()),
+        patch("tui_gateway.server._load_reasoning_config", return_value=None),
+        patch("tui_gateway.server._load_service_tier", return_value=None),
+        patch("tui_gateway.server._load_enabled_toolsets", return_value=None),
+        patch("hermes_cli.models.detect_provider_for_model") as mock_detect,
+        patch(
+            "hermes_cli.runtime_provider.resolve_runtime_provider",
+            return_value=fake_runtime,
+        ) as mock_resolve,
+        patch("run_agent.AIAgent"),
+    ):
+        from tui_gateway.server import _make_agent
+
+        _make_agent(
+            "sid-explicit",
+            "key-explicit",
+            model_override={"model": "claude-opus-4-7", "provider": "anthropic"},
+        )
+
+        mock_detect.assert_not_called()
+        assert mock_resolve.call_args.kwargs.get("requested") == "anthropic"
