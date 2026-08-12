@@ -26,9 +26,12 @@ name: Release (Electron auto-update)
 # name and break the in-app backend update channel. Dispatching from the branch
 # keeps the stamp = feat/projects, identical to the distributed 0.15.1 build.
 #
-# WINDOWS ONLY by design: Mac auto-update needs Apple code signing (Squirrel.Mac
-# rejects unsigned updates), so this publishes no latest-mac.yml and Mac testers
-# keep installing the .dmg manually until signing is added.
+# WINDOWS ONLY: this workflow builds and uploads the Windows half of a release.
+# The MAC half (Basecamp-<ver>-mac-arm64.{zip,dmg} + blockmaps + latest-mac.yml)
+# is built LOCALLY on a Mac -- see apps/desktop/RELEASING.md -- and uploaded to
+# the SAME v<version> release. Mac auto-update works and depends on it, so a
+# release is NOT finished until the Mac assets are attached; skipping them makes
+# every installed Mac app 404 on latest-mac.yml.
 #
 # UNSIGNED: testers still get a one-time SmartScreen "unknown publisher" prompt on
 # first install; auto-updates after that download and apply in the background.
