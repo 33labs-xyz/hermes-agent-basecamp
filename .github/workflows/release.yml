@@ -70,13 +70,15 @@ jobs:
       - name: Install npm dependencies (workspace root)
         run: npm ci
 
-      - name: Build Electron NSIS installer (no publish)
+      - name: Build Electron NSIS installer + portable ZIP (no publish)
         working-directory: apps/desktop
         # --publish never: build + sign the NSIS installer and write
         # Basecamp-<ver>-win-x64.exe, its .blockmap, and latest.yml into ./release
         # WITHOUT uploading. The next step uploads them deterministically so we
         # avoid electron-builder's lazy-release-creation race that drops assets.
-        run: npm run build && npm run builder -- --win nsis --publish never
+        # The zip target is the "portable, no installer" download the release page
+        # links to; it cannot be cross-built on macOS, so it has to happen here.
+        run: npm run build && npm run builder -- --win nsis zip --publish never
         env:
           # Unsigned tester build: skip code-signing identity discovery so the
           # build never blocks on a missing certificate.
@@ -91,8 +93,9 @@ jobs:
           VERSION=$(node -p "require('./package.json').version")
           TAG="v${VERSION}"
           EXE="release/Basecamp-${VERSION}-win-x64.exe"
+          ZIP="release/Basecamp-${VERSION}-win-x64.zip"
           # Fail loudly if electron-builder did not produce every expected asset.
-          for f in "$EXE" "${EXE}.blockmap" "release/latest.yml"; do
+          for f in "$EXE" "${EXE}.blockmap" "$ZIP" "release/latest.yml"; do
             if [ ! -f "$f" ]; then
               echo "Missing expected artifact: $f"
               ls -la release || true
@@ -110,7 +113,7 @@ jobs:
           fi
           # --clobber makes re-runs overwrite instead of erroring on duplicates.
           gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" --clobber \
-            "$EXE" "${EXE}.blockmap" "release/latest.yml"
+            "$EXE" "${EXE}.blockmap" "$ZIP" "release/latest.yml"
           echo "Uploaded Windows assets to $TAG."
 
       - name: Summary
